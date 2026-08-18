@@ -6,7 +6,7 @@ via Apple's RAW engine.
 
 ## Stack
 
-- Swift + SwiftUI (macOS 14+)
+- Swift + SwiftUI (macOS 26+; Liquid Glass per ADR 0004)
 - Core Image (`CIRAWFilter`) for RAW decode, Metal-backed rendering
 - Vision + Core ML for subject segmentation / depth (portrait blur, relight)
 - Non-destructive: edits live in sidecar files next to originals; originals are never modified

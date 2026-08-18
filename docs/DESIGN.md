@@ -10,9 +10,12 @@ Two views, one window:
 - **Library** — justified rows (photos keep aspect ratio, packed into even-height rows,
   portfolio-style). Toolbar: folder name, count, sort, thumbnail-size slider. Metadata
   appears on hover only. Double-click or ⏎ enters Edit.
-- **Edit** — classic pro layout: photo edge-to-edge on the canvas, fixed right rail
-  (histogram on top, then grouped adjustments: Light / Color / Effects / Detail),
-  session filmstrip along the bottom. Esc returns to Library.
+- **Edit** — hybrid materials (ADR 0004): photo edge-to-edge; opaque graphite right rail
+  (histogram on top, then grouped adjustments: Light / Color / Portrait / Effects / Detail);
+  Liquid Glass filmstrip pill and floating tool palette overlay the photo and fade when
+  idle. Filmstrip and tool palette share one GlassEffectContainer. Esc returns to Library.
+
+Material rule: **glass for what comes and goes, graphite for what you judge color against.**
 
 ## Appearance
 
