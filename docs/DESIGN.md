@@ -10,12 +10,14 @@ Two views, one window:
 - **Library** — justified rows (photos keep aspect ratio, packed into even-height rows,
   portfolio-style). Toolbar: folder name, count, sort, thumbnail-size slider. Metadata
   appears on hover only. Double-click or ⏎ enters Edit.
-- **Edit** — hybrid materials (ADR 0004): photo edge-to-edge; opaque graphite right rail
-  (histogram on top, then grouped adjustments: Light / Color / Portrait / Effects / Detail);
-  Liquid Glass filmstrip pill and floating tool palette overlay the photo and fade when
-  idle. Filmstrip and tool palette share one GlassEffectContainer. Esc returns to Library.
+- **Edit** — photo fills the window; heavy-frost Liquid Glass right rail floats over it
+  (ADR 0006): histogram on a solid graphite plate, then grouped adjustments:
+  Light / Color / Portrait / Effects / Detail. Liquid Glass filmstrip pill and floating
+  tool palette overlay the photo and fade when idle; filmstrip and tool palette share one
+  GlassEffectContainer. Esc returns to Library.
 
-Material rule: **glass for what comes and goes, graphite for what you judge color against.**
+Material rule: **everything floats on glass except what you judge color against — the
+histogram plate is solid, and rail frost is heavy enough to read as material, not photo.**
 
 ## Appearance
 
@@ -28,12 +30,18 @@ photo's colors).
 - Primary text: white at 85% · secondary: white at 50%
 - **Accent — safelight amber `#E8A33D`**: active slider fills, selection borders,
   edited badge, focused control. Used sparingly; never on large surfaces.
-- Typography: SF Pro (system), 11–13pt controls; slider values in SF Mono.
+- Typography: **Geist** for UI chrome (11–13pt controls, wordmark); **Geist Mono** for
+  every numeral — slider values, ƒ-stops, EXIF, histogram labels — with tabular figures.
+  Both bundled in-app (SIL OFL 1.1).
 
 ## Controls
 
+- **Scrub-on-photo is primary** (ADR 0005): arming a parameter turns the canvas into
+  its control surface — horizontal drag or trackpad scroll adjusts it, with a floating
+  glass readout (name, value, scale). Tracking is strictly 1:1 with the gesture; haptic
+  detents at full stops and zero-crossings.
 - Sliders: thin track, amber fill from the neutral default point, scrubbable numeric
-  value at right; double-click resets to default.
+  value at right; hover + scroll adjusts; double-click resets to default.
 - Before/after: hold `\` (press-and-hold, like Lightroom).
 - Filmstrip thumbs: amber border = selected; small amber dot = has edits.
 - Ratings: 1–5 keys in Library and Edit.

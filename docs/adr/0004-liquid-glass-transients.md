@@ -1,6 +1,6 @@
 # ADR 0004: Liquid Glass for transient controls only; macOS 26 target
 
-**Status:** Accepted · 2026-08-18
+**Status:** Accepted · 2026-08-18 · Rail opacity amended by ADR 0006
 
 ## Context
 
