@@ -1,14 +1,14 @@
-# Darkroom v0.1 — Build Spec
+# Chiaro v0.1 — Build Spec
 
 Native macOS 26 app, Swift 6 / SwiftUI, built with SPM (`swift run` for development,
-`scripts/bundle.sh` assembles `Darkroom.app`). Everything below follows ADRs 0001–0006
+`scripts/bundle.sh` assembles `Chiaro.app`). Everything below follows ADRs 0001–0006
 and DESIGN.md.
 
 ## Module map
 
 ```
-Sources/Darkroom/
-  DarkroomApp.swift        @main App; window, activation, theme
+Sources/Chiaro/
+  ChiaroApp.swift        @main App; window, activation, theme
   Theme.swift              colors, fonts, metrics (single source of design tokens)
   Models/
     EditState.swift        the whole edit, Codable (ADR 0003)
@@ -21,7 +21,7 @@ Sources/Darkroom/
     HistogramSampler.swift CIAreaHistogram → [Float] bins
     Exporter.swift         full-res render → JPEG / HEIF / TIFF-16
   Persistence/
-    Sidecar.swift          <name>.darkroom.json read/write, versioned
+    Sidecar.swift          <name>.chiaro.json read/write, versioned
   Views/
     LibraryView.swift      justified rows, selection, ratings
     EditView.swift         canvas + rail + filmstrip composition
@@ -63,7 +63,7 @@ sharpness → portrait (mask blur + relight) → vignette.
 
 ## Sidecar (ADR 0002)
 
-`DSC04002.ARW` → `DSC04002.darkroom.json`, `{ "version": 1, "edit": EditState }`.
+`DSC04002.ARW` → `DSC04002.chiaro.json`, `{ "version": 1, "edit": EditState }`.
 Written debounced (500 ms) after any change; read at library scan. Missing/corrupt
 sidecar ⇒ neutral EditState, never an error dialog.
 
@@ -108,7 +108,7 @@ sidecar ⇒ neutral EditState, never an error dialog.
 ## Export
 
 Sheet: format (JPEG / HEIF / TIFF-16), quality (JPEG/HEIF), destination folder.
-Default: JPEG q0.92 → `<folder>/Darkroom Exports/<name>.jpg`. Color space Display P3.
+Default: JPEG q0.92 → `<folder>/Chiaro Exports/<name>.jpg`. Color space Display P3.
 Batch: exports every selected photo with its own sidecar edits.
 
 ## v0.1 cut line

@@ -10,7 +10,7 @@ survive app reinstalls, and travel with the photos.
 ## Decision
 
 Never modify originals. All edits serialize to a JSON sidecar next to the source file
-(`DSC04002.arw` → `DSC04002.darkroom.json`) containing a versioned `EditState`:
+(`DSC04002.arw` → `DSC04002.chiaro.json`) containing a versioned `EditState`:
 every adjustment parameter, crop, masks, and preset lineage. Rendering is a pure
 function `(RAW, EditState) → image`.
 

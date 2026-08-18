@@ -1,4 +1,6 @@
-# Darkroom
+# Chiaro
+
+Named for the "light" half of chiaroscuro — composing with light against dark.
 
 A native macOS RAW photo editor. Simple, sleek, fast — Lightroom-grade RAW editing
 without the subscription. Built for a Sony RX100 IV (.arw) workflow but camera-agnostic

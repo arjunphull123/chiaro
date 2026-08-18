@@ -4,7 +4,7 @@
 
 ## Context
 
-Darkroom needs to decode 20MB Sony ARW files, render slider adjustments in real time
+Chiaro needs to decode 20MB Sony ARW files, render slider adjustments in real time
 at 5472×3648, and feel like a polished Mac app. Candidate platforms: web app,
 Electron + LibRaw, native macOS.
 

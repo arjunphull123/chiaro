@@ -1,6 +1,6 @@
 # Design
 
-Darkroom is a dark, quiet, photo-first Mac app. The chrome recedes; the photograph is
+Chiaro is a dark, quiet, photo-first Mac app. The chrome recedes; the photograph is
 the interface. One signature color — safelight amber — marks what's active or edited.
 
 ## Structure

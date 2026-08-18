@@ -1,4 +1,4 @@
-# Darkroom
+# Chiaro
 
 A simple, sleek, native macOS RAW photo editor. Point it at a folder of RAW files,
 pick a photo, and edit — non-destructively, at full quality, with no subscription.
