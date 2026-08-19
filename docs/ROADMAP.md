@@ -2,7 +2,8 @@
 
 ## Ship list (v1.0, beyond features — owner's list, 2026-08-19)
 
-Features done → bug sweep → ADRs current → app icon → landing page
+Feature phase declared complete 2026-08-19 (owner). Remaining:
+bug sweep → ADRs current → landing page
 (chiaro.arjunphull.dev) → repo polish → open-source decision + monetization
 framing → distribution (Sparkle/Homebrew/notarization) → LinkedIn launch post
 ("agent-native" framing) → competitive positioning check.
