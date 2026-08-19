@@ -131,7 +131,7 @@ struct RailView: View {
             HStack(spacing: 6) {
                 Chip(title: "Subject", selected: model.edit.blurMode == .subject) { model.setBlurMode(.subject) }
                 Chip(title: "Person", selected: model.edit.blurMode == .person) { model.setBlurMode(.person) }
-                Chip(title: "Lens", selected: model.edit.blurMode == .depth) { model.setBlurMode(.depth) }
+                Chip(title: "Depth ML", selected: model.edit.blurMode == .depth) { model.setBlurMode(.depth) }
             }
             .padding(.bottom, 4)
             if model.edit.blurMode == .depth {
@@ -220,10 +220,76 @@ struct RailView: View {
             .buttonStyle(.plain)
             .clickCursor()
             .help("See the scene in 3D — drag to orbit, grab a handle to move a focus plane")
+            focusOnObjectControl
             AdjustmentRow(parameter: .blurF, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
             AdjustmentRow(parameter: .focusDepth, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
             AdjustmentRow(parameter: .focusRange, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
             AdjustmentRow(parameter: .relight, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
+        }
+    }
+
+    /// SAM-assisted selection: drag a box on the photo, focus wraps the object.
+    @ViewBuilder private var focusOnObjectControl: some View {
+        switch SamModelStore.shared.availability {
+        case .missing:
+            Button("Download selection model (80 MB)") {
+                SamModelStore.shared.downloadIfNeeded()
+            }
+            .buttonStyle(OutlineButtonStyle())
+            .clickCursor()
+            .help("Segment Anything, run on-device — drag a box to focus on any object")
+        case .downloading(let progress):
+            HStack(spacing: 7) {
+                ProgressView(value: progress)
+                    .progressViewStyle(.linear)
+                    .tint(Theme.amber)
+                Text("\(Int(progress * 100))%")
+                    .font(Theme.mono(9)).foregroundStyle(Theme.ink3).monospacedDigit()
+            }
+            .frame(height: 24)
+        case .preparing:
+            Text("Preparing the model…")
+                .font(Theme.ui(10.5)).foregroundStyle(Theme.ink3)
+                .frame(height: 24)
+        case .failed(let message):
+            VStack(alignment: .leading, spacing: 4) {
+                Text(message)
+                    .font(Theme.ui(9.5)).foregroundStyle(Theme.ink3)
+                    .lineLimit(2)
+                Button("Try again") { SamModelStore.shared.downloadIfNeeded() }
+                    .buttonStyle(OutlineButtonStyle())
+                    .clickCursor()
+            }
+        case .ready:
+            Button {
+                model.samPicking.toggle()
+            } label: {
+                HStack(spacing: 7) {
+                    if model.samProcessing {
+                        ProgressView().controlSize(.mini)
+                    } else {
+                        Image(systemName: "rectangle.dashed")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    Text(model.samProcessing ? "Finding the object…" : "Focus on object")
+                        .font(Theme.ui(11, .medium))
+                }
+                .foregroundStyle(model.samPicking ? Theme.amber : Theme.ink2)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 7)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(model.samPicking ? Theme.amber.opacity(0.12) : Color.white.opacity(0.04))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(model.samPicking ? Theme.amber.opacity(0.6) : Theme.hairline)
+                )
+            }
+            .buttonStyle(.plain)
+            .clickCursor()
+            .disabled(model.samProcessing)
+            .help("Drag a box around anything — focus and range wrap its depth")
         }
     }
 

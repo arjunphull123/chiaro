@@ -96,6 +96,9 @@ final class EditViewModel {
     /// Orbit state, shared with the orientation cube.
     var sceneYaw: CGFloat = DepthScene.restYaw
     var scenePitch: CGFloat = DepthScene.restPitch
+    /// SAM selection: while picking, a canvas drag draws the box.
+    var samPicking = false
+    var samProcessing = false
     private var renderGeneration = 0
     private var saveItem: DispatchWorkItem?
     private var saveActivity: NSObjectProtocol?
@@ -177,6 +180,29 @@ final class EditViewModel {
         let url = photo.url
         return await Offload.on(Offload.render) {
             DepthEngine.shared.pointGrid(for: url, image: basePreview)
+        }
+    }
+
+    /// Drag-a-box focus: SAM masks whatever the box covers, and the focus
+    /// plane + range wrap that object's disparity interval.
+    func focusOnObject(box: CGRect) {
+        guard edit.blurMode == .depth, let basePreview, !samProcessing else { return }
+        samProcessing = true
+        let url = photo.url
+        Task { [weak self] in
+            let interval = await Offload.on(Offload.vision) { () -> ClosedRange<Double>? in
+                guard let mask = SamEngine.shared.mask(for: url, image: basePreview, box: box),
+                      let grid = DepthEngine.shared.pointGrid(for: url, image: basePreview) else { return nil }
+                return SamEngine.disparityInterval(mask: mask, grid: grid)
+            }
+            guard let self else { return }
+            self.samProcessing = false
+            guard let interval else { return }
+            // Disparity (1 = near) → focus units (0 = near), padded 25%.
+            let lo = 1 - interval.upperBound
+            let hi = 1 - interval.lowerBound
+            self.edit.focusDepth = ((lo + hi) / 2).clamped(to: 0...1)
+            self.edit.focusRange = (((hi - lo) / 2 / 0.4) * 1.25).clamped(to: 0.04...1)
         }
     }
 

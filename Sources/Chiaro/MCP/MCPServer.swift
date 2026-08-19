@@ -276,6 +276,18 @@ final class MCPServer {
             ],
         ],
         [
+            "name": "set_rating",
+            "description": "Star-rate a photo (0-5). Ratings persist in the sidecar and show in the library — the culling workflow: review previews, rate the keepers.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "name": ["type": "string"],
+                    "rating": ["type": "integer", "minimum": 0, "maximum": 5],
+                ],
+                "required": ["name", "rating"],
+            ],
+        ],
+        [
             "name": "set_edit",
             "description": "Set adjustment values on a photo. Only supplied parameters change. If the photo is open in the editor, the change renders live. Values outside a parameter's range are clamped.",
             "inputSchema": [
@@ -356,6 +368,22 @@ final class MCPServer {
             let p = try photo(args)
             let edit = try JSONSerialization.jsonObject(with: JSONEncoder().encode(p.edit))
             return try text(["name": p.name, "rating": p.rating, "edit": edit])
+        case "set_rating":
+            let p = try photo(args)
+            guard let rating = args["rating"] as? Int, (0...5).contains(rating) else {
+                throw ToolError("rating must be an integer 0-5")
+            }
+            p.rating = rating
+            Sidecar.write(for: p)
+            return try text(["applied": true, "name": p.name, "rating": rating])
+        case "set_rating":
+            let p = try photo(args)
+            guard let rating = args["rating"] as? Int, (0...5).contains(rating) else {
+                throw ToolError("rating must be an integer 0-5")
+            }
+            p.rating = rating
+            Sidecar.write(for: p)
+            return try text(["applied": true, "name": p.name, "rating": rating])
         case "set_edit":
             let p = try photo(args)
             guard let params = args["edit"] as? [String: Any] else { throw ToolError("missing edit object") }
@@ -477,6 +505,7 @@ final class MCPServer {
         case "get_preview": text = "looked at \(name)"
         case "open_photo": text = "opened \(name)"
         case "set_edit": text = (args["intent"] as? String).map { "\(name) — \($0)" } ?? "adjusted \(name)"
+        case "set_rating": text = "rated \(name)"
         case "export": text = "exported \(name)"
         default: text = "\(tool) \(name)"
         }

@@ -27,7 +27,8 @@ struct EditView: View {
         .focused($focused)
         .focusEffectDisabled()
         .onKeyPress(.escape) {
-            if model.depthSceneVisible { model.depthSceneCommand = .exit }
+            if model.samPicking { model.samPicking = false }
+            else if model.depthSceneVisible { model.depthSceneCommand = .exit }
             else if model.cropMode { model.cropMode = false }
             else if model.armed != nil { model.armed = nil }
             else { close() }
