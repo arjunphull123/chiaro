@@ -22,11 +22,10 @@ struct EditView: View {
         }
         .overlay(alignment: .bottom) { navPill.padding(.bottom, 16).padding(.trailing, Theme.railWidth) }
         .overlay(alignment: .topLeading) {
-            backButton.padding(.top, 40).padding(.leading, 14) // below the traffic lights
+            backButton.padding(.top, 10).padding(.leading, 14) // just below the traffic lights
         }
         .overlay(alignment: .topTrailing) {
             HStack(spacing: 8) {
-                ConnectAgentButton()
                 glassIcon("arrow.uturn.backward", disabled: !model.canUndo, help: "Undo (⌘Z)") { model.undo() }
                 glassIcon("arrow.uturn.forward", disabled: !model.canRedo, help: "Redo (⇧⌘Z)") { model.redo() }
                 glassAction("Copy Edits", icon: "doc.on.doc", disabled: model.edit.isNeutral) {

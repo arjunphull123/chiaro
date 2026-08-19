@@ -9,8 +9,16 @@ final class AgentStatus {
     var clientName: String?
     var lastSeen: Date?
 
+    /// HTTP transport is stateless — "connected" means requests arrived recently.
+    /// Window is generous because agents legitimately go quiet while thinking.
     func isConnected(now: Date = Date()) -> Bool {
         guard let lastSeen else { return false }
-        return now.timeIntervalSince(lastSeen) < 180
+        return now.timeIntervalSince(lastSeen) < 600
+    }
+
+    func lastSeenText(now: Date = Date()) -> String? {
+        guard let lastSeen else { return nil }
+        let minutes = Int(now.timeIntervalSince(lastSeen) / 60)
+        return minutes < 1 ? "active now" : "\(minutes)m ago"
     }
 }

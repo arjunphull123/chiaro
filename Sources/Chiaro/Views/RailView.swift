@@ -7,9 +7,9 @@ struct RailView: View {
     let library: Library
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
+        ScrollView(showsIndicators: true) {
             VStack(alignment: .leading, spacing: 12) {
-                if library.agentActive { agentBanner }
+                AgentRailStatus(library: library)
                 Group {
                     photoHeader
                     HistogramView(data: model.histogram)
@@ -32,6 +32,12 @@ struct RailView: View {
             }
             .padding(16)
             .padding(.top, 40)
+        }
+        .overlay(alignment: .bottom) {
+            // Hints that the rail continues below the fold.
+            LinearGradient(colors: [.clear, .black.opacity(0.35)], startPoint: .top, endPoint: .bottom)
+                .frame(height: 26)
+                .allowsHitTesting(false)
         }
         .frame(width: Theme.railWidth)
         .frame(maxHeight: .infinity)
@@ -72,36 +78,6 @@ struct RailView: View {
         }
     }
 
-    /// Agent presence lives at the top of the rail (per user design): locked pill,
-    /// intent beneath, everything below dimmed while the agent drives.
-    private var agentBanner: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(spacing: 8) {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(Theme.amber)
-                Text("AGENT IS EDITING…")
-                    .font(Theme.mono(9, .medium))
-                    .kerning(1.4)
-                    .foregroundStyle(Theme.ink)
-                Spacer()
-                Circle().fill(Theme.amber).frame(width: 6, height: 6)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(RoundedRectangle(cornerRadius: 9).fill(Theme.amber.opacity(0.13)))
-            .overlay(RoundedRectangle(cornerRadius: 9).stroke(Theme.amber.opacity(0.4)))
-            if let intent = library.agentIntent {
-                Text(intent)
-                    .font(Theme.ui(10.5))
-                    .foregroundStyle(Theme.ink2)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 2)
-            }
-        }
-        .transition(.opacity)
-    }
-
     private func section(_ title: String, _ params: [EditParameter], help: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             sectionLabel(title, help: help)
@@ -140,6 +116,7 @@ struct RailView: View {
             Rectangle().fill(Theme.hairline).frame(height: 1)
         }
         .padding(.top, 10)
+        .padding(.bottom, 6)
         .help(help)
     }
 
