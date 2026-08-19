@@ -123,9 +123,11 @@ struct ChiaroApp: App {
                     DispatchQueue.main.async {
                         let scene = DepthScene.build(grid: grid, focusDepth: focus, focusRange: range)
                         scene.background.contents = NSColor(Theme.ground)
+                        let cameraNode = scene.rootNode.childNode(withName: "camera", recursively: false)
+                        cameraNode?.position = SCNVector3(0.99, 0.68, 1.99) // rest orbit pose
                         let renderer = SCNRenderer(device: nil, options: nil)
                         renderer.scene = scene
-                        renderer.pointOfView = scene.rootNode.childNode(withName: "camera", recursively: false)
+                        renderer.pointOfView = cameraNode
                         let image = renderer.snapshot(
                             atTime: 0, with: CGSize(width: 1280, height: 860), antialiasingMode: .multisampling4X)
                         if let tiff = image.tiffRepresentation,

@@ -97,11 +97,10 @@ final class EditViewModel {
     private var basePreview: CIImage?
     private var personMask: CIImage?
     private var maskKind: PortraitEngine.MaskKind = .subject
-    /// 3D depth scene visibility.
+    /// 3D depth scene visibility, and one-shot commands routed to it
+    /// (exit / view presets) — the scene lives behind an NSViewRepresentable.
     var depthSceneVisible = false
-    /// Depth histogram for the focal-range strip (48 bins, 0 near … 1 far).
-    var depthHistogram: [Float]?
-    private var histogramURL: URL?
+    var depthSceneCommand: DepthSceneCommand?
     private var renderGeneration = 0
     private var saveItem: DispatchWorkItem?
     private var saveActivity: NSObjectProtocol?
@@ -135,9 +134,8 @@ final class EditViewModel {
         basePreview = nil
         personMask = nil
         hasPerson = nil
-        depthHistogram = nil
-        histogramURL = nil
         depthSceneVisible = false
+        depthSceneCommand = nil
         isLoading = true
         load()
     }
@@ -184,19 +182,6 @@ final class EditViewModel {
         let url = photo.url
         return await Offload.on(Offload.render) {
             DepthEngine.shared.pointGrid(for: url, image: basePreview)
-        }
-    }
-
-    func loadDepthHistogram() {
-        guard histogramURL != photo.url, let basePreview else { return }
-        histogramURL = photo.url
-        let url = photo.url
-        Task { [weak self] in
-            let grid = await Offload.on(Offload.render) {
-                DepthEngine.shared.pointGrid(for: url, image: basePreview, width: 64)
-            }
-            guard let self, self.photo.url == url else { return }
-            self.depthHistogram = grid?.histogram
         }
     }
 

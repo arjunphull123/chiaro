@@ -20,16 +20,20 @@ struct CanvasView: View {
             ZStack {
                 Color.black.opacity(0.001) // hit target for gestures on empty canvas
                 if model.depthSceneVisible && model.edit.blurMode == .depth {
-                    DepthSceneView(model: model)
+                    DepthSceneView(model: model, fitFraction: fitFraction(in: fitRegion))
                         .frame(width: fitRegion.width, height: fitRegion.height)
                         .position(x: fitRegion.width / 2, y: fitRegion.height / 2)
-                        .overlay(alignment: .bottom) {
-                            Text("drag up or down to move focus · sideways to orbit · scroll for range")
+                        .overlay(alignment: .top) {
+                            Text("drag to orbit · grab a handle to move a plane · scroll for range")
                                 .font(Theme.mono(9))
                                 .foregroundStyle(Theme.ink3)
-                                .padding(.bottom, 46)
-                                .padding(.trailing, Theme.railWidth)
+                                .padding(.top, 56)
                                 .allowsHitTesting(false)
+                        }
+                        .overlay(alignment: .topLeading) {
+                            depthSceneControls
+                                .padding(.top, 48)
+                                .padding(.leading, 16)
                         }
                 } else if let cg = model.showOriginal ? model.originalPreview : model.preview {
                     let imageSize = CGSize(width: cg.width, height: cg.height)
@@ -87,6 +91,44 @@ struct CanvasView: View {
             }
             .onChange(of: model.photo.url) { resetView() }
             .onChange(of: model.cropMode) { resetView() }
+        }
+    }
+
+    /// The flat photo's height as a fraction of the canvas, for the seamless
+    /// head-on camera match in the 3D scene.
+    private func fitFraction(in fitRegion: CGSize) -> CGFloat {
+        guard let cg = model.preview else { return 0.85 }
+        let imageSize = CGSize(width: cg.width, height: cg.height)
+        let fitScale = min(
+            (fitRegion.width - 48) / imageSize.width,
+            (fitRegion.height - 48) / imageSize.height
+        )
+        return imageSize.height * fitScale / fitRegion.height
+    }
+
+    /// Exit and view presets for the 3D scene.
+    private var depthSceneControls: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button { model.depthSceneCommand = .exit } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
+                    Text("Exit 3D")
+                }
+            }
+            .buttonStyle(GlassButtonStyle())
+            .clickCursor()
+            .help("Back to the photo (esc)")
+            ForEach([("Front", DepthSceneCommand.front), ("Left", .left), ("Right", .right), ("Top", .top)], id: \.0) { title, command in
+                Button(title) { model.depthSceneCommand = command }
+                    .buttonStyle(.plain)
+                    .font(Theme.ui(10, .medium))
+                    .foregroundStyle(Theme.ink2)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Color.black.opacity(0.35)))
+                    .overlay(Capsule().stroke(Theme.hairline))
+                    .clickCursor()
+            }
         }
     }
 

@@ -1,32 +1,40 @@
 import SwiftUI
 import SceneKit
 
-/// Spatial focus: the photo as a depth-displaced point cloud seen from an
-/// angle, bounded by two draggable planes — near and far edges of the sharp
-/// zone. Drag a plane to move that boundary, drag between them to move the
-/// whole zone, drag sideways to orbit, scroll for fine range.
-/// AppKit here because SceneKit has no SwiftUI surface.
+/// Spatial focus: the photo as a depth-displaced point cloud, bounded by two
+/// gridded slice planes — the near and far edges of the sharp zone. Drag
+/// anywhere to orbit (a full 180°, plus overhead), grab a plane's handle to
+/// slide it along the depth axis, scroll for symmetric range. Enter and exit
+/// animate through a head-on camera so the cloud dissolves from and back into
+/// the flat photo. AppKit because SceneKit has no SwiftUI surface.
+enum DepthSceneCommand: Equatable {
+    case exit
+    case front, left, right, top
+}
+
 enum DepthScene {
     /// World-space span of the disparity axis.
     static let zSpan: Float = 1.15
     static let amber = NSColor(red: 0.91, green: 0.64, blue: 0.24, alpha: 1)
+    /// The whole rig sits slightly high in frame — the canvas bottom carries chrome.
+    static let sceneLift: CGFloat = 0.09
 
-    /// Tiling grid texture so the boundary planes read as slices of the scene.
+    /// Tiling grid texture: one cell per tile, so the tiling makes the lattice.
     static let gridTexture: NSImage = {
         let size = 256
         let image = NSImage(size: NSSize(width: size, height: size))
         image.lockFocus()
         NSColor.clear.set()
         NSRect(x: 0, y: 0, width: size, height: size).fill()
-        amber.withAlphaComponent(0.42).setStroke()
+        // One vertical + one horizontal line per tile — tiling closes the
+        // lattice without doubled seam lines.
+        amber.withAlphaComponent(0.4).setStroke()
         let path = NSBezierPath()
-        path.lineWidth = 2
-        for i in stride(from: 0, through: size, by: 32) {
-            path.move(to: NSPoint(x: CGFloat(i), y: 0))
-            path.line(to: NSPoint(x: CGFloat(i), y: CGFloat(size)))
-            path.move(to: NSPoint(x: 0, y: CGFloat(i)))
-            path.line(to: NSPoint(x: CGFloat(size), y: CGFloat(i)))
-        }
+        path.lineWidth = 1
+        path.move(to: NSPoint(x: 0.5, y: 0))
+        path.line(to: NSPoint(x: 0.5, y: CGFloat(size)))
+        path.move(to: NSPoint(x: 0, y: 0.5))
+        path.line(to: NSPoint(x: CGFloat(size), y: 0.5))
         path.stroke()
         image.unlockFocus()
         return image
@@ -41,12 +49,12 @@ enum DepthScene {
         camera.zFar = 20
         let cameraNode = SCNNode()
         cameraNode.camera = camera
-        cameraNode.position = SCNVector3(0.95, 0.6, 1.95)
         cameraNode.name = "camera"
         scene.rootNode.addChildNode(cameraNode)
 
         let rig = SCNNode()
         rig.name = "rig"
+        rig.position = SCNVector3(0, sceneLift, 0)
         scene.rootNode.addChildNode(rig)
 
         let constraint = SCNLookAtConstraint(target: rig)
@@ -95,20 +103,20 @@ enum DepthScene {
         cloud.name = "cloud"
         rig.addChildNode(cloud)
 
-        let planeSize = CGSize(width: CGFloat(grid.aspect) * 1.18, height: 1.18)
-        rig.addChildNode(boundaryPlane(name: "near", size: planeSize, emphasis: 1))
-        rig.addChildNode(boundaryPlane(name: "far", size: planeSize, emphasis: 0.55))
+        let planeSize = CGSize(width: CGFloat(grid.aspect) * 1.16, height: 1.16)
+        rig.addChildNode(slicePlane(name: "near", size: planeSize, emphasis: 1))
+        rig.addChildNode(slicePlane(name: "far", size: planeSize, emphasis: 0.6))
 
         updatePlanes(in: scene, focusDepth: focusDepth, focusRange: focusRange)
         return scene
     }
 
-    /// A sharp-zone boundary: translucent amber sheet with a solid frame so
-    /// it reads as a draggable object, not a tint.
-    private static func boundaryPlane(name: String, size: CGSize, emphasis: CGFloat) -> SCNNode {
+    /// A slice of the scene: faint fill, fine lattice, hairline border, and a
+    /// grab handle on the right edge for dragging along the depth axis.
+    private static func slicePlane(name: String, size: CGSize, emphasis: CGFloat) -> SCNNode {
         let sheet = SCNNode(geometry: SCNPlane(width: size.width, height: size.height))
         let sheetMaterial = SCNMaterial()
-        sheetMaterial.diffuse.contents = amber.withAlphaComponent(0.07 * emphasis)
+        sheetMaterial.diffuse.contents = amber.withAlphaComponent(0.06 * emphasis)
         sheetMaterial.lightingModel = .constant
         sheetMaterial.isDoubleSided = true
         sheetMaterial.writesToDepthBuffer = false // never occlude the cloud
@@ -119,11 +127,11 @@ enum DepthScene {
         let grid = SCNNode(geometry: SCNPlane(width: size.width, height: size.height))
         let gridMaterial = SCNMaterial()
         gridMaterial.diffuse.contents = gridTexture
-        gridMaterial.transparency = emphasis
         gridMaterial.diffuse.wrapS = .repeat
         gridMaterial.diffuse.wrapT = .repeat
         gridMaterial.diffuse.contentsTransform = SCNMatrix4MakeScale(
-            size.width / size.height * 1.4, 1.4, 1)
+            (size.width / size.height * 7).rounded(), 7, 1)
+        gridMaterial.transparency = emphasis
         gridMaterial.lightingModel = .constant
         gridMaterial.isDoubleSided = true
         gridMaterial.writesToDepthBuffer = false
@@ -132,27 +140,46 @@ enum DepthScene {
         grid.name = "\(name)-grid"
         sheet.addChildNode(grid)
 
-        // Clean border from four bars (a wireframe box would draw its
+        // Hairline border from four bars (a wireframe box would draw its
         // triangulation diagonals).
-        let bar: CGFloat = 0.009
+        let bar: CGFloat = 0.004
         let edges: [(CGFloat, CGFloat, CGFloat, CGFloat)] = [
-            (size.width + bar, bar, 0, size.height / 2),  // top
-            (size.width + bar, bar, 0, -size.height / 2), // bottom
-            (bar, size.height + bar, -size.width / 2, 0), // left
-            (bar, size.height + bar, size.width / 2, 0),  // right
+            (size.width + bar, bar, 0, size.height / 2),
+            (size.width + bar, bar, 0, -size.height / 2),
+            (bar, size.height + bar, -size.width / 2, 0),
+            (bar, size.height + bar, size.width / 2, 0),
         ]
         for (w, h, x, y) in edges {
             let edge = SCNNode(geometry: SCNBox(width: w, height: h, length: bar, chamferRadius: 0))
             let material = SCNMaterial()
-            material.diffuse.contents = amber.withAlphaComponent(0.9 * emphasis)
+            material.diffuse.contents = amber.withAlphaComponent(0.8 * emphasis)
             material.lightingModel = .constant
             material.writesToDepthBuffer = false
             edge.geometry?.materials = [material]
             edge.renderingOrder = 101
-            edge.position = SCNVector3(x, y, 0)
             edge.name = "\(name)-frame"
             sheet.addChildNode(edge)
         }
+
+        // The grab handle: solid knob outside the right edge, plus an oversize
+        // invisible hit target so it's easy to catch mid-orbit.
+        let handle = SCNNode(geometry: SCNSphere(radius: 0.038))
+        let handleMaterial = SCNMaterial()
+        handleMaterial.diffuse.contents = amber.withAlphaComponent(0.95 * emphasis)
+        handleMaterial.lightingModel = .constant
+        handle.geometry?.materials = [handleMaterial]
+        handle.position = SCNVector3(size.width / 2 + 0.075, 0, 0)
+        handle.renderingOrder = 102
+        handle.name = "\(name)-handle"
+        let grab = SCNNode(geometry: SCNSphere(radius: 0.11))
+        let grabMaterial = SCNMaterial()
+        grabMaterial.colorBufferWriteMask = [] // hit-testable, never drawn
+        grabMaterial.writesToDepthBuffer = false
+        grab.geometry?.materials = [grabMaterial]
+        grab.name = "\(name)-handle-grab"
+        handle.addChildNode(grab)
+        sheet.addChildNode(handle)
+
         return sheet
     }
 
@@ -169,6 +196,10 @@ enum DepthScene {
 
 struct DepthSceneView: NSViewRepresentable {
     @Bindable var model: EditViewModel
+    /// The flat photo's height as a fraction of the canvas — the head-on
+    /// camera matches it so enter/exit reads as the photo itself folding
+    /// into space.
+    var fitFraction: CGFloat
 
     func makeNSView(context: Context) -> SCNView {
         let view = ScrollableSCNView()
@@ -186,12 +217,19 @@ struct DepthSceneView: NSViewRepresentable {
     func updateNSView(_ view: SCNView, context: Context) {
         let coordinator = context.coordinator
         coordinator.model = model
+        coordinator.fitFraction = fitFraction
         if coordinator.builtURL != model.photo.url {
             coordinator.builtURL = model.photo.url
             coordinator.rebuildCloud()
         }
         if let scene = view.scene {
             DepthScene.updatePlanes(in: scene, focusDepth: model.edit.focusDepth, focusRange: model.edit.focusRange)
+        }
+        if let command = model.depthSceneCommand {
+            DispatchQueue.main.async { [weak model] in
+                if model?.depthSceneCommand == command { model?.depthSceneCommand = nil }
+            }
+            coordinator.handle(command)
         }
     }
 
@@ -202,15 +240,42 @@ struct DepthSceneView: NSViewRepresentable {
         var model: EditViewModel
         weak var view: SCNView?
         var builtURL: URL?
+        var fitFraction: CGFloat = 0.85
 
-        private enum DragTarget { case near, far, zone, orbit }
+        /// Orbit state (spherical around the rig).
+        private var yaw: CGFloat = 0
+        private var pitch: CGFloat = 0
+        private let radius: CGFloat = 2.3
+        private static let restYaw: CGFloat = 0.46
+        private static let restPitch: CGFloat = 0.26
+
+        private enum DragTarget { case near, far, orbit }
         private var dragTarget: DragTarget?
         private var startFocus = 0.0
         private var startRange = 0.0
         private var startYaw: CGFloat = 0
+        private var startPitch: CGFloat = 0
 
         init(model: EditViewModel) {
             self.model = model
+        }
+
+        private var cameraNode: SCNNode? {
+            view?.scene?.rootNode.childNode(withName: "camera", recursively: false)
+        }
+
+        /// Head-on distance where the 1-unit-tall cloud fills exactly the same
+        /// screen height as the flat photo (default 60° vertical field of view).
+        private var headOnDistance: CGFloat {
+            1 / (2 * tan(30 * .pi / 180) * max(0.2, fitFraction))
+        }
+
+        private func cameraPosition(yaw: CGFloat, pitch: CGFloat, radius: CGFloat) -> SCNVector3 {
+            SCNVector3(
+                radius * sin(yaw) * cos(pitch),
+                radius * sin(pitch) + DepthScene.sceneLift,
+                radius * cos(yaw) * cos(pitch)
+            )
         }
 
         func rebuildCloud() {
@@ -220,18 +285,59 @@ struct DepthSceneView: NSViewRepresentable {
                 let scene = DepthScene.build(
                     grid: grid, focusDepth: model.edit.focusDepth, focusRange: model.edit.focusRange)
                 self.view?.scene = scene
-                // Enter head-on — the cloud reads as the flat photo — then
-                // swing out to the 3/4 view so the depth reveals itself.
-                if let camera = scene.rootNode.childNode(withName: "camera", recursively: false) {
-                    let destination = camera.position
-                    camera.position = SCNVector3(0, 0.02, 2.45)
-                    SCNTransaction.begin()
-                    SCNTransaction.animationDuration = 1.1
-                    SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                    camera.position = destination
-                    SCNTransaction.commit()
-                }
+                self.animateIn()
             }
+        }
+
+        /// Head-on (the cloud reads as the flat photo), then swing to 3/4.
+        private func animateIn() {
+            guard let cameraNode else { return }
+            yaw = Self.restYaw
+            pitch = Self.restPitch
+            cameraNode.position = cameraPosition(yaw: 0, pitch: 0.005, radius: headOnDistance)
+            SCNTransaction.begin()
+            SCNTransaction.animationDuration = 1.0
+            SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            cameraNode.position = cameraPosition(yaw: yaw, pitch: pitch, radius: radius)
+            SCNTransaction.commit()
+        }
+
+        /// Swing back to head-on, then hand the canvas back to the flat photo.
+        private func animateOut() {
+            guard let cameraNode else {
+                model.depthSceneVisible = false
+                return
+            }
+            let model = model
+            SCNTransaction.begin()
+            SCNTransaction.animationDuration = 0.8
+            SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            SCNTransaction.completionBlock = {
+                Task { @MainActor in model.depthSceneVisible = false }
+            }
+            cameraNode.position = cameraPosition(yaw: 0, pitch: 0.005, radius: headOnDistance)
+            SCNTransaction.commit()
+        }
+
+        func handle(_ command: DepthSceneCommand) {
+            switch command {
+            case .exit: animateOut()
+            case .front: snap(yaw: 0, pitch: 0.005)
+            case .left: snap(yaw: -.pi / 2, pitch: 0.005)
+            case .right: snap(yaw: .pi / 2, pitch: 0.005)
+            case .top: snap(yaw: 0.001, pitch: .pi / 2 - 0.06)
+            }
+        }
+
+        private func snap(yaw newYaw: CGFloat, pitch newPitch: CGFloat) {
+            guard let cameraNode else { return }
+            yaw = newYaw
+            pitch = newPitch
+            SCNTransaction.begin()
+            SCNTransaction.animationDuration = 0.55
+            SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            cameraNode.position = cameraPosition(yaw: yaw, pitch: pitch, radius: radius)
+            SCNTransaction.commit()
         }
 
         private func refresh() {
@@ -246,53 +352,56 @@ struct DepthSceneView: NSViewRepresentable {
             case .began:
                 startFocus = model.edit.focusDepth
                 startRange = model.edit.focusRange
-                startYaw = view.scene?.rootNode.childNode(withName: "rig", recursively: false)?.eulerAngles.y ?? 0
-                // What's under the cursor decides the drag: a boundary plane
-                // moves that edge; anything else moves the zone or orbits.
-                let hits = view.hitTest(gesture.location(in: view), options: [.searchMode: SCNHitTestSearchMode.all.rawValue])
-                let names = hits.compactMap { $0.node.name ?? $0.node.parent?.name }
-                if names.contains(where: { $0.hasPrefix("near") }) { dragTarget = .near }
-                else if names.contains(where: { $0.hasPrefix("far") }) { dragTarget = .far }
-                else { dragTarget = .zone }
+                startYaw = yaw
+                startPitch = pitch
+                // Only the handles grab a plane; everything else orbits.
+                let hits = view.hitTest(gesture.location(in: view), options: [
+                    .searchMode: SCNHitTestSearchMode.all.rawValue,
+                    .ignoreHiddenNodes: false,
+                ])
+                let names = hits.compactMap(\.node.name)
+                if names.contains(where: { $0.hasPrefix("near-handle") }) { dragTarget = .near }
+                else if names.contains(where: { $0.hasPrefix("far-handle") }) { dragTarget = .far }
+                else { dragTarget = .orbit }
             case .changed:
-                guard let target = dragTarget else { return }
-                if target == .zone, abs(translation.x) > abs(translation.y) * 1.6 {
-                    dragTarget = .orbit
-                }
-                // Drag up pushes toward far: screen-up = -y translation.
-                let dz = -Double(translation.y) / 260
                 switch dragTarget {
-                case .zone:
-                    model.edit.focusDepth = (startFocus + dz).clamped(to: 0...1)
-                case .near:
-                    // Near boundary at focus − half·range: pulling it moves the
-                    // near edge; focus and range both follow so far stays put.
-                    moveBoundary(near: true, dz: dz)
-                case .far:
-                    moveBoundary(near: false, dz: dz)
                 case .orbit:
-                    if let rig = view.scene?.rootNode.childNode(withName: "rig", recursively: false) {
-                        rig.eulerAngles.y = max(-0.85, min(0.85, startYaw + translation.x / 300))
-                    }
+                    yaw = (startYaw + translation.x / 220).clamped(to: -.pi / 2 ... .pi / 2)
+                    pitch = (startPitch - translation.y / 220).clamped(to: -0.1 ... .pi / 2 - 0.06)
+                    cameraNode?.position = cameraPosition(yaw: yaw, pitch: pitch, radius: radius)
+                case .near, .far:
+                    dragPlane(near: dragTarget == .near, translation: translation)
                 case nil:
                     break
                 }
-                refresh()
             default:
                 dragTarget = nil
             }
         }
 
-        /// Move one edge of the sharp zone, keeping the other edge fixed.
-        private func moveBoundary(near: Bool, dz: Double) {
+        /// Screen-space drag projected onto the depth axis, so plane dragging
+        /// tracks the cursor from any camera angle.
+        private func dragPlane(near: Bool, translation: NSPoint) {
+            guard let view else { return }
+            let a = view.projectPoint(SCNVector3(0, DepthScene.sceneLift, 0))
+            let b = view.projectPoint(SCNVector3(0, DepthScene.sceneLift, 0.5))
+            let axis = CGPoint(x: CGFloat(b.x - a.x), y: CGFloat(b.y - a.y))
+            let lengthSquared = axis.x * axis.x + axis.y * axis.y
+            guard lengthSquared > 1 else { return }
+            // Gesture translation is top-left origin; projectPoint is bottom-left.
+            let drag = CGPoint(x: translation.x, y: -translation.y)
+            let worldDz = 0.5 * Double((drag.x * axis.x + drag.y * axis.y) / lengthSquared)
+            let focusDz = -worldDz / Double(DepthScene.zSpan) // +z = nearer = smaller focus value
+
             let startHalf = startRange * 0.4
             let nearEdge = startFocus - startHalf
             let farEdge = startFocus + startHalf
-            let newNear = near ? (nearEdge + dz).clamped(to: 0...1) : nearEdge
-            let newFar = near ? farEdge : (farEdge + dz).clamped(to: 0...1)
+            let newNear = near ? (nearEdge + focusDz).clamped(to: -0.2...1.2) : nearEdge
+            let newFar = near ? farEdge : (farEdge + focusDz).clamped(to: -0.2...1.2)
             let lo = min(newNear, newFar), hi = max(newNear, newFar)
-            model.edit.focusDepth = (lo + hi) / 2
+            model.edit.focusDepth = ((lo + hi) / 2).clamped(to: 0...1)
             model.edit.focusRange = ((hi - lo) / 2 / 0.4).clamped(to: 0...1)
+            refresh()
         }
 
         func adjustRange(by delta: CGFloat) {

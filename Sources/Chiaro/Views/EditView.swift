@@ -28,7 +28,7 @@ struct EditView: View {
         .focusEffectDisabled()
         .onKeyPress(.escape) {
             if model.focusPicking { model.focusPicking = false }
-            else if model.depthSceneVisible { model.depthSceneVisible = false }
+            else if model.depthSceneVisible { model.depthSceneCommand = .exit }
             else if model.cropMode { model.cropMode = false }
             else if model.armed != nil { model.armed = nil }
             else { close() }
@@ -59,7 +59,7 @@ struct EditView: View {
             return .handled
         }
         .overlay(alignment: .bottom) {
-            if !model.cropMode {
+            if !model.cropMode && !model.depthSceneVisible {
                 navPill.padding(.bottom, 16).padding(.trailing, Theme.railWidth)
             }
         }
