@@ -48,6 +48,9 @@ final class EditViewModel {
             scheduleRender()
         }
     }
+    /// The local adjustment being edited (gizmo shows on the canvas).
+    var selectedLocalID: UUID?
+
     /// Clean up: brush mode, radius (fraction of image width), and the
     /// stroke being painted right now.
     var cleanupMode = false {

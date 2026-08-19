@@ -233,6 +233,10 @@ final class MCPServer {
             "type": "object",
             "description": "color mixer: per-band {h,s,l} each -100...100 — bands: \(HSLBand.names.joined(separator: ", ")). Partial objects fine, e.g. {\"orange\": {\"s\": -30}, \"blue\": {\"l\": 20}}",
         ]
+        props["locals"] = [
+            "type": "array",
+            "description": "local adjustments: [{kind: radial|linear|subject, ax, ay, bx, by (normalized, y from top; radial: a=center b=radii, linear: gradient a→b), feather 0-100, invert, exposure -3..3, contrast/highlights/shadows/temp/tint/saturation/clarity -100..100}]. Empty array clears",
+        ]
         props["cleanup"] = [
             "type": "array",
             "description": "Clean up strokes: [{points: [[x,y],...] normalized (y from top), radius: fraction of width}] — brushed regions are removed and inpainted on-device (needs the cleanup model downloaded in the app). Empty array clears",
@@ -489,6 +493,16 @@ final class MCPServer {
                             }
                         }
                     }
+                    continue
+                }
+                if key == "locals" {
+                    if let empty = value as? [Any], empty.isEmpty { edit.locals = []; continue }
+                    guard let raw = value as? [[String: Any]],
+                          let data = try? JSONSerialization.data(withJSONObject: raw),
+                          let decoded = try? JSONDecoder().decode([LocalAdjustment].self, from: data) else {
+                        throw ToolError("locals must be [{kind, ax, ay, bx, by, feather, ...adjustments}] — kind is radial, linear, or subject")
+                    }
+                    edit.locals = decoded
                     continue
                 }
                 if key == "cleanup" {

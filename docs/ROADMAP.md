@@ -29,14 +29,14 @@ deferred (ADR 0003); personal tool first — no signing/App Store constraints ye
 - [x] Depth-map blur: Depth Anything V2 on-demand model, focus-plane slider (ADR 0010)
 - [x] Subject relight
 - [x] Scrub-on-photo editing with glass readout + haptic detents (ADR 0005)
-- [ ] Tone curve + HSL color mixer
-- [ ] Presets: built-in set + user-saved
+- [x] Tone curve + HSL color mixer (8-band Color mix)
+- [x] Presets: six built-ins + user-saved, MCP list/apply
 - [x] Star ratings (keys 0–5) — dedicated culling flow cut by owner decision
 - [x] Library views: gallery / grid / Finder-style list (sortable columns), search,
       filename toggle, folder recursion + chips, card import to Chiaro Library
 - [x] Onboarding tips (TipKit): scrub, fine-tune scroll, agent discovery
 - [x] App icon (pinwheel mark) + scripts/bundle.sh → Chiaro.app
-- [ ] Local adjustments: radial, linear, AI-subject masks
+- [x] Local adjustments: radial, linear, subject masks with per-mask tonal controls
 
 ## Tier 3 — AI via MCP (ADR 0008: no embedded agent)
 
@@ -45,10 +45,10 @@ deferred (ADR 0003); personal tool first — no signing/App Store constraints ye
 - [x] Agent presence pill + soft input lock while an agent edits
 - [x] Portrait mask refinement (Mask slider: grow/shrink subject boundary)
 - Albums: cut by owner decision (2026-08-19)
-- SAM-assisted focus selection: drag a box on the photo → on-device SAM 2 mask →
-  Focus/Range wrap the object's depth interval (planes stay the render model)
-- Clean up (object removal): on-device inpainting (LaMa-class Core ML model,
-  on-demand download like Depth Anything); cloud provider layer deferred to
-  post-release. Positioning: AI-driven editing, not generative content
+- SAM-assisted focus selection: built, tested, cut — SAM 2.1 tiny masks weren't
+  good enough (owner decision 2026-08-19)
+- [x] Clean up: on-device LaMa inpainting (40 MB on-demand), brush UI + MCP
+  strokes. Cloud provider layer deferred post-release. Positioning: AI-driven
+  editing, not generative content
 - Auto-culling: not an in-app feature — an agent workflow over MCP
   (get_preview + a set_rating tool; agent picks the keepers)

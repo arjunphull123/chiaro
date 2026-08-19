@@ -28,6 +28,7 @@ struct EditView: View {
         .focusEffectDisabled()
         .onKeyPress(.escape) {
             if model.cleanupMode { model.cleanupMode = false }
+            else if model.selectedLocalID != nil { model.selectedLocalID = nil }
             else if model.depthSceneVisible { model.depthSceneCommand = .exit }
             else if model.cropMode { model.cropMode = false }
             else if model.armed != nil { model.armed = nil }

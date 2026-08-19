@@ -51,6 +51,7 @@ struct RailView: View {
                         help: "White balance and color strength"
                     )
                     colorMixSection
+                    localSection
                     section("Effects", [.clarity, .vignette], help: "Punch and framing")
                     section("Detail", [.sharpness, .noiseReduction], help: "Fine texture and grain cleanup")
                     cleanupSection
@@ -301,6 +302,132 @@ struct RailView: View {
                 .onEnded { _ in bandScrubStart = nil }
         )
         .onTapGesture(count: 2) { model.edit.hsl[selectedBand][keyPath: keyPath] = 0 }
+        .clickCursor()
+    }
+
+    private var localSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                Text("Local")
+                    .font(Theme.ui(12, .medium))
+                    .foregroundStyle(Theme.ink2)
+                Rectangle().fill(Theme.hairline).frame(height: 1)
+                Menu {
+                    Button("Radial") { addLocal(.radial) }
+                    Button("Linear") { addLocal(.linear) }
+                    Button("Subject") { addLocal(.subject) }
+                } label: {
+                    Text("Add")
+                        .font(Theme.ui(9.5))
+                        .foregroundStyle(Theme.ink3)
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .clickCursor()
+            }
+            .padding(.top, 10)
+            if !model.edit.locals.isEmpty {
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 5), GridItem(.flexible(), spacing: 5)], spacing: 5) {
+                    ForEach(Array(model.edit.locals.enumerated()), id: \.element.id) { index, local in
+                        let selected = model.selectedLocalID == local.id
+                        Button {
+                            model.selectedLocalID = selected ? nil : local.id
+                        } label: {
+                            Text("\(local.kind.rawValue.prefix(1).uppercased() + local.kind.rawValue.dropFirst()) \(index + 1)")
+                                .font(Theme.ui(10.5, selected ? .medium : .regular))
+                                .foregroundStyle(selected ? Theme.amber : Theme.ink2)
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 6)
+                                .background(Capsule().fill(Color.white.opacity(selected ? 0.08 : 0.03)))
+                                .overlay(Capsule().stroke(selected ? Theme.amber.opacity(0.5) : Theme.hairline))
+                        }
+                        .buttonStyle(.plain)
+                        .clickCursor()
+                        .contextMenu {
+                            Button("Delete") {
+                                model.edit.locals.removeAll { $0.id == local.id }
+                                if selected { model.selectedLocalID = nil }
+                            }
+                        }
+                    }
+                }
+            }
+            if let index = model.edit.locals.firstIndex(where: { $0.id == model.selectedLocalID }) {
+                localRow("Exposure", index: index, keyPath: \.exposure, range: -3...3)
+                localRow("Contrast", index: index, keyPath: \.contrast, range: -100...100)
+                localRow("Highlights", index: index, keyPath: \.highlights, range: -100...100)
+                localRow("Shadows", index: index, keyPath: \.shadows, range: -100...100)
+                localRow("Temp", index: index, keyPath: \.temp, range: -100...100)
+                localRow("Tint", index: index, keyPath: \.tint, range: -100...100)
+                localRow("Saturation", index: index, keyPath: \.saturation, range: -100...100)
+                localRow("Clarity", index: index, keyPath: \.clarity, range: -100...100)
+                if model.edit.locals[index].kind != .linear {
+                    localRow("Feather", index: index, keyPath: \.feather, range: 0...100)
+                }
+                Toggle(isOn: Binding(
+                    get: { model.edit.locals[index].invert },
+                    set: { model.edit.locals[index].invert = $0 }
+                )) {
+                    Text("Invert")
+                        .font(Theme.ui(11.5))
+                        .foregroundStyle(Theme.ink2)
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .tint(Theme.amber)
+                .padding(.horizontal, 9)
+                .padding(.top, 2)
+            }
+        }
+        .help("Masked corrections — a radial or linear region, or the detected subject")
+    }
+
+    private func addLocal(_ kind: LocalAdjustment.Kind) {
+        var local = LocalAdjustment(kind: kind)
+        if kind == .linear {
+            local.ax = 0.5; local.ay = 0.15; local.bx = 0.5; local.by = 0.55
+        }
+        model.edit.locals.append(local)
+        model.selectedLocalID = local.id
+    }
+
+    @State private var localScrubStart: (x: CGFloat, value: Double)?
+
+    private func localRow(_ label: String, index: Int, keyPath: WritableKeyPath<LocalAdjustment, Double>, range: ClosedRange<Double>) -> some View {
+        let value = model.edit.locals[index][keyPath: keyPath]
+        let isEV = range.upperBound <= 3
+        return HStack {
+            Text(label)
+                .font(Theme.ui(11.5))
+                .foregroundStyle(Theme.ink2)
+            Spacer()
+            Text(isEV ? String(format: "%+.2f", value) : (value == 0 ? "0" : String(format: "%+.0f", value)))
+                .font(Theme.mono(10, .medium))
+                .foregroundStyle(value == 0 ? Theme.ink3 : Theme.amber)
+                .monospacedDigit()
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(Color.white.opacity(0.05)))
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(RoundedRectangle(cornerRadius: 7).fill(Color.white.opacity(0.03)))
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 1)
+                .onChanged { g in
+                    if localScrubStart == nil {
+                        localScrubStart = (g.startLocation.x, model.edit.locals[index][keyPath: keyPath])
+                    }
+                    guard let start = localScrubStart else { return }
+                    let span = range.upperBound - range.lowerBound
+                    let delta = Double(g.location.x - start.x) / 260 * span
+                    model.edit.locals[index][keyPath: keyPath] = (start.value + delta).clamped(to: range)
+                }
+                .onEnded { _ in localScrubStart = nil }
+        )
+        .onTapGesture(count: 2) { model.edit.locals[index][keyPath: keyPath] = 0 }
         .clickCursor()
     }
 

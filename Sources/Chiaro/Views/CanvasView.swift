@@ -57,6 +57,14 @@ struct CanvasView: View {
                             .position(x: fitRegion.width / 2, y: fitRegion.height / 2)
                             .allowsHitTesting(false)
                     }
+                    if let localIndex = model.edit.locals.firstIndex(where: { $0.id == model.selectedLocalID }),
+                       !model.cropMode, !model.cleanupMode, !model.depthSceneVisible {
+                        localGizmo(index: localIndex, fitSize: fitSize)
+                            .frame(width: fitSize.width, height: fitSize.height)
+                            .scaleEffect(zoom * gestureZoom)
+                            .offset(x: pan.width + gesturePan.width, y: pan.height + gesturePan.height)
+                            .position(x: fitRegion.width / 2, y: fitRegion.height / 2)
+                    }
                     if model.cropMode {
                         CropOverlayView(
                             edit: $model.edit,
@@ -250,6 +258,67 @@ struct CanvasView: View {
         Chip(title: title, selected: model.cropAspectName == title) {
             model.applyCropAspect(aspect, name: title)
         }
+    }
+
+    /// Gizmo for the selected local adjustment: draggable geometry over the photo.
+    @ViewBuilder private func localGizmo(index: Int, fitSize: CGSize) -> some View {
+        let local = model.edit.locals[index]
+        ZStack {
+            switch local.kind {
+            case .radial:
+                Ellipse()
+                    .stroke(Theme.amber.opacity(0.85), style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                    .frame(width: local.bx * 2 * fitSize.width, height: local.by * 2 * fitSize.height)
+                    .position(x: local.ax * fitSize.width, y: local.ay * fitSize.height)
+                    .allowsHitTesting(false)
+                gizmoHandle(x: local.ax, y: local.ay, fitSize: fitSize) { u, v in
+                    model.edit.locals[index].ax = u
+                    model.edit.locals[index].ay = v
+                }
+                gizmoHandle(x: local.ax + local.bx, y: local.ay, fitSize: fitSize) { u, _ in
+                    model.edit.locals[index].bx = max(0.02, abs(u - local.ax))
+                }
+                gizmoHandle(x: local.ax, y: local.ay + local.by, fitSize: fitSize) { _, v in
+                    model.edit.locals[index].by = max(0.02, abs(v - local.ay))
+                }
+            case .linear:
+                Path { path in
+                    path.move(to: CGPoint(x: local.ax * fitSize.width, y: local.ay * fitSize.height))
+                    path.addLine(to: CGPoint(x: local.bx * fitSize.width, y: local.by * fitSize.height))
+                }
+                .stroke(Theme.amber.opacity(0.85), style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                .allowsHitTesting(false)
+                gizmoHandle(x: local.ax, y: local.ay, fitSize: fitSize) { u, v in
+                    model.edit.locals[index].ax = u
+                    model.edit.locals[index].ay = v
+                }
+                gizmoHandle(x: local.bx, y: local.by, fitSize: fitSize) { u, v in
+                    model.edit.locals[index].bx = u
+                    model.edit.locals[index].by = v
+                }
+            case .subject:
+                EmptyView()
+            }
+        }
+    }
+
+    private func gizmoHandle(x: Double, y: Double, fitSize: CGSize, onDrag: @escaping (Double, Double) -> Void) -> some View {
+        Circle()
+            .fill(Theme.amber)
+            .frame(width: 11, height: 11)
+            .overlay(Circle().stroke(.black.opacity(0.5), lineWidth: 1))
+            .contentShape(Circle().inset(by: -9))
+            .position(x: x * fitSize.width, y: y * fitSize.height)
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { g in
+                        onDrag(
+                            Double((g.location.x / fitSize.width).clamped(to: 0...1)),
+                            Double((g.location.y / fitSize.height).clamped(to: 0...1))
+                        )
+                    }
+            )
+            .clickCursor()
     }
 
     /// Committed and in-progress Clean up strokes, amber over the photo.

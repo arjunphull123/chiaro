@@ -46,6 +46,63 @@ struct CleanupStroke: Codable, Equatable {
     }
 }
 
+/// One local adjustment: a mask (radial ellipse, linear gradient, or the
+/// detected subject) carrying its own tonal corrections. Coordinates are
+/// normalized, y from the top. Radial: a = center, b = radii. Linear: the
+/// gradient runs a → b (full effect at a, none at b).
+struct LocalAdjustment: Codable, Equatable, Identifiable {
+    enum Kind: String, Codable { case radial, linear, subject }
+    var id = UUID()
+    var kind: Kind
+    var ax: Double = 0.5, ay: Double = 0.5
+    var bx: Double = 0.25, by: Double = 0.25
+    var feather: Double = 50   // 0…100
+    var invert = false
+    var exposure = 0.0         // -3…3 EV
+    var contrast = 0.0         // -100…100
+    var highlights = 0.0
+    var shadows = 0.0
+    var temp = 0.0
+    var tint = 0.0
+    var saturation = 0.0
+    var clarity = 0.0
+
+    var isNeutral: Bool {
+        exposure == 0 && contrast == 0 && highlights == 0 && shadows == 0
+            && temp == 0 && tint == 0 && saturation == 0 && clarity == 0
+    }
+
+    // id is UI state, not edit data — regenerated per session. Decoding is
+    // tolerant: only `kind` is required, everything else keeps its default.
+    enum CodingKeys: String, CodingKey {
+        case kind, ax, ay, bx, by, feather, invert
+        case exposure, contrast, highlights, shadows, temp, tint, saturation, clarity
+    }
+
+    init(kind: Kind) {
+        self.kind = kind
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        kind = try c.decode(Kind.self, forKey: .kind)
+        ax = try c.decodeIfPresent(Double.self, forKey: .ax) ?? ax
+        ay = try c.decodeIfPresent(Double.self, forKey: .ay) ?? ay
+        bx = try c.decodeIfPresent(Double.self, forKey: .bx) ?? bx
+        by = try c.decodeIfPresent(Double.self, forKey: .by) ?? by
+        feather = try c.decodeIfPresent(Double.self, forKey: .feather) ?? feather
+        invert = try c.decodeIfPresent(Bool.self, forKey: .invert) ?? invert
+        exposure = try c.decodeIfPresent(Double.self, forKey: .exposure) ?? 0
+        contrast = try c.decodeIfPresent(Double.self, forKey: .contrast) ?? 0
+        highlights = try c.decodeIfPresent(Double.self, forKey: .highlights) ?? 0
+        shadows = try c.decodeIfPresent(Double.self, forKey: .shadows) ?? 0
+        temp = try c.decodeIfPresent(Double.self, forKey: .temp) ?? 0
+        tint = try c.decodeIfPresent(Double.self, forKey: .tint) ?? 0
+        saturation = try c.decodeIfPresent(Double.self, forKey: .saturation) ?? 0
+        clarity = try c.decodeIfPresent(Double.self, forKey: .clarity) ?? 0
+    }
+}
+
 /// The complete, serializable description of one photo's edit (ADR 0003).
 /// Every UI input path mutates this; the render pipeline is a pure function of it.
 struct EditState: Codable, Equatable {
@@ -74,6 +131,8 @@ struct EditState: Codable, Equatable {
     var blurMode: BlurMode = .subject
     var focusDepth: Double = 0.5  // 0 = nearest, 1 = farthest — the plane kept sharp
     var focusRange: Double = 0.25 // width of the sharp zone around the focus plane
+    // Local adjustments: masked corrections, applied after global ones
+    var locals: [LocalAdjustment] = []
     // Clean up: brush strokes over removed objects (inpainted on-device)
     var cleanup: [CleanupStroke] = []
     // Color mixer: 8 hue bands (see HSLBand.names)
@@ -129,6 +188,9 @@ struct EditState: Codable, Equatable {
         }
         if crop != .full {
             try c.encode(crop, forKey: CodingKeys(stringValue: "crop")!)
+        }
+        if !locals.isEmpty {
+            try c.encode(locals, forKey: CodingKeys(stringValue: "locals")!)
         }
         if !cleanup.isEmpty {
             try c.encode(cleanup, forKey: CodingKeys(stringValue: "cleanup")!)

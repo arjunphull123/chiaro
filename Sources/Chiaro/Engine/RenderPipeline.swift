@@ -55,6 +55,9 @@ enum RenderPipeline {
         if edit.hsl.contains(where: { !$0.isNeutral }) {
             image = HSLCube.apply(image, bands: edit.hsl)
         }
+        for local in edit.locals where !local.isNeutral {
+            image = applyLocal(local, to: image, personMask: personMask, scale: scale)
+        }
         if edit.clarity != 0 {
             let f = CIFilter.unsharpMask()
             f.inputImage = image
@@ -191,6 +194,88 @@ enum RenderPipeline {
             "inputCurvesDomain": CIVector(x: 0, y: 1),
             "inputColorSpace": CGColorSpace(name: CGColorSpace.displayP3)!,
         ])
+    }
+
+    /// One masked correction: build the mask, apply the local's adjustments
+    /// to a copy, blend through the mask.
+    private static func applyLocal(_ local: LocalAdjustment, to image: CIImage, personMask: CIImage?, scale: CGFloat) -> CIImage {
+        guard var mask = localMask(local, extent: image.extent, personMask: personMask) else { return image }
+        if local.invert {
+            mask = mask.applyingFilter("CIColorInvert").cropped(to: image.extent)
+        }
+        var adjusted = image
+        if local.temp != 0 || local.tint != 0 {
+            let f = CIFilter.temperatureAndTint()
+            f.inputImage = adjusted
+            f.neutral = CIVector(x: 6500, y: 0)
+            f.targetNeutral = CIVector(x: 6500 + local.temp * 28, y: local.tint * 0.9)
+            adjusted = f.outputImage ?? adjusted
+        }
+        if local.exposure != 0 {
+            adjusted = adjusted.applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: local.exposure])
+        }
+        if local.highlights != 0 || local.shadows != 0 {
+            let f = CIFilter.highlightShadowAdjust()
+            f.inputImage = adjusted
+            f.highlightAmount = Float(1 + min(0, local.highlights) / 100 * 0.7)
+            f.shadowAmount = Float(local.shadows / 100)
+            f.radius = Float(3 * scale)
+            adjusted = f.outputImage ?? adjusted
+        }
+        if local.contrast != 0 || local.saturation != 0 {
+            let f = CIFilter.colorControls()
+            f.inputImage = adjusted
+            f.contrast = Float(1 + local.contrast / 100 * 0.35)
+            f.saturation = Float(1 + local.saturation / 100)
+            adjusted = f.outputImage ?? adjusted
+        }
+        if local.clarity != 0 {
+            let f = CIFilter.unsharpMask()
+            f.inputImage = adjusted
+            f.radius = Float(25 * scale)
+            f.intensity = Float(local.clarity / 100 * 0.5)
+            adjusted = f.outputImage ?? adjusted
+        }
+        let blend = CIFilter.blendWithMask()
+        blend.inputImage = adjusted
+        blend.backgroundImage = image
+        blend.maskImage = mask
+        return blend.outputImage?.cropped(to: image.extent) ?? image
+    }
+
+    private static func localMask(_ local: LocalAdjustment, extent: CGRect, personMask: CIImage?) -> CIImage? {
+        switch local.kind {
+        case .subject:
+            return personMask?.cropped(to: extent)
+        case .radial:
+            // Unit-circle radial gradient, scaled into the ellipse.
+            let feather = max(0.02, local.feather / 100)
+            let gradient = CIFilter.radialGradient()
+            gradient.center = .zero
+            gradient.radius0 = Float(1 - feather)
+            gradient.radius1 = 1
+            gradient.color0 = CIColor.white
+            gradient.color1 = CIColor.black
+            let rx = max(0.01, local.bx) * extent.width
+            let ry = max(0.01, local.by) * extent.height
+            return gradient.outputImage?
+                .transformed(by: CGAffineTransform(scaleX: rx, y: ry)
+                    .translatedBy(
+                        x: (local.ax * extent.width + extent.origin.x) / rx,
+                        y: ((1 - local.ay) * extent.height + extent.origin.y) / ry))
+                .cropped(to: extent)
+        case .linear:
+            let gradient = CIFilter.smoothLinearGradient()
+            gradient.point0 = CGPoint(
+                x: local.ax * extent.width + extent.origin.x,
+                y: (1 - local.ay) * extent.height + extent.origin.y)
+            gradient.point1 = CGPoint(
+                x: local.bx * extent.width + extent.origin.x,
+                y: (1 - local.by) * extent.height + extent.origin.y)
+            gradient.color0 = CIColor.white
+            gradient.color1 = CIColor.black
+            return gradient.outputImage?.cropped(to: extent)
+        }
     }
 
     private static func portrait(_ image: CIImage, edit: EditState, personMask: CIImage?, depthMap: CIImage?, scale: CGFloat) -> CIImage {
