@@ -20,9 +20,45 @@ struct EditView: View {
                 .ignoresSafeArea()
                 .disabled(library.agentActive)
         }
+        // Keyboard handling attaches HERE, before the button overlays — a
+        // focusable ancestor swallows the first click on buttons inside it.
+        .focusable()
+        .focused($focused)
+        .focusEffectDisabled()
+        .onKeyPress(.escape) {
+            if model.cropMode { model.cropMode = false }
+            else if model.armed != nil { model.armed = nil }
+            else { close() }
+            return .handled
+        }
+        .onKeyPress(.return) {
+            guard model.cropMode else { return .ignored }
+            model.cropMode = false
+            return .handled
+        }
+        .onKeyPress(keys: ["c"], phases: [.down]) { _ in
+            model.cropMode.toggle()
+            return .handled
+        }
+        .onKeyPress(keys: ["\\"], phases: [.down, .up]) { press in
+            model.showOriginal = press.phase == .down
+            return .handled
+        }
+        .onKeyPress(.leftArrow) { step(-1); return .handled }
+        .onKeyPress(.rightArrow) { step(1); return .handled }
+        .onKeyPress(characters: .init(charactersIn: "012345")) { press in
+            model.photo.rating = Int(press.characters) ?? 0
+            model.saveNow()
+            return .handled
+        }
+        .overlay(alignment: .bottom) {
+            if !model.cropMode {
+                navPill.padding(.bottom, 16).padding(.trailing, Theme.railWidth)
+            }
+        }
         .overlay(alignment: .topLeading) {
             HStack(spacing: 12) {
-                HStack(spacing: 7) {
+                HStack(spacing: 5) {
                     AppMark(size: 16)
                     Text("Chiaro")
                         .font(Theme.serif(16, .semibold))
@@ -55,39 +91,10 @@ struct EditView: View {
             .padding(14)
             .padding(.trailing, Theme.railWidth)
         }
-        .focusable()
-        .focused($focused)
-        .focusEffectDisabled()
         .onAppear {
             focused = true
             library.activeEditor = model
             installScrollMonitor()
-        }
-        .onKeyPress(.escape) {
-            if model.cropMode { model.cropMode = false }
-            else if model.armed != nil { model.armed = nil }
-            else { close() }
-            return .handled
-        }
-        .onKeyPress(.return) {
-            guard model.cropMode else { return .ignored }
-            model.cropMode = false
-            return .handled
-        }
-        .onKeyPress(keys: ["c"], phases: [.down]) { _ in
-            model.cropMode.toggle()
-            return .handled
-        }
-        .onKeyPress(keys: ["\\"], phases: [.down, .up]) { press in
-            model.showOriginal = press.phase == .down
-            return .handled
-        }
-        .onKeyPress(.leftArrow) { step(-1); return .handled }
-        .onKeyPress(.rightArrow) { step(1); return .handled }
-        .onKeyPress(characters: .init(charactersIn: "012345")) { press in
-            model.photo.rating = Int(press.characters) ?? 0
-            model.saveNow()
-            return .handled
         }
         .onDisappear {
             model.saveNow()
@@ -112,6 +119,34 @@ struct EditView: View {
         }
     }
 
+
+    private var navPill: some View {
+        HStack(spacing: 12) {
+            Button { step(-1) } label: { chevron("chevron.left") }
+                .buttonStyle(.plain).clickCursor()
+            Text("\(photoIndex + 1) / \(library.photos.count)")
+                .font(Theme.mono(10))
+                .foregroundStyle(Theme.ink2)
+                .monospacedDigit()
+            Button { step(1) } label: { chevron("chevron.right") }
+                .buttonStyle(.plain).clickCursor()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .chiaroGlass(cornerRadius: 12)
+    }
+
+    private func chevron(_ name: String) -> some View {
+        Image(systemName: name)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(Theme.ink2)
+            .frame(width: 20, height: 20)
+            .contentShape(Rectangle())
+    }
+
+    private var photoIndex: Int {
+        library.photos.firstIndex(where: { $0.url == model.photo.url }) ?? 0
+    }
 
     private func glassIcon(_ icon: String, disabled: Bool, help: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { Image(systemName: icon) }

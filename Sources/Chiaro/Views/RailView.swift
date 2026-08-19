@@ -65,8 +65,6 @@ struct RailView: View {
                         .padding(.horizontal, 5).padding(.vertical, 2)
                         .background(RoundedRectangle(cornerRadius: 4).stroke(Theme.amber.opacity(0.5)))
                 }
-                Spacer()
-                navControl
             }
             if let exif = model.photo.exifSummary {
                 Text(exif)
@@ -79,35 +77,6 @@ struct RailView: View {
                     .foregroundStyle(Theme.ink3)
             }
         }
-    }
-
-    /// ‹ 36 / 109 › — session position, lives with the photo's identity.
-    private var navControl: some View {
-        HStack(spacing: 5) {
-            Button { step(-1) } label: {
-                Image(systemName: "chevron.left").font(.system(size: 8, weight: .semibold))
-            }
-            .buttonStyle(.plain).foregroundStyle(Theme.ink3).clickCursor()
-            Text("\(photoIndex + 1) / \(library.photos.count)")
-                .font(Theme.mono(9))
-                .foregroundStyle(Theme.ink3)
-                .monospacedDigit()
-            Button { step(1) } label: {
-                Image(systemName: "chevron.right").font(.system(size: 8, weight: .semibold))
-            }
-            .buttonStyle(.plain).foregroundStyle(Theme.ink3).clickCursor()
-        }
-    }
-
-    private var photoIndex: Int {
-        library.photos.firstIndex(where: { $0.url == model.photo.url }) ?? 0
-    }
-
-    private func step(_ delta: Int) {
-        guard !library.photos.isEmpty,
-              let index = library.photos.firstIndex(where: { $0.url == model.photo.url }) else { return }
-        let next = (index + delta + library.photos.count) % library.photos.count
-        library.edit(library.photos[next])
     }
 
     private var curveSection: some View {

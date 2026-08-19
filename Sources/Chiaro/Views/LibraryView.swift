@@ -65,7 +65,7 @@ struct LibraryView: View {
     /// Pinned frosted header: title, zoom slider, and the real actions.
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 AppMark(size: 18)
                 Text("Chiaro")
                     .font(Theme.serif(19, .semibold))
@@ -238,10 +238,16 @@ struct LibraryView: View {
                     }
                 }
                 .padding(.horizontal, 9)
-                .padding(.vertical, 7)
+                .padding(.top, 30)
+                .padding(.bottom, 7)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
-                    LinearGradient(colors: [.clear, .black.opacity(0.78)], startPoint: .top, endPoint: .bottom)
+                    LinearGradient(
+                        stops: [.init(color: .clear, location: 0),
+                                .init(color: .black.opacity(0.55), location: 0.45),
+                                .init(color: .black.opacity(0.92), location: 1)],
+                        startPoint: .top, endPoint: .bottom
+                    )
                 )
                 .frame(width: height * photo.aspect, alignment: .leading)
                 .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 7, bottomTrailingRadius: 7))
@@ -363,7 +369,7 @@ struct LibraryView: View {
             Spacer(minLength: 10)
 
             VStack(alignment: .leading, spacing: 11) {
-                HStack(spacing: 9) {
+                HStack(spacing: 6) {
                     AppMark(size: 23)
                     Text("Chiaro")
                         .font(Theme.serif(26, .semibold))
