@@ -8,7 +8,7 @@ let package = Package(
         .executableTarget(
             name: "Chiaro",
             path: "Sources/Chiaro",
-            resources: [.copy("Resources/Fonts"), .copy("Resources/AgentIcons")],
+            resources: [.copy("Resources/Fonts"), .copy("Resources/AgentIcons"), .copy("Resources/AppIcon.png")],
             swiftSettings: [.swiftLanguageMode(.v5)]
         )
     ]

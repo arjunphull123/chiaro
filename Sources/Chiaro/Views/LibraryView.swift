@@ -9,7 +9,11 @@ struct LibraryView: View {
     @State private var searchText = ""
     @FocusState private var searchFocused: Bool
 
-    enum ListSortKey: String { case name, rating, time }
+    /// Top-level subfolder filter (nil = everything). Only meaningful when the
+    /// opened folder actually nests photos.
+    @State private var folderScope: String?
+
+    enum ListSortKey: String { case name, rating, time, folder }
     @AppStorage("listSortKey") private var listSortRaw = ListSortKey.name.rawValue
     @AppStorage("listSortAscending") private var listSortAscending = true
     private var listSort: ListSortKey { ListSortKey(rawValue: listSortRaw) ?? .name }
@@ -19,6 +23,7 @@ struct LibraryView: View {
         case .name: photos.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         case .rating: photos.sorted { $0.rating < $1.rating }
         case .time: photos.sorted { ($0.captureDate ?? .distantPast) < ($1.captureDate ?? .distantPast) }
+        case .folder: photos.sorted { relativeFolder($0).localizedStandardCompare(relativeFolder($1)) == .orderedAscending }
         }
         return listSortAscending ? sorted : sorted.reversed()
     }
@@ -26,10 +31,42 @@ struct LibraryView: View {
     private let gap: CGFloat = 8
 
     private var visiblePhotos: [Photo] {
+        var result = library.photos
+        if let folderScope {
+            result = result.filter { topFolder($0) == folderScope }
+        }
         let query = searchText.trimmingCharacters(in: .whitespaces)
-        guard !query.isEmpty else { return library.photos }
-        return library.photos.filter { $0.name.localizedCaseInsensitiveContains(query) }
+        if !query.isEmpty {
+            result = result.filter { $0.name.localizedCaseInsensitiveContains(query) }
+        }
+        return result
     }
+
+    /// Path of the photo's parent, relative to the opened folder ("" at root).
+    private func relativeFolder(_ photo: Photo) -> String {
+        guard let root = library.folderURL else { return "" }
+        let parent = photo.url.deletingLastPathComponent().standardizedFileURL.path
+        let rootPath = root.standardizedFileURL.path
+        guard parent.hasPrefix(rootPath), parent != rootPath else { return "" }
+        return String(parent.dropFirst(rootPath.count + 1))
+    }
+
+    private func topFolder(_ photo: Photo) -> String? {
+        let rel = relativeFolder(photo)
+        return rel.isEmpty ? nil : rel.split(separator: "/").first.map(String.init)
+    }
+
+    /// Direct subfolders that contain photos, with counts, alphabetical.
+    private var subfolders: [(name: String, count: Int)] {
+        var counts: [String: Int] = [:]
+        for photo in library.photos {
+            if let top = topFolder(photo) { counts[top, default: 0] += 1 }
+        }
+        return counts.sorted { $0.key.localizedStandardCompare($1.key) == .orderedAscending }
+            .map { (name: $0.key, count: $0.value) }
+    }
+
+    private var hasSubfolders: Bool { !subfolders.isEmpty }
 
     private var targetRowHeight: CGFloat {
         64 + CGFloat(library.zoomLevel) * 190
@@ -49,11 +86,38 @@ struct LibraryView: View {
     private var gallery: some View {
         VStack(spacing: 0) {
             header
+            if hasSubfolders {
+                folderChips
+            }
             if library.viewMode == .list {
                 listColumnHeader
             }
             galleryScroll
         }
+        .onChange(of: library.folderURL) {
+            folderScope = nil
+            searchText = ""
+        }
+    }
+
+    /// One chip per direct subfolder — the visible face of recursion.
+    private var folderChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                Chip(title: "All photos", selected: folderScope == nil) { folderScope = nil }
+                ForEach(subfolders, id: \.name) { folder in
+                    Chip(title: "\(folder.name) · \(folder.count)", selected: folderScope == folder.name) {
+                        folderScope = folderScope == folder.name ? nil : folder.name
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
+        .background(
+            Rectangle().fill(Theme.panel.opacity(0.25))
+                .overlay(alignment: .bottom) { Theme.hairline.frame(height: 1) }
+        )
     }
 
     /// Finder-style sortable column titles for list mode.
@@ -63,6 +127,9 @@ struct LibraryView: View {
             columnTitle("Name", key: .name, width: nil, alignment: .leading)
             Spacer(minLength: 12)
             columnTitle("★", key: .rating, width: nil, alignment: .trailing)
+            if hasSubfolders && folderScope == nil {
+                columnTitle("Folder", key: .folder, width: 120, alignment: .trailing)
+            }
             Text("Exposure")
                 .font(Theme.ui(10, .medium))
                 .foregroundStyle(Theme.ink3)
@@ -227,6 +294,9 @@ struct LibraryView: View {
             if library.viewMode != .list {
                 zoomSlider
             }
+            if let folderURL = library.folderURL, Library.isRemovable(folderURL) {
+                importControl
+            }
             Button("Open folder…") { openFolder() }
                 .buttonStyle(OutlineButtonStyle())
                 .clickCursor()
@@ -246,6 +316,34 @@ struct LibraryView: View {
                 .overlay(alignment: .bottom) { Theme.hairline.frame(height: 1) }
                 .ignoresSafeArea()
         )
+    }
+
+    /// Card offload: copies the shoot into ~/Pictures/Chiaro Library.
+    @ViewBuilder private var importControl: some View {
+        if let progress = library.importProgress {
+            HStack(spacing: 7) {
+                ProgressView(value: Double(progress.done), total: Double(progress.total))
+                    .progressViewStyle(.linear)
+                    .tint(Theme.amber)
+                    .frame(width: 90)
+                Text("\(progress.done)/\(progress.total)")
+                    .font(Theme.mono(10))
+                    .foregroundStyle(Theme.ink2)
+                    .monospacedDigit()
+            }
+        } else {
+            Button {
+                library.importToLibrary(library.selection.isEmpty ? library.photos : library.selectedPhotos)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "square.and.arrow.down").font(.system(size: 10, weight: .semibold))
+                    Text(library.selection.isEmpty ? "Import all to library" : "Import \(library.selection.count) to library")
+                }
+            }
+            .buttonStyle(GlassButtonStyle(tint: Theme.amber))
+            .clickCursor()
+            .help("Copy the shoot into your Chiaro Library, organized by capture day")
+        }
     }
 
     private var searchField: some View {
@@ -775,6 +873,14 @@ struct LibraryView: View {
                 Text(String(repeating: "★", count: photo.rating))
                     .font(.system(size: 8))
                     .foregroundStyle(Theme.amber)
+            }
+            if hasSubfolders && folderScope == nil {
+                Text(relativeFolder(photo))
+                    .font(Theme.mono(9))
+                    .foregroundStyle(Theme.ink3)
+                    .lineLimit(1)
+                    .truncationMode(.head)
+                    .frame(width: 120, alignment: .trailing)
             }
             if let exif = photo.exifSummary {
                 Text(exif)

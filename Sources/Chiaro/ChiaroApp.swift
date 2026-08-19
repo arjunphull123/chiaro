@@ -19,10 +19,12 @@ struct ChiaroApp: App {
         _exporting = State(initialValue: CommandLine.arguments.contains("--show-export"))
         Theme.registerFonts()
         let lib = library
+        // --quiet: dev-harness launches don't steal focus from the foreground app.
+        let quiet = CommandLine.arguments.contains("--quiet")
         DispatchQueue.main.async {
             MCPServer.shared.start(library: lib)
             NSApp.setActivationPolicy(.regular)
-            NSApp.activate(ignoringOtherApps: true)
+            if !quiet { NSApp.activate(ignoringOtherApps: true) }
         }
         // Dock icon for unbundled dev runs; the .app bundle carries the .icns.
         DispatchQueue.main.async {
@@ -45,6 +47,46 @@ struct ChiaroApp: App {
                 }
                 NSApp.terminate(nil)
             }
+        }
+        // --click <x> <y-from-top> [count]: post real mouse events through the
+        // app's own window — hit-testing behaves exactly as a user click.
+        if let i = args.firstIndex(of: "--click"), i + 2 < args.count {
+            let x = Double(args[i + 1]) ?? 0
+            let yTop = Double(args[i + 2]) ?? 0
+            let count = i + 3 < args.count ? Int(args[i + 3]) ?? 1 : 1
+            let clickLib = library
+            func attemptClick(_ triesLeft: Int) {
+                guard let window = NSApp.windows.first(where: { $0.contentView != nil }) else {
+                    if triesLeft > 0 {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { attemptClick(triesLeft - 1) }
+                    } else {
+                        fputs("CLICK: no window\n", stderr)
+                    }
+                    return
+                }
+                let point = NSPoint(x: x, y: window.frame.height - yTop)
+                let hit = window.contentView.flatMap { $0.hitTest($0.convert(point, from: nil)) }
+                fputs("CLICK: isKey=\(window.isKeyWindow) active=\(NSApp.isActive) " +
+                      "hit=\(hit.map { NSStringFromClass(type(of: $0)) } ?? "nil") " +
+                      "firstMouse=\(hit?.acceptsFirstMouse(for: nil) ?? false)\n", stderr)
+                for n in 0..<count {
+                    for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                        if let event = NSEvent.mouseEvent(
+                            with: type, location: point, modifierFlags: [],
+                            timestamp: ProcessInfo.processInfo.systemUptime,
+                            windowNumber: window.windowNumber, context: nil,
+                            eventNumber: 0, clickCount: 1, pressure: 1
+                        ) {
+                            window.sendEvent(event)
+                        }
+                    }
+                    fputs("CLICK \(n + 1) at \(point)\n", stderr)
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    fputs("POST: editing=\(clickLib.editing?.name ?? "nil")\n", stderr)
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { attemptClick(40) }
         }
         if let i = args.firstIndex(of: "--snapshot"), i + 1 < args.count {
             let path = args[i + 1]
@@ -178,8 +220,12 @@ struct RootView: View {
 
 /// Behind-window blur that makes the whole window translucent.
 struct WindowBackdrop: NSViewRepresentable {
+    final class FirstMouseEffectView: NSVisualEffectView {
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    }
+
     func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
+        let view = FirstMouseEffectView()
         view.material = .hudWindow
         view.blendingMode = .behindWindow
         view.state = .active
@@ -193,6 +239,7 @@ struct WindowBackdrop: NSViewRepresentable {
             window.isOpaque = false
             window.backgroundColor = .clear
             window.titlebarAppearsTransparent = true
+            if let content = window.contentView { FirstMouse.enable(content) }
         }
     }
 }

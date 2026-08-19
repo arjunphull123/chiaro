@@ -122,15 +122,26 @@ final class Library {
         recents.removeAll { $0 == url.path }
         recents.insert(url.path, at: 0)
         UserDefaults.standard.set(Array(recents.prefix(5)), forKey: "recentFolders")
+        // Recurse into subfolders (bounded: depth 5, 10k files) so a nested
+        // library — e.g. Chiaro Library/<day>/ — opens as one gallery.
         let fm = FileManager.default
-        let urls = (try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? []
+        var urls: [URL] = []
+        if let enumerator = fm.enumerator(
+            at: url, includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) {
+            for case let file as URL in enumerator {
+                if enumerator.level > 5 { enumerator.skipDescendants(); continue }
+                guard Photo.imageExtensions.contains(file.pathExtension.lowercased()) else { continue }
+                urls.append(file)
+                if urls.count >= 10_000 { break }
+            }
+        }
 
         // A RAW+JPEG pair is one photo; prefer the RAW.
         var byStem: [String: URL] = [:]
-        for u in urls.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
-            let ext = u.pathExtension.lowercased()
-            guard Photo.imageExtensions.contains(ext) else { continue }
-            let stem = u.deletingPathExtension().lastPathComponent
+        for u in urls.sorted(by: { $0.path < $1.path }) {
+            let stem = u.deletingPathExtension().path
             if let existing = byStem[stem],
                Photo.rawExtensions.contains(existing.pathExtension.lowercased()) {
                 continue
@@ -138,7 +149,7 @@ final class Library {
             byStem[stem] = u
         }
         photos = byStem.values
-            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+            .sorted { $0.path < $1.path }
             .map(Photo.init)
         loadThumbnails()
     }
@@ -279,6 +290,51 @@ final class Library {
         return values?.volumeIsRemovable ?? false
             || values?.volumeIsEjectable ?? false
             || values?.volumeIsReadOnly ?? false
+    }
+
+    // MARK: - Card import
+
+    var importProgress: (done: Int, total: Int)?
+
+    /// Offload a camera card: copy each photo — and its RAW+JPEG sibling —
+    /// into ~/Pictures/Chiaro Library/<capture day>/. Existing files are
+    /// skipped, so re-importing a card is safe and cheap.
+    func importToLibrary(_ targets: [Photo]) {
+        guard importProgress == nil, !targets.isEmpty else { return }
+        importProgress = (0, targets.count)
+        KeepAwake.poke(600)
+        let jobs = targets.map { photo in
+            (url: photo.url,
+             day: (photo.captureDate ?? Date()).formatted(.iso8601.year().month().day()))
+        }
+        DispatchQueue.global(qos: .utility).async {
+            let fm = FileManager.default
+            let root = fm.urls(for: .picturesDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("Chiaro Library")
+            var listings: [URL: [URL]] = [:]
+            for (index, job) in jobs.enumerated() {
+                let folder = root.appendingPathComponent(job.day)
+                try? fm.createDirectory(at: folder, withIntermediateDirectories: true)
+                let dir = job.url.deletingLastPathComponent()
+                if listings[dir] == nil {
+                    listings[dir] = (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
+                }
+                let stem = job.url.deletingPathExtension().lastPathComponent
+                let siblings = listings[dir]!.filter {
+                    $0.deletingPathExtension().lastPathComponent == stem
+                        && Photo.imageExtensions.contains($0.pathExtension.lowercased())
+                }
+                for file in siblings {
+                    let target = folder.appendingPathComponent(file.lastPathComponent)
+                    if !fm.fileExists(atPath: target.path) {
+                        try? fm.copyItem(at: file, to: target)
+                    }
+                }
+                let done = index + 1
+                DispatchQueue.main.async { self.importProgress = (done, jobs.count) }
+            }
+            DispatchQueue.main.async { self.importProgress = nil }
+        }
     }
 
     // MARK: - Edit transfer
