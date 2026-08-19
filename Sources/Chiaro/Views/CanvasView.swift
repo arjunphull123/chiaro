@@ -202,31 +202,27 @@ struct CanvasView: View {
     private var cropPanel: some View {
         VStack(spacing: 8) {
             ZStack {
-                HStack {
+                HStack(spacing: 6) {
                     aspectMenu
                     Spacer()
+                    Button { model.edit.straighten = 0 } label: {
+                        Image(systemName: "arrow.counterclockwise")
+                    }
+                    .buttonStyle(GlassIconButtonStyle())
+                    .clickCursor()
+                    .disabled(model.edit.straighten == 0)
+                    .help("Clear straighten")
                     Button("Auto") { model.autoLevel() }
                         .buttonStyle(GlassButtonStyle(tint: Theme.amber))
                         .clickCursor()
                         .help("Level the horizon automatically")
                 }
-                HStack(spacing: 5) {
-                    Text(EditParameter.straighten.format(model.edit.straighten))
-                        .font(Theme.mono(17, .medium))
-                        .foregroundStyle(Theme.amber)
-                        .monospacedDigit()
-                        .fixedSize()
-                    Button { model.edit.straighten = 0 } label: {
-                        Image(systemName: "arrow.counterclockwise")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(Theme.ink3)
-                    }
-                    .buttonStyle(.plain)
-                    .clickCursor()
-                    .disabled(model.edit.straighten == 0)
-                    .opacity(model.edit.straighten == 0 ? 0.3 : 1)
-                    .help("Clear straighten")
-                }
+                // Centered alone so the number sits exactly over the arc's center tick.
+                Text(EditParameter.straighten.format(model.edit.straighten))
+                    .font(Theme.mono(17, .medium))
+                    .foregroundStyle(Theme.amber)
+                    .monospacedDigit()
+                    .fixedSize()
             }
             .frame(width: 264)
             ArcRuler(value: straightenBinding)

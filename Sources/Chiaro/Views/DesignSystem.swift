@@ -199,24 +199,47 @@ struct AppMark: View {
 /// The app icon artwork: macOS-26 squircle tile, graphite ground lit from the
 /// upper left, the pinwheel in amber. Rendered to PNG via --render-icon.
 struct AppIconView: View {
+    private let tile: CGFloat = 850
+
     var body: some View {
         ZStack {
-            // Apple's icon grid: the tile is 824/1024 with transparent margin —
+            // Apple's icon grid: the tile floats in a transparent margin —
             // filling the canvas makes the icon loom over its dock neighbors.
-            RoundedRectangle(cornerRadius: 824 * 0.2237, style: .continuous)
+            RoundedRectangle(cornerRadius: tile * 0.2237, style: .continuous)
                 .fill(
                     RadialGradient(
                         colors: [Color(hex: 0x2F2F35), Color(hex: 0x141416)],
                         center: UnitPoint(x: 0.32, y: 0.22),
-                        startRadius: 50, endRadius: 930
+                        startRadius: 50, endRadius: 960
                     )
                 )
-                .frame(width: 824, height: 824)
+            // Liquid Glass rim: specular edge, bright at the top light source.
+            RoundedRectangle(cornerRadius: tile * 0.2237, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [.white.opacity(0.5), .white.opacity(0.12), .white.opacity(0.03), .white.opacity(0.16)],
+                        startPoint: .top, endPoint: .bottom
+                    ),
+                    lineWidth: 5
+                )
+            // Top sheen falling onto the glass.
+            RoundedRectangle(cornerRadius: tile * 0.2237, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .white.opacity(0.10), location: 0),
+                            .init(color: .white.opacity(0.02), location: 0.22),
+                            .init(color: .clear, location: 0.45),
+                        ],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                )
             PinwheelMark()
                 .fill(Theme.amber)
-                .frame(width: 560, height: 560)
+                .frame(width: 610, height: 610)
                 .shadow(color: .black.opacity(0.5), radius: 26, y: 12)
         }
+        .frame(width: tile, height: tile)
         .frame(width: 1024, height: 1024)
     }
 }
