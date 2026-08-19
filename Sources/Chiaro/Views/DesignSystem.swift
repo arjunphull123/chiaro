@@ -135,3 +135,25 @@ struct AppMark: View {
             .frame(width: size, height: size)
     }
 }
+
+/// The app icon artwork: macOS-26 squircle tile, graphite ground lit from the
+/// upper left, the pinwheel in amber. Rendered to PNG via --render-icon.
+struct AppIconView: View {
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 1024 * 0.2237, style: .continuous)
+                .fill(
+                    RadialGradient(
+                        colors: [Color(hex: 0x2F2F35), Color(hex: 0x141416)],
+                        center: UnitPoint(x: 0.32, y: 0.22),
+                        startRadius: 60, endRadius: 1150
+                    )
+                )
+            PinwheelMark()
+                .fill(Theme.amber)
+                .frame(width: 620, height: 620)
+                .shadow(color: .black.opacity(0.5), radius: 30, y: 14)
+        }
+        .frame(width: 1024, height: 1024)
+    }
+}

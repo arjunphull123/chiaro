@@ -24,8 +24,28 @@ struct ChiaroApp: App {
             NSApp.setActivationPolicy(.regular)
             NSApp.activate(ignoringOtherApps: true)
         }
+        // Dock icon for unbundled dev runs; the .app bundle carries the .icns.
+        DispatchQueue.main.async {
+            if let url = Bundle.module.url(forResource: "AppIcon", withExtension: "png"),
+               let image = NSImage(contentsOf: url) {
+                NSApp.applicationIconImage = image
+            }
+        }
         // Dev harness: `swift run Chiaro --open <folder> [--edit <name>] [--snapshot <png>]`
         let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--render-icon"), i + 1 < args.count {
+            let path = args[i + 1]
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                let renderer = ImageRenderer(content: AppIconView())
+                renderer.scale = 1
+                if let cg = renderer.cgImage {
+                    let rep = NSBitmapImageRep(cgImage: cg)
+                    try? rep.representation(using: .png, properties: [:])?
+                        .write(to: URL(fileURLWithPath: path))
+                }
+                NSApp.terminate(nil)
+            }
+        }
         if let i = args.firstIndex(of: "--snapshot"), i + 1 < args.count {
             let path = args[i + 1]
             let lib = library

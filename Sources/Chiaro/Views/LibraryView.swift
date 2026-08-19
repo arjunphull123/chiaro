@@ -51,21 +51,21 @@ struct LibraryView: View {
                                 ForEach(Array(justifiedRows(section.photos, width: width).enumerated()), id: \.offset) { _, row in
                                     HStack(spacing: gap) {
                                         ForEach(row.photos) { photo in
-                                            tile(photo, width: row.height * photo.aspect, height: row.height)
+                                            tile(photo, height: row.height)
                                         }
                                     }
                                 }
                             case .grid:
                                 let cell = 80 + CGFloat(library.zoomLevel) * 140
-                                LazyVGrid(columns: [GridItem(.adaptive(minimum: cell, maximum: cell * 1.4), spacing: gap)], spacing: gap) {
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: cell, maximum: cell * 1.35), spacing: gap)], spacing: gap) {
                                     ForEach(section.photos) { photo in
-                                        tile(photo, width: nil, height: cell)
+                                        gridTile(photo)
                                     }
                                 }
                             case .list:
-                                VStack(spacing: 2) {
-                                    ForEach(section.photos) { photo in
-                                        listRow(photo)
+                                VStack(spacing: 0) {
+                                    ForEach(Array(section.photos.enumerated()), id: \.element.id) { index, photo in
+                                        listRow(photo, alternate: index.isMultiple(of: 2))
                                     }
                                 }
                             }
@@ -258,8 +258,9 @@ struct LibraryView: View {
 
     @State private var hoveredTile: URL?
 
-    private func tile(_ photo: Photo, width: CGFloat?, height: CGFloat) -> some View {
+    private func tile(_ photo: Photo, height: CGFloat) -> some View {
         let selected = library.selection.contains(photo.url)
+        let width = height * photo.aspect
         return ZStack(alignment: .bottomTrailing) {
             Group {
                 if let cg = photo.thumbnail {
@@ -273,7 +274,6 @@ struct LibraryView: View {
                 }
             }
             .frame(width: width, height: height)
-            .frame(maxWidth: width == nil ? .infinity : nil)
             .clipShape(RoundedRectangle(cornerRadius: 7))
             .overlay(
                 RoundedRectangle(cornerRadius: 7)
@@ -303,7 +303,6 @@ struct LibraryView: View {
                     )
                 )
                 .frame(width: width, alignment: .leading)
-                .frame(maxWidth: width == nil ? .infinity : nil)
                 .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 7, bottomTrailingRadius: 7))
                 .allowsHitTesting(false)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
@@ -321,35 +320,52 @@ struct LibraryView: View {
             .padding(6)
             .shadow(color: .black.opacity(0.6), radius: 2)
         }
-        .contentShape(Rectangle())
-        .clickCursor()
-        .onHover { inside in
-            hoveredTile = inside ? photo.url : (hoveredTile == photo.url ? nil : hoveredTile)
-        }
-        .gesture(TapGesture(count: 2).onEnded {
-            library.edit(photo)
-        })
-        .simultaneousGesture(TapGesture().modifiers(.command).onEnded {
-            if selected { library.selection.remove(photo.url) }
-            else { library.selection.insert(photo.url); library.lastSelected = photo.url }
-        })
-        .simultaneousGesture(TapGesture().onEnded {
-            library.selection = [photo.url]
-            library.lastSelected = photo.url
-        })
-        .contextMenu {
-            Button("Open in editor") { library.edit(photo) }
-            Button("Export…") {
-                library.selection.insert(photo.url)
-                onExport()
+        .modifier(PhotoInteractions(photo: photo, library: library, hoveredTile: $hoveredTile, onExport: onExport))
+    }
+
+    /// Square grid cell: crop-filled, one-line caption, shared interactions.
+    private func gridTile(_ photo: Photo) -> some View {
+        let selected = library.selection.contains(photo.url)
+        return Color.clear
+            .aspectRatio(1, contentMode: .fit)
+            .overlay {
+                if let cg = photo.thumbnail {
+                    Image(cg, scale: 1, label: Text(photo.name))
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Theme.panel
+                }
             }
-            Divider()
-            Button("Copy edits") { library.copiedEdit = photo.edit }
-            Button("Paste edits") {
-                if let copied = library.copiedEdit { photo.edit = copied; Sidecar.write(for: photo) }
+            .clipShape(RoundedRectangle(cornerRadius: 7))
+            .overlay(alignment: .bottom) {
+                if hoveredTile == photo.url || library.showFilenames {
+                    Text(photo.name)
+                        .font(Theme.ui(9.5, .medium))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .padding(.horizontal, 7)
+                        .padding(.top, 14)
+                        .padding(.bottom, 5)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            LinearGradient(colors: [.clear, .black.opacity(0.8)], startPoint: .top, endPoint: .bottom)
+                        )
+                        .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 7, bottomTrailingRadius: 7))
+                        .allowsHitTesting(false)
+                }
             }
-            .disabled(library.copiedEdit == nil)
-        }
+            .overlay(alignment: .topTrailing) {
+                if photo.hasEdits {
+                    Circle().fill(Theme.amber).frame(width: 6, height: 6).padding(6)
+                        .shadow(color: .black.opacity(0.6), radius: 2)
+                }
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 7)
+                    .stroke(selected ? Theme.amber : .clear, lineWidth: 2)
+            )
+            .modifier(PhotoInteractions(photo: photo, library: library, hoveredTile: $hoveredTile, onExport: onExport))
     }
 
     private struct SourceItem: Identifiable {
@@ -603,78 +619,55 @@ struct LibraryView: View {
         return "\(raws.isEmpty ? photos.count : raws.count) photos · \(folder.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent)"
     }
 
-    private func listRow(_ photo: Photo) -> some View {
+    /// Finder-style row: 26pt, zebra striping, full-row selection, columns.
+    private func listRow(_ photo: Photo, alternate: Bool) -> some View {
         let selected = library.selection.contains(photo.url)
-        return HStack(spacing: 11) {
+        return HStack(spacing: 9) {
             Group {
                 if let cg = photo.thumbnail {
                     Image(cg, scale: 1, label: Text(photo.name))
                         .resizable()
-                        .aspectRatio(contentMode: .fill)
+                        .scaledToFill()
                 } else {
                     Theme.panel
                 }
             }
-            .frame(width: 58, height: 40)
-            .clipShape(RoundedRectangle(cornerRadius: 5))
-            VStack(alignment: .leading, spacing: 1) {
-                Text(photo.name)
-                    .font(Theme.ui(12, .medium))
-                    .foregroundStyle(Theme.ink)
-                if let exif = photo.exifSummary {
-                    Text(exif).font(Theme.mono(9)).foregroundStyle(Theme.ink3)
-                }
-            }
-            Spacer()
+            .frame(width: 30, height: 20)
+            .clipShape(RoundedRectangle(cornerRadius: 3))
+            Text(photo.name)
+                .font(Theme.ui(11.5, selected ? .medium : .regular))
+                .foregroundStyle(Theme.ink)
+                .lineLimit(1)
             if photo.hasEdits {
-                Circle().fill(Theme.amber).frame(width: 6, height: 6)
+                Circle().fill(Theme.amber).frame(width: 5, height: 5)
             }
+            Spacer(minLength: 12)
             if photo.rating > 0 {
                 Text(String(repeating: "★", count: photo.rating))
-                    .font(.system(size: 9))
+                    .font(.system(size: 8))
                     .foregroundStyle(Theme.amber)
             }
-            if let date = photo.captureDate {
-                Text(date.formatted(date: .omitted, time: .shortened))
+            if let exif = photo.exifSummary {
+                Text(exif)
                     .font(Theme.mono(9))
                     .foregroundStyle(Theme.ink3)
-                    .frame(width: 64, alignment: .trailing)
+                    .lineLimit(1)
+                    .frame(width: 190, alignment: .trailing)
             }
+            Text(photo.captureDate?.formatted(date: .omitted, time: .shortened) ?? "—")
+                .font(Theme.mono(9))
+                .foregroundStyle(Theme.ink3)
+                .frame(width: 60, alignment: .trailing)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 9)
+        .frame(height: 26)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(selected ? Color.white.opacity(0.08) : (hoveredTile == photo.url ? Color.white.opacity(0.04) : .clear))
+            RoundedRectangle(cornerRadius: 5)
+                .fill(selected ? Theme.amber.opacity(0.22)
+                    : hoveredTile == photo.url ? Color.white.opacity(0.05)
+                    : alternate ? Color.white.opacity(0.03) : .clear)
         )
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(selected ? Theme.amber.opacity(0.6) : .clear))
-        .contentShape(Rectangle())
-        .clickCursor()
-        .onHover { inside in
-            hoveredTile = inside ? photo.url : (hoveredTile == photo.url ? nil : hoveredTile)
-        }
-        .gesture(TapGesture(count: 2).onEnded { library.edit(photo) })
-        .simultaneousGesture(TapGesture().modifiers(.command).onEnded {
-            if selected { library.selection.remove(photo.url) }
-            else { library.selection.insert(photo.url); library.lastSelected = photo.url }
-        })
-        .simultaneousGesture(TapGesture().onEnded {
-            library.selection = [photo.url]
-            library.lastSelected = photo.url
-        })
-        .contextMenu {
-            Button("Open in editor") { library.edit(photo) }
-            Button("Export…") {
-                library.selection.insert(photo.url)
-                onExport()
-            }
-            Divider()
-            Button("Copy edits") { library.copiedEdit = photo.edit }
-            Button("Paste edits") {
-                if let copied = library.copiedEdit { photo.edit = copied; Sidecar.write(for: photo) }
-            }
-            .disabled(library.copiedEdit == nil)
-        }
+        .modifier(PhotoInteractions(photo: photo, library: library, hoveredTile: $hoveredTile, onExport: onExport))
     }
 
     private func openSelectedInEditor() {
@@ -721,5 +714,52 @@ struct LibraryView: View {
             rows.append(Row(photos: current, height: height))
         }
         return rows
+    }
+}
+
+/// One set of behaviors for every library representation: hover tracking,
+/// select / cmd-select, double-click to edit, and the photo context menu.
+private struct PhotoInteractions: ViewModifier {
+    let photo: Photo
+    let library: Library
+    @Binding var hoveredTile: URL?
+    let onExport: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .contentShape(Rectangle())
+            .clickCursor()
+            .onHover { inside in
+                hoveredTile = inside ? photo.url : (hoveredTile == photo.url ? nil : hoveredTile)
+            }
+            .gesture(TapGesture(count: 2).onEnded { library.edit(photo) })
+            .simultaneousGesture(TapGesture().modifiers(.command).onEnded {
+                if library.selection.contains(photo.url) {
+                    library.selection.remove(photo.url)
+                } else {
+                    library.selection.insert(photo.url)
+                    library.lastSelected = photo.url
+                }
+            })
+            .simultaneousGesture(TapGesture().onEnded {
+                library.selection = [photo.url]
+                library.lastSelected = photo.url
+            })
+            .contextMenu {
+                Button("Open in editor") { library.edit(photo) }
+                Button("Export…") {
+                    library.selection.insert(photo.url)
+                    onExport()
+                }
+                Divider()
+                Button("Copy edits") { library.copiedEdit = photo.edit }
+                Button("Paste edits") {
+                    if let copied = library.copiedEdit {
+                        photo.edit = copied
+                        Sidecar.write(for: photo)
+                    }
+                }
+                .disabled(library.copiedEdit == nil)
+            }
     }
 }
