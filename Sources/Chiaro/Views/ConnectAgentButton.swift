@@ -89,18 +89,10 @@ struct ConnectAgentButton: View {
                             .font(.system(size: 10))
                             .foregroundStyle(Theme.ink3)
                     }
-                    Text(connected ? AgentStatus.shared.displayName + " is connected" : "Connect agent")
-                        .font(Theme.ui(12, .medium))
+                    Text(connected ? AgentStatus.shared.displayName + " is connected" : "Connect your agent via MCP")
                 }
-                .foregroundStyle(connected ? Theme.ink : Theme.ink2)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(connected ? brand.color.opacity(0.45) : Theme.hairline)
-                )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(OutlineButtonStyle())
             .clickCursor()
         }
         .popover(isPresented: $showing, arrowEdge: .bottom) { AgentConnectPopover() }
@@ -129,7 +121,7 @@ struct AgentConnectPopover: View {
     private var historyContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("\(AgentStatus.shared.displayName) in Chiaro")
-                .font(Theme.serif(16))
+                .font(Theme.ui(14, .semibold))
                 .foregroundStyle(Theme.ink)
             ScrollView {
                 VStack(alignment: .leading, spacing: 7) {
@@ -161,7 +153,7 @@ struct AgentConnectPopover: View {
     private var connectContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Drive Chiaro with any agent")
-                .font(Theme.serif(16))
+                .font(Theme.ui(14, .semibold))
                 .foregroundStyle(Theme.ink)
             Text("Paste this into any MCP-capable agent — Claude Code, Cursor, whatever you run — and it can see, edit, and export your photos, live in this window. It will confirm once connected.")
                 .font(Theme.ui(11.5))

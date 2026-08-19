@@ -83,7 +83,7 @@ struct RailView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 5) {
                 Text("Curve")
-                    .font(Theme.serif(13, .semibold))
+                    .font(Theme.ui(12, .medium))
                     .foregroundStyle(Theme.ink2)
                 Rectangle().fill(Theme.hairline).frame(height: 1)
                 if model.edit.curve != CurvePoint.identity {
@@ -132,7 +132,7 @@ struct RailView: View {
     private func sectionLabel(_ title: String, help: String) -> some View {
         HStack(spacing: 5) {
             Text(title)
-                .font(Theme.serif(13, .semibold))
+                .font(Theme.ui(12, .medium))
                 .foregroundStyle(Theme.ink2)
             Rectangle().fill(Theme.hairline).frame(height: 1)
         }

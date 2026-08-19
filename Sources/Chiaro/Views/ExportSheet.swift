@@ -153,7 +153,7 @@ struct ExportSheet: View {
                     .buttonStyle(OutlineButtonStyle())
                     .clickCursor()
                     .keyboardShortcut(.escape)
-                Button(photos.count == 1 ? "Export Photo" : "Export \(photos.count) photos") {
+                Button(photos.count == 1 ? "Export photo" : "Export \(photos.count) photos") {
                     runExport()
                 }
                 .buttonStyle(AmberButtonStyle())
@@ -176,7 +176,7 @@ struct ExportSheet: View {
     private func sectionLabel(_ title: String) -> some View {
         HStack(spacing: 5) {
             Text(title)
-                .font(Theme.serif(12.5))
+                .font(Theme.ui(11, .medium))
                 .foregroundStyle(Theme.ink2)
             Rectangle().fill(Theme.hairline).frame(height: 1)
         }

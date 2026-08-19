@@ -91,3 +91,23 @@ struct Chip: View {
         .clickCursor()
     }
 }
+
+/// Interim brand mark: a sphere lit from the upper right — chiaroscuro itself.
+/// Doubles as the app-icon motif until a real icon is designed.
+struct AppMark: View {
+    var size: CGFloat = 24
+
+    var body: some View {
+        Circle()
+            .fill(
+                RadialGradient(
+                    colors: [Theme.amber, Color(hex: 0x8A5A2B), Color(hex: 0x17130E)],
+                    center: UnitPoint(x: 0.68, y: 0.3),
+                    startRadius: size * 0.05,
+                    endRadius: size * 0.95
+                )
+            )
+            .overlay(Circle().stroke(Color.white.opacity(0.12), lineWidth: 0.5))
+            .frame(width: size, height: size)
+    }
+}

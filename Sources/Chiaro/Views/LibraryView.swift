@@ -39,7 +39,7 @@ struct LibraryView: View {
                         VStack(alignment: .leading, spacing: gap) {
                             HStack(alignment: .firstTextBaseline, spacing: 8) {
                                 Text(section.title)
-                                    .font(Theme.serif(16))
+                                    .font(Theme.ui(13.5, .semibold))
                                     .foregroundStyle(Theme.ink)
                                 Text("\(section.photos.count)")
                                     .font(Theme.mono(10))
@@ -78,7 +78,7 @@ struct LibraryView: View {
             .clickCursor()
             .help("Back to the start screen (⌘W)")
             Text(library.folderName)
-                .font(Theme.serif(20, .semibold))
+                .font(Theme.ui(18, .semibold))
                 .foregroundStyle(Theme.ink)
             Text("\(library.photos.count) photos · \(library.photos.filter(\.isRAW).count) RAW")
                 .font(Theme.mono(10))
@@ -315,27 +315,37 @@ struct LibraryView: View {
         }
     }
 
+    /// "Good evening, Arjun" — hour-aware, first name from the macOS account.
+    private var greeting: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        let salutation = hour < 5 ? "Up late" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"
+        let first = NSFullUserName().split(separator: " ").first.map(String.init) ?? ""
+        return first.isEmpty ? salutation : "\(salutation), \(first)"
+    }
+
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("Chiaro")
-                    .font(Theme.serif(21, .semibold))
-                    .foregroundStyle(Theme.ink)
-                Spacer()
-                ConnectAgentButton()
-            }
-            .padding(.top, 12)
-            .padding(.bottom, 6)
-
             Spacer(minLength: 10)
 
             VStack(alignment: .leading, spacing: 11) {
+                HStack(spacing: 9) {
+                    AppMark(size: 23)
+                    Text("Chiaro")
+                        .font(Theme.serif(26, .semibold))
+                        .kerning(-0.8)
+                        .foregroundStyle(Theme.ink)
+                }
+                Text(greeting)
+                    .font(Theme.serif(34))
+                    .foregroundStyle(Theme.ink)
+                    .padding(.top, 14)
+                    .padding(.bottom, 4)
                 if let hero = recentEdits.first {
                     heroCard(hero)
                 }
                 if recentEdits.count > 1 {
                     Text("Recent edits")
-                        .font(Theme.serif(14, .semibold))
+                        .font(Theme.ui(12, .medium))
                         .foregroundStyle(Theme.ink2)
                         .padding(.top, 8)
                     HStack(spacing: 8) {
@@ -345,7 +355,7 @@ struct LibraryView: View {
                     }
                 }
                 Text("Sources")
-                    .font(Theme.serif(14, .semibold))
+                    .font(Theme.ui(12, .medium))
                     .foregroundStyle(Theme.ink2)
                     .padding(.top, 8)
                 VStack(spacing: 6) {
@@ -383,6 +393,9 @@ struct LibraryView: View {
         }
         .padding(.horizontal, 28)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay(alignment: .topTrailing) {
+            ConnectAgentButton().padding(14)
+        }
         .contentShape(Rectangle())
         .onAppear {
             refreshSources()
@@ -398,7 +411,11 @@ struct LibraryView: View {
     }
 
     private func heroCard(_ item: RecentEditItem) -> some View {
-        Button {
+        // True to the photo's aspect, capped by height.
+        let aspect = item.image.map { Double($0.width) / Double($0.height) } ?? 1.5
+        let height: CGFloat = 300
+        let width = min(620, height * CGFloat(aspect))
+        return Button {
             openRecentEdit(item.id)
         } label: {
             ZStack(alignment: .bottomLeading) {
@@ -411,19 +428,19 @@ struct LibraryView: View {
                         Theme.panel
                     }
                 }
-                .frame(width: 620, height: 260)
-                LinearGradient(colors: [.clear, .black.opacity(0.75)], startPoint: .center, endPoint: .bottom)
+                .frame(width: width, height: height)
+                LinearGradient(colors: [.clear, .black.opacity(0.7)], startPoint: .center, endPoint: .bottom)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.id.deletingPathExtension().lastPathComponent)
-                        .font(Theme.ui(14, .semibold))
+                        .font(Theme.ui(13.5, .semibold))
                         .foregroundStyle(.white)
                     Text(heroSubtitle(item))
                         .font(Theme.mono(9.5))
                         .foregroundStyle(.white.opacity(0.65))
                 }
-                .padding(14)
+                .padding(13)
             }
-            .frame(width: 620, height: 260)
+            .frame(width: width, height: height)
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
@@ -478,8 +495,7 @@ struct LibraryView: View {
             }
             .padding(.horizontal, 13)
             .padding(.vertical, 9)
-            .background(RoundedRectangle(cornerRadius: 9).fill(Color.white.opacity(0.04)))
-            .overlay(RoundedRectangle(cornerRadius: 9).stroke(Theme.hairline))
+            .chiaroGlass(cornerRadius: 10)
         }
         .buttonStyle(.plain)
         .clickCursor()

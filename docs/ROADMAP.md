@@ -1,5 +1,13 @@
 # Roadmap
 
+## Ship list (v1.0, beyond features — owner's list, 2026-08-19)
+
+Features done → bug sweep → ADRs current → app icon → landing page
+(chiaro.arjunphull.dev) → repo polish → open-source decision + monetization
+framing → distribution (Sparkle/Homebrew/notarization) → LinkedIn launch post
+("agent-native" framing) → competitive positioning check.
+Culling flow: cut from the feature queue by owner decision.
+
 Decisions (2026-08-18): first build spans Tiers 1+2; AI features are designed-for but
 deferred (ADR 0003); personal tool first — no signing/App Store constraints yet.
 
