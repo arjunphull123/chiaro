@@ -8,6 +8,7 @@ struct EditView: View {
     @State private var scrollMonitor: Any?
     @State private var savingVersion = false
     @State private var versionName = ""
+    @State private var versionsHovering = false
     @FocusState private var focused: Bool
 
     init(library: Library, photo: Photo, onExport: @escaping () -> Void) {
@@ -182,7 +183,8 @@ struct EditView: View {
 
     private var toolbar: some View {
         HStack(spacing: 7) {
-            iconAction("Auto", icon: "wand.and.stars") { model.autoEnhance() }
+            iconAction(model.autoApplied ? "Undo auto" : "Auto",
+                       icon: "wand.and.stars", active: model.autoApplied) { model.autoEnhance() }
             iconAction(model.photo.starred ? "Starred" : "Star",
                        icon: model.photo.starred ? "star.fill" : "star",
                        active: model.photo.starred) {
@@ -190,7 +192,6 @@ struct EditView: View {
                 model.saveNow()
             }
             iconAction("Crop", icon: "crop", active: model.cropMode) { model.cropMode.toggle() }
-            iconAction("Level", icon: "level") { model.autoLevel() }
             iconAction("Headshot", icon: "person.crop.square") { model.autoHeadshotCrop() }
             iconAction("Rotate", icon: "rotate.right") {
                 model.edit.rotation = (model.edit.rotation + 90) % 360
@@ -240,14 +241,32 @@ struct EditView: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(model.photo.snapshots.isEmpty ? Theme.ink2 : Theme.amber)
                 .frame(width: 16, height: 14)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 7)
-                .chiaroGlass(cornerRadius: 10)
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .clickCursor()
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
+        .chiaroGlass(cornerRadius: 10)
+        .overlay(alignment: .top) {
+            if versionsHovering {
+                Text("Versions")
+                    .font(Theme.ui(10, .medium))
+                    .foregroundStyle(Theme.ink)
+                    .fixedSize()
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Color.black.opacity(0.75)))
+                    .overlay(Capsule().stroke(Theme.hairline))
+                    .offset(y: 32)
+                    .transition(.opacity)
+                    .allowsHitTesting(false)
+            }
+        }
+        .onHover { inside in
+            withAnimation(.easeOut(duration: 0.12)) { versionsHovering = inside }
+            if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
         .help("Versions — save and switch between edit states")
         .alert("Save version", isPresented: $savingVersion) {
             TextField("Name", text: $versionName)
@@ -319,6 +338,13 @@ struct EditView: View {
             .foregroundStyle(model.canvasZoom > 1 ? Theme.amber : Theme.ink2)
             .clickCursor()
             .help("Actual pixels — check sharpness (Z toggles)")
+            Slider(value: Binding(
+                get: { Double(model.canvasZoom) },
+                set: { model.canvasZoom = CGFloat($0) }
+            ), in: 1...8)
+                .tint(Theme.amber)
+                .controlSize(.mini)
+                .frame(width: 76)
             Text(String(format: "×%.1f", model.canvasZoom))
                 .font(Theme.mono(9))
                 .foregroundStyle(Theme.ink3)

@@ -117,7 +117,6 @@ struct ChiaroApp: App {
                 }
                 let url = photo.url
                 let focus = photo.edit.focusDepth
-                let range = photo.edit.focusRange
                 DispatchQueue.global(qos: .userInitiated).async {
                     guard let base = RawEngine.shared.preview(for: url),
                           let grid = DepthEngine.shared.pointGrid(for: url, image: base) else {
@@ -126,11 +125,11 @@ struct ChiaroApp: App {
                         return
                     }
                     DispatchQueue.main.async {
-                        let scene = DepthScene.build(grid: grid, focusDepth: focus, focusRange: range)
+                        let scene = DepthScene.build(grid: grid, focusDepth: focus)
                         scene.rootNode.childNode(withName: "rig", recursively: false)?
                             .childNode(withName: "cloud", recursively: false)?
                             .morpher?.setWeight(1, forTargetAt: 0)
-                        DepthScene.updatePlanes(in: scene, focusDepth: focus, focusRange: range)
+                        DepthScene.updatePlanes(in: scene, focusDepth: focus)
                         scene.background.contents = NSColor(Theme.ground)
                         let cameraNode = scene.rootNode.childNode(withName: "camera", recursively: false)
                         cameraNode?.position = SCNVector3(0.99, 0.68, 1.99) // rest orbit pose

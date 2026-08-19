@@ -235,6 +235,36 @@ struct LibraryView: View {
         }
     }
 
+    private func filterChip(_ option: LibraryFilter) -> some View {
+        let active = filter == option
+        return Button { filter = option } label: {
+            Group {
+                if option == .starred {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(active ? Theme.amber : Theme.ink3)
+                } else if option == .edited {
+                    PinwheelMark()
+                        .fill(active ? Theme.amber : Theme.ink3)
+                        .frame(width: 11, height: 11)
+                } else {
+                    Text(option.rawValue)
+                        .font(Theme.ui(10, .medium))
+                        .foregroundStyle(active ? Theme.amber : Theme.ink3)
+                }
+            }
+            .padding(.horizontal, 8)
+            .frame(height: 22)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(active ? Color.white.opacity(0.08) : .clear)
+            )
+        }
+        .buttonStyle(.plain)
+        .clickCursor()
+        .help(option == .all ? "Every photo" : option == .starred ? "Starred only" : "Edited only")
+    }
+
     /// Pinned frosted header: title, zoom slider, and the real actions.
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -267,25 +297,7 @@ struct LibraryView: View {
             Spacer()
             HStack(spacing: 3) {
                 ForEach(LibraryFilter.allCases, id: \.self) { option in
-                    Button { filter = option } label: {
-                        Group {
-                            if option == .starred {
-                                Image(systemName: "star.fill").font(.system(size: 9, weight: .medium))
-                            } else {
-                                Text(option.rawValue).font(Theme.ui(10, .medium))
-                            }
-                        }
-                        .foregroundStyle(filter == option ? Theme.amber : Theme.ink3)
-                        .padding(.horizontal, 8)
-                        .frame(height: 22)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(filter == option ? Color.white.opacity(0.08) : .clear)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .clickCursor()
-                    .help(option == .all ? "Every photo" : option == .starred ? "Starred only" : "Edited only")
+                    filterChip(option)
                 }
             }
             .padding(3)
@@ -522,7 +534,7 @@ struct LibraryView: View {
     private func tile(_ photo: Photo, height: CGFloat) -> some View {
         let selected = library.selection.contains(photo.url)
         let width = height * photo.aspect
-        return ZStack(alignment: .bottomTrailing) {
+        return ZStack(alignment: .topTrailing) {
             Group {
                 if let cg = photo.thumbnail {
                     Image(cg, scale: 1, label: Text(photo.name))
@@ -540,6 +552,13 @@ struct LibraryView: View {
                 RoundedRectangle(cornerRadius: 7)
                     .stroke(selected ? Theme.amber : .clear, lineWidth: 2)
             )
+            .overlay(alignment: .topLeading) {
+                if photo.hasEdits {
+                    AppMark(size: 10)
+                        .padding(6)
+                        .shadow(color: .black.opacity(0.7), radius: 2)
+                }
+            }
             if hoveredTile == photo.url || library.showFilenames {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(photo.name)
@@ -568,18 +587,13 @@ struct LibraryView: View {
                 .allowsHitTesting(false)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             }
-            HStack(spacing: 4) {
-                if photo.starred {
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 8))
-                        .foregroundStyle(Theme.amber)
-                }
-                if photo.hasEdits {
-                    Circle().fill(Theme.amber).frame(width: 6, height: 6)
-                }
+            if photo.starred {
+                Image(systemName: "star.fill")
+                    .font(.system(size: 9))
+                    .foregroundStyle(Theme.amber)
+                    .padding(6)
+                    .shadow(color: .black.opacity(0.7), radius: 2)
             }
-            .padding(6)
-            .shadow(color: .black.opacity(0.6), radius: 2)
         }
         .modifier(PhotoInteractions(photo: photo, library: library, hoveredTile: $hoveredTile, onExport: onExport))
     }
@@ -617,9 +631,19 @@ struct LibraryView: View {
                 }
             }
             .overlay(alignment: .topTrailing) {
+                if photo.starred {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(Theme.amber)
+                        .padding(6)
+                        .shadow(color: .black.opacity(0.7), radius: 2)
+                }
+            }
+            .overlay(alignment: .topLeading) {
                 if photo.hasEdits {
-                    Circle().fill(Theme.amber).frame(width: 6, height: 6).padding(6)
-                        .shadow(color: .black.opacity(0.6), radius: 2)
+                    AppMark(size: 10)
+                        .padding(6)
+                        .shadow(color: .black.opacity(0.7), radius: 2)
                 }
             }
             .overlay(
@@ -900,7 +924,7 @@ struct LibraryView: View {
                 .foregroundStyle(Theme.ink)
                 .lineLimit(1)
             if photo.hasEdits {
-                Circle().fill(Theme.amber).frame(width: 5, height: 5)
+                AppMark(size: 9)
             }
             Spacer(minLength: 12)
             if photo.starred {

@@ -212,7 +212,7 @@ final class MCPServer {
             "clarity": "Effects", "vignette": "Effects",
             "sharpness": "Detail", "noiseReduction": "Detail",
             "blurF": "Background blur", "relight": "Background blur", "maskReach": "Background blur",
-            "focusDepth": "Background blur", "focusRange": "Background blur",
+            "focusDepth": "Background blur",
             "blurMode": "Background blur", "depthBlur": "Background blur",
             "locals": "Masking",
         ]
@@ -249,7 +249,7 @@ final class MCPServer {
         props["blurMode"] = [
             "type": "string",
             "enum": ["subject", "person", "depth"],
-            "description": "what stays sharp: subject (any lifted foreground), person (people only), or depth (focus plane — pair with focusDepth 0 near…1 far and focusRange; needs the depth model downloaded in the app)",
+            "description": "what stays sharp: subject (any lifted foreground), person (people only), or depth (a focus plane — focusDepth 0 near…1 far; everything nearer stays sharp; needs the depth model downloaded in the app)",
         ]
         props["hsl"] = [
             "type": "object",

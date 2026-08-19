@@ -60,8 +60,7 @@ final class EditViewModel {
         didSet {
             if armed != nil { armedHSL = nil }
             // Focus peaking overlays only while Focus is armed.
-            let peakers: Set<EditParameter?> = [.focusDepth, .focusRange]
-            guard armed != oldValue, peakers.contains(armed) || peakers.contains(oldValue) else { return }
+            guard armed != oldValue, armed == .focusDepth || oldValue == .focusDepth else { return }
             scheduleRender()
         }
     }
@@ -162,6 +161,8 @@ final class EditViewModel {
         undoStack.removeAll()
         redoStack.removeAll()
         armed = nil
+        autoApplied = false
+        preAutoEdit = nil
         preview = nil
         originalPreview = nil
         basePreview = nil
@@ -279,9 +280,17 @@ final class EditViewModel {
         Sidecar.write(for: photo)
     }
 
-    /// The wand: conservative histogram heuristics, subject-weighted when a
-    /// person is in frame. Every output is an ordinary EditState value.
+    /// The wand is a toggle: apply the auto edit, or click again to restore
+    /// whatever was there before.
+    var autoApplied = false
+    private var preAutoEdit: EditState?
+
     func autoEnhance() {
+        if autoApplied {
+            if let preAutoEdit { edit = preAutoEdit }
+            autoApplied = false
+            return
+        }
         guard let basePreview else { return }
         let mask = personMask
         let current = edit
@@ -290,7 +299,9 @@ final class EditViewModel {
                 AutoEnhance.compute(base: basePreview, subjectMask: mask, onto: current)
             }
             guard let self, let enhanced else { return }
+            self.preAutoEdit = current
             self.edit = enhanced
+            self.autoApplied = true
         }
     }
 
@@ -319,7 +330,8 @@ final class EditViewModel {
                 return DepthEngine.subjectFocus(depth: depth, mask: mask)
             }
             guard let self, let focus, self.edit.blurMode == .depth else { return }
-            self.edit.focusDepth = focus
+            // The plane sits just behind the subject, not through it.
+            self.edit.focusDepth = (focus + 0.14).clamped(to: 0...1)
         }
     }
 
@@ -337,7 +349,7 @@ final class EditViewModel {
         let mask = personMask
         let skipCrop = cropMode
         let url = photo.url
-        let peaking = (armed == .focusDepth || armed == .focusRange) && edit.blurMode == .depth
+        let peaking = armed == .focusDepth && edit.blurMode == .depth
         let clipping = showClipping
         Task { [weak self] in
             let result = await Offload.on(Offload.render) { () -> (CGImage, HistogramData)? in

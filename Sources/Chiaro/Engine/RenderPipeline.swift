@@ -92,9 +92,9 @@ enum RenderPipeline {
         // Focus peaking (preview only, never export): amber wash over the
         // in-focus plane while the Focus control is armed.
         if focusPeaking, edit.blurMode == .depth, let depthMap {
-            // Peaking shows the sharp zone: everything nearer than the far
-            // edge, with a small soft shoulder.
-            let farEdge = (1 - edit.focusDepth) - edit.focusRange * 0.4 - 0.04
+            // Peaking shows the sharp zone: everything nearer than the
+            // plane, with a small soft shoulder.
+            let farEdge = 1 - edit.focusDepth - 0.04
             let inFocus = depthMap.cropped(to: image.extent)
                 .applyingFilter("CIColorMatrix", parameters: [
                     "inputRVector": CIVector(x: 12, y: 0, z: 0, w: 0),
@@ -162,6 +162,20 @@ enum RenderPipeline {
         if edit.flipV { result = result.oriented(.downMirrored) }
         for _ in 0..<(((edit.rotation % 360) + 360) % 360 / 90) {
             result = result.oriented(.right)
+        }
+        if edit.skewV != 0 || edit.skewH != 0 {
+            let e = result.extent
+            let dv = CGFloat(edit.skewV / 100) * e.width * 0.3
+            let dh = CGFloat(edit.skewH / 100) * e.height * 0.3
+            let f = CIFilter.perspectiveTransform()
+            f.inputImage = result
+            f.topLeft = CGPoint(x: e.minX - dv, y: e.maxY + dh)
+            f.topRight = CGPoint(x: e.maxX + dv, y: e.maxY - dh)
+            f.bottomLeft = CGPoint(x: e.minX + dv, y: e.minY + dh)
+            f.bottomRight = CGPoint(x: e.maxX - dv, y: e.minY - dh)
+            if let skewed = f.outputImage {
+                result = skewed.cropped(to: e.insetBy(dx: abs(dv), dy: abs(dh)))
+            }
         }
         if edit.straighten != 0 {
             let extent = result.extent
@@ -329,10 +343,9 @@ enum RenderPipeline {
             // the person.
             let amountMask: CIImage?
             if edit.blurMode == .depth, let depthMap {
-                // One-sided: everything from the focus plane toward the camera
-                // stays sharp — blur ramps only beyond the sharp zone's far
-                // edge. (Two-sided optics blur noses; nobody wants that.)
-                let farEdge = (1 - edit.focusDepth) - edit.focusRange * 0.4
+                // One-sided: Focus IS the plane — everything nearer stays
+                // sharp, blur ramps beyond it. (Two-sided optics blur noses.)
+                let farEdge = 1 - edit.focusDepth
                 let gain: CGFloat = 2.4
                 amountMask = depthMap.cropped(to: image.extent)
                     .applyingFilter("CIColorMatrix", parameters: [

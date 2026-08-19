@@ -119,8 +119,8 @@ struct EditState: Codable, Equatable {
     var relight: Double = 0       // -100...100
     var maskReach: Double = 0     // -100...100: grow (+) or shrink (−) the subject mask
     var blurMode: BlurMode = .subject
-    var focusDepth: Double = 0.5  // 0 = nearest, 1 = farthest — the plane kept sharp
-    var focusRange: Double = 0.25 // width of the sharp zone around the focus plane
+    var focusDepth: Double = 0.5  // the focus plane, 0 = nearest, 1 = farthest —
+                                  // everything nearer stays sharp, blur ramps beyond
     // Local adjustments: masked corrections, applied after global ones
     var locals: [LocalAdjustment] = []
     // Color mixer: 8 hue bands (see HSLBand.names)
@@ -132,6 +132,8 @@ struct EditState: Codable, Equatable {
     var flipH = false
     var flipV = false
     var straighten: Double = 0    // -45...45 degrees
+    var skewV: Double = 0         // -30...30: keystone, verticals converge/diverge
+    var skewH: Double = 0         // -30...30: keystone, horizontals
     var crop: CropRect = .full    // normalized, applied after straighten
 
     static let neutral = EditState()
@@ -208,8 +210,8 @@ enum EditParameter: String, CaseIterable, Identifiable {
     case temp, tint, vibrance, saturation
     case clarity, vignette
     case sharpness, noiseReduction
-    case blurF, relight, maskReach, focusDepth, focusRange
-    case straighten
+    case blurF, relight, maskReach, focusDepth
+    case straighten, skewV, skewH
 
     var id: String { rawValue }
 
@@ -221,8 +223,9 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .relight: "Relight"
         case .maskReach: "Mask"
         case .focusDepth: "Focus"
-        case .focusRange: "Range"
         case .straighten: "Straighten"
+        case .skewV: "Skew V"
+        case .skewH: "Skew H"
         default: rawValue.prefix(1).uppercased() + rawValue.dropFirst()
         }
     }
@@ -231,18 +234,15 @@ enum EditParameter: String, CaseIterable, Identifiable {
         switch self {
         case .exposure: -3...3
         case .straighten: -45...45
+        case .skewV, .skewH: -30...30
         case .vignette, .sharpness, .noiseReduction: 0...100
-        case .blurF, .focusDepth, .focusRange: 0...1
+        case .blurF, .focusDepth: 0...1
         default: -100...100
         }
     }
 
     var defaultValue: Double {
-        switch self {
-        case .focusDepth: 0.5
-        case .focusRange: 0.25
-        default: 0
-        }
+        self == .focusDepth ? 0.5 : 0
     }
 
     /// Detent positions for haptic feedback while scrubbing (ADR 0005).
@@ -256,7 +256,6 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .exposure: [-2, -1, 0, 1, 2]
         case .vignette, .sharpness, .noiseReduction: []
         case .focusDepth: [0.5]
-        case .focusRange: [0.25]
         default: [0]
         }
     }
@@ -289,8 +288,9 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .relight: \.relight
         case .maskReach: \.maskReach
         case .focusDepth: \.focusDepth
-        case .focusRange: \.focusRange
         case .straighten: \.straighten
+        case .skewV: \.skewV
+        case .skewH: \.skewH
         }
     }
 
@@ -305,8 +305,8 @@ enum EditParameter: String, CaseIterable, Identifiable {
             }()
         case .vignette, .sharpness, .noiseReduction: String(format: "%.0f", v)
         case .focusDepth: v <= 0.02 ? "near" : v >= 0.98 ? "far" : String(format: "%.0f%%", v * 100)
-        case .focusRange: String(format: "%.0f%%", v * 100)
         case .straighten: String(format: "%.1f°", v)
+        case .skewV, .skewH: v == 0 ? "0" : String(format: "%+.0f", v)
         default: v == 0 ? "0" : String(format: "%+.0f", v)
         }
     }

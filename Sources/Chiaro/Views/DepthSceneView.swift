@@ -22,7 +22,7 @@ enum DepthScene {
     static let restYaw: CGFloat = 0.46
     static let restPitch: CGFloat = 0.26
 
-    static func build(grid: DepthEngine.PointGrid, focusDepth: Double, focusRange: Double) -> SCNScene {
+    static func build(grid: DepthEngine.PointGrid, focusDepth: Double) -> SCNScene {
         let scene = SCNScene()
         scene.background.contents = NSColor.clear
 
@@ -56,7 +56,7 @@ enum DepthScene {
         let planeSize = CGSize(width: CGFloat(grid.aspect) * planeHeight, height: planeHeight)
         rig.addChildNode(slicePlane(name: "edge", size: planeSize, emphasis: 1))
 
-        updatePlanes(in: scene, focusDepth: focusDepth, focusRange: focusRange, hidden: true)
+        updatePlanes(in: scene, focusDepth: focusDepth, hidden: true)
         return scene
     }
 
@@ -182,11 +182,10 @@ enum DepthScene {
         return geometry
     }
 
-    static func updatePlanes(in scene: SCNScene, focusDepth: Double, focusRange: Double, hidden: Bool = false) {
+    static func updatePlanes(in scene: SCNScene, focusDepth: Double, hidden: Bool = false) {
         guard let rig = scene.rootNode.childNode(withName: "rig", recursively: false),
               let plane = rig.childNode(withName: "edge", recursively: false) else { return }
-        let farEdge = (1 - focusDepth) - focusRange * 0.4
-        plane.position = SCNVector3(0, -planeHeight / 2, CGFloat((Float(farEdge) - 0.5) * zSpan))
+        plane.position = SCNVector3(0, -planeHeight / 2, CGFloat((Float(1 - focusDepth) - 0.5) * zSpan))
         plane.scale = SCNVector3(1, hidden ? 0.001 : 1, 1)
     }
 
@@ -210,7 +209,6 @@ struct DepthSceneView: NSViewRepresentable {
     var yaw: CGFloat
     var pitch: CGFloat
     var focusDepth: Double
-    var focusRange: Double
 
     func makeNSView(context: Context) -> SCNView {
         let view = ScrollableSCNView()
@@ -242,7 +240,7 @@ struct DepthSceneView: NSViewRepresentable {
             coordinator.rebuildCloud()
         }
         if let scene = view.scene, !coordinator.isAnimating {
-            DepthScene.updatePlanes(in: scene, focusDepth: focusDepth, focusRange: focusRange)
+            DepthScene.updatePlanes(in: scene, focusDepth: focusDepth)
             if !coordinator.dragOwnsCamera { coordinator.applyOrbit() }
         }
         if let command = model.depthSceneCommand {
@@ -270,7 +268,6 @@ struct DepthSceneView: NSViewRepresentable {
         private enum DragTarget { case plane, orbit }
         private var dragTarget: DragTarget?
         private var startFocus = 0.0
-        private var startRange = 0.0
         private var startYaw: CGFloat = 0
         private var startPitch: CGFloat = 0
 
@@ -305,8 +302,7 @@ struct DepthSceneView: NSViewRepresentable {
             let model = model
             Task {
                 guard let grid = await model.depthGrid() else { return }
-                let scene = DepthScene.build(
-                    grid: grid, focusDepth: model.edit.focusDepth, focusRange: model.edit.focusRange)
+                let scene = DepthScene.build(grid: grid, focusDepth: model.edit.focusDepth)
                 self.view?.scene = scene
                 self.animateIn()
             }
@@ -354,8 +350,7 @@ struct DepthSceneView: NSViewRepresentable {
             SCNTransaction.completionBlock = { [weak self] in
                 Task { @MainActor in self?.isAnimating = false }
             }
-            DepthScene.updatePlanes(
-                in: scene, focusDepth: model.edit.focusDepth, focusRange: model.edit.focusRange)
+            DepthScene.updatePlanes(in: scene, focusDepth: model.edit.focusDepth)
             SCNTransaction.commit()
         }
 
@@ -400,8 +395,7 @@ struct DepthSceneView: NSViewRepresentable {
                     SCNTransaction.commit()
                 }
             }
-            DepthScene.updatePlanes(
-                in: scene, focusDepth: model.edit.focusDepth, focusRange: model.edit.focusRange, hidden: true)
+            DepthScene.updatePlanes(in: scene, focusDepth: model.edit.focusDepth, hidden: true)
             SCNTransaction.commit()
         }
 
@@ -432,7 +426,7 @@ struct DepthSceneView: NSViewRepresentable {
 
         private func refresh() {
             guard let scene = view?.scene else { return }
-            DepthScene.updatePlanes(in: scene, focusDepth: model.edit.focusDepth, focusRange: model.edit.focusRange)
+            DepthScene.updatePlanes(in: scene, focusDepth: model.edit.focusDepth)
         }
 
         @objc func pan(_ gesture: NSPanGestureRecognizer) {
@@ -442,7 +436,6 @@ struct DepthSceneView: NSViewRepresentable {
             case .began:
                 dragOwnsCamera = true
                 startFocus = model.edit.focusDepth
-                startRange = model.edit.focusRange
                 startYaw = model.sceneYaw
                 startPitch = model.scenePitch
                 // Only the handles grab a plane; everything else orbits.

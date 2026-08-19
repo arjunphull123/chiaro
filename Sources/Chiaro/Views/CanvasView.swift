@@ -30,7 +30,7 @@ struct CanvasView: View {
                     DepthSceneView(
                         model: model, fitFraction: fitFraction(in: fitRegion),
                         yaw: model.sceneYaw, pitch: model.scenePitch,
-                        focusDepth: model.edit.focusDepth, focusRange: model.edit.focusRange
+                        focusDepth: model.edit.focusDepth
                     )
                         .frame(width: fitRegion.width, height: fitRegion.height)
                         .overlay(alignment: .topTrailing) {
@@ -209,20 +209,29 @@ struct CanvasView: View {
                 Text("Straighten")
                     .font(Theme.ui(10))
                     .foregroundStyle(Theme.ink3)
-                Slider(value: straightenBinding, in: -45...45)
-                    .tint(Theme.amber)
-                    .controlSize(.small)
-                    .frame(width: 180)
+                Button("Auto") { model.autoLevel() }
+                    .buttonStyle(.plain)
+                    .font(Theme.ui(10, .medium))
+                    .foregroundStyle(Theme.amber)
+                    .clickCursor()
+                    .help("Level the horizon automatically")
+                Spacer()
                 Text(EditParameter.straighten.format(model.edit.straighten))
                     .font(Theme.mono(10))
                     .foregroundStyle(model.edit.straighten == 0 ? Theme.ink3 : Theme.amber)
                     .frame(width: 42, alignment: .trailing)
                     .monospacedDigit()
             }
+            ArcRuler(value: straightenBinding)
+                .frame(width: 264, height: 46)
+            skewRow("Vertical", parameter: .skewV)
+            skewRow("Horizontal", parameter: .skewH)
             HStack(spacing: 8) {
                 Button("Reset") {
                     model.edit.crop = .full
                     model.edit.straighten = 0
+                    model.edit.skewV = 0
+                    model.edit.skewH = 0
                     model.cropAspect = nil
                 }
                 .buttonStyle(OutlineButtonStyle())
@@ -235,6 +244,27 @@ struct CanvasView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 13)
         .chiaroGlass(cornerRadius: 15)
+    }
+
+    private func skewRow(_ label: String, parameter: EditParameter) -> some View {
+        HStack(spacing: 10) {
+            Text(label)
+                .font(Theme.ui(10))
+                .foregroundStyle(Theme.ink3)
+                .frame(width: 62, alignment: .leading)
+            Slider(value: Binding(
+                get: { parameter.value(in: model.edit) },
+                set: { parameter.set($0, in: &model.edit) }
+            ), in: -30...30)
+                .tint(Theme.amber)
+                .controlSize(.mini)
+            Text(parameter.format(parameter.value(in: model.edit)))
+                .font(Theme.mono(10))
+                .foregroundStyle(parameter.value(in: model.edit) == 0 ? Theme.ink3 : Theme.amber)
+                .frame(width: 42, alignment: .trailing)
+                .monospacedDigit()
+        }
+        .frame(width: 264)
     }
 
     private var originalAspect: Double? {
@@ -354,19 +384,19 @@ struct CanvasView: View {
         }
     }
 
-    /// The 3D scene's card: same glass dial, driving Range — Focus is set
-    /// spatially (planes, dots) — and its checkmark exits the scene.
+    /// The 3D scene's card: the same glass dial, driving the focus plane —
+    /// exactly what dragging the plane does. Done exits the scene.
     private var depthSceneCard: some View {
         dialCard(
-            label: "Range",
-            value: EditParameter.focusRange.format(model.edit.focusRange),
-            t: model.edit.focusRange,
-            detents: [0.25],
+            label: "Focus",
+            value: EditParameter.focusDepth.format(model.edit.focusDepth),
+            t: model.edit.focusDepth,
+            detents: [0.5],
             doneHelp: "Exit 3D focus (esc)",
             onDrag: { dx in
-                model.edit.focusRange = (model.edit.focusRange + Double(dx) / 260).clamped(to: 0...1)
+                model.edit.focusDepth = (model.edit.focusDepth + Double(dx) / 260).clamped(to: 0...1)
             },
-            onReset: { model.edit.focusRange = EditParameter.focusRange.defaultValue },
+            onReset: { model.edit.focusDepth = EditParameter.focusDepth.defaultValue },
             onDone: { model.depthSceneCommand = .exit }
         )
     }
@@ -448,5 +478,70 @@ struct CanvasView: View {
         .padding(.bottom, 10)
         .chiaroGlass(cornerRadius: 15)
         .transition(.opacity)
+    }
+}
+
+
+/// Curved rotation ruler (the Photos-style arc): the degree scale slides
+/// under a fixed center marker, following the finger.
+struct ArcRuler: View {
+    @Binding var value: Double
+    @State private var startValue: Double?
+
+    var body: some View {
+        Canvas { context, size in
+            let radius: CGFloat = 330
+            let center = CGPoint(x: size.width / 2, y: radius + 10)
+            for degree in stride(from: -45, through: 45, by: 1) {
+                let relative = Double(degree) - value
+                guard abs(relative) <= 20 else { continue }
+                let angle = relative * .pi / 180 * 1.1 - .pi / 2
+                let major = degree % 5 == 0
+                let length: CGFloat = major ? 12 : 7
+                let outer = CGPoint(
+                    x: center.x + cos(angle) * radius,
+                    y: center.y + sin(angle) * radius
+                )
+                let inner = CGPoint(
+                    x: center.x + cos(angle) * (radius - length),
+                    y: center.y + sin(angle) * (radius - length)
+                )
+                var path = Path()
+                path.move(to: outer)
+                path.addLine(to: inner)
+                let fade = 1 - abs(relative) / 24
+                context.stroke(path, with: .color(.white.opacity((major ? 0.42 : 0.2) * fade)), lineWidth: 1)
+                if major {
+                    let labelPoint = CGPoint(
+                        x: center.x + cos(angle) * (radius - 20),
+                        y: center.y + sin(angle) * (radius - 20)
+                    )
+                    context.draw(
+                        Text("\(degree)").font(.system(size: 7, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.35 * fade)),
+                        at: labelPoint
+                    )
+                }
+            }
+            // Fixed marker: the current angle.
+            var marker = Path()
+            marker.move(to: CGPoint(x: size.width / 2, y: 2))
+            marker.addLine(to: CGPoint(x: size.width / 2, y: 18))
+            context.stroke(marker, with: .color(Theme.amber), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+        }
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { g in
+                    if startValue == nil { startValue = value }
+                    guard let startValue else { return }
+                    // The scale follows the finger.
+                    value = (startValue - Double(g.translation.width) / 6).clamped(to: -45...45)
+                }
+                .onEnded { _ in startValue = nil }
+        )
+        .onTapGesture(count: 2) { value = 0 }
+        .clickCursor()
+        .help("Drag to straighten — double-click resets")
     }
 }
