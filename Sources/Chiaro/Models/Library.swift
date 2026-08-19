@@ -40,6 +40,31 @@ final class Library {
     /// slider and trackpad pinch both write it.
     var zoomLevel: Double = 0.8
 
+    /// Library presentation: justified gallery, square grid, or detail list.
+    enum ViewMode: String, CaseIterable {
+        case gallery, grid, list
+        var icon: String {
+            switch self {
+            case .gallery: "rectangle.grid.3x2"
+            case .grid: "square.grid.3x3"
+            case .list: "list.bullet"
+            }
+        }
+        var help: String {
+            switch self {
+            case .gallery: "Gallery — photos keep their shape"
+            case .grid: "Grid — uniform squares"
+            case .list: "List — details and dates"
+            }
+        }
+    }
+    var viewMode: ViewMode = ViewMode(rawValue: UserDefaults.standard.string(forKey: "viewMode") ?? "") ?? .gallery {
+        didSet { UserDefaults.standard.set(viewMode.rawValue, forKey: "viewMode") }
+    }
+    var showFilenames = UserDefaults.standard.bool(forKey: "showFilenames") {
+        didSet { UserDefaults.standard.set(showFilenames, forKey: "showFilenames") }
+    }
+
     enum Zoom { case days, months, years }
     var zoom: Zoom {
         if zoomLevel < 0.3 { .years } else if zoomLevel < 0.58 { .months } else { .days }

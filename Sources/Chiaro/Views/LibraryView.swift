@@ -46,10 +46,26 @@ struct LibraryView: View {
                                     .foregroundStyle(Theme.ink3)
                             }
                             .padding(.top, 14)
-                            ForEach(Array(justifiedRows(section.photos, width: width).enumerated()), id: \.offset) { _, row in
-                                HStack(spacing: gap) {
-                                    ForEach(row.photos) { photo in
-                                        tile(photo, height: row.height)
+                            switch library.viewMode {
+                            case .gallery:
+                                ForEach(Array(justifiedRows(section.photos, width: width).enumerated()), id: \.offset) { _, row in
+                                    HStack(spacing: gap) {
+                                        ForEach(row.photos) { photo in
+                                            tile(photo, width: row.height * photo.aspect, height: row.height)
+                                        }
+                                    }
+                                }
+                            case .grid:
+                                let cell = 80 + CGFloat(library.zoomLevel) * 140
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: cell, maximum: cell * 1.4), spacing: gap)], spacing: gap) {
+                                    ForEach(section.photos) { photo in
+                                        tile(photo, width: nil, height: cell)
+                                    }
+                                }
+                            case .list:
+                                VStack(spacing: 2) {
+                                    ForEach(section.photos) { photo in
+                                        listRow(photo)
                                     }
                                 }
                             }
@@ -92,7 +108,43 @@ struct LibraryView: View {
                 .font(Theme.mono(10))
                 .foregroundStyle(Theme.ink3)
             Spacer()
-            zoomSlider
+            HStack(spacing: 3) {
+                ForEach(Library.ViewMode.allCases, id: \.self) { mode in
+                    Button { library.viewMode = mode } label: {
+                        Image(systemName: mode.icon)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(library.viewMode == mode ? Theme.amber : Theme.ink3)
+                            .frame(width: 26, height: 22)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(library.viewMode == mode ? Color.white.opacity(0.08) : .clear)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .clickCursor()
+                    .help(mode.help)
+                }
+                if library.viewMode != .list {
+                    Button { library.showFilenames.toggle() } label: {
+                        Image(systemName: "textformat")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(library.showFilenames ? Theme.amber : Theme.ink3)
+                            .frame(width: 26, height: 22)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(library.showFilenames ? Color.white.opacity(0.08) : .clear)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .clickCursor()
+                    .help("Show filenames and shooting info on every photo")
+                }
+            }
+            .padding(3)
+            .background(RoundedRectangle(cornerRadius: 8).stroke(Theme.hairline))
+            if library.viewMode != .list {
+                zoomSlider
+            }
             Button("Open folder…") { openFolder() }
                 .buttonStyle(OutlineButtonStyle())
                 .clickCursor()
@@ -206,7 +258,7 @@ struct LibraryView: View {
 
     @State private var hoveredTile: URL?
 
-    private func tile(_ photo: Photo, height: CGFloat) -> some View {
+    private func tile(_ photo: Photo, width: CGFloat?, height: CGFloat) -> some View {
         let selected = library.selection.contains(photo.url)
         return ZStack(alignment: .bottomTrailing) {
             Group {
@@ -220,13 +272,14 @@ struct LibraryView: View {
                     )
                 }
             }
-            .frame(width: height * photo.aspect, height: height)
+            .frame(width: width, height: height)
+            .frame(maxWidth: width == nil ? .infinity : nil)
             .clipShape(RoundedRectangle(cornerRadius: 7))
             .overlay(
                 RoundedRectangle(cornerRadius: 7)
                     .stroke(selected ? Theme.amber : .clear, lineWidth: 2)
             )
-            if hoveredTile == photo.url {
+            if hoveredTile == photo.url || library.showFilenames {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(photo.name)
                         .font(Theme.ui(10.5, .semibold))
@@ -249,7 +302,8 @@ struct LibraryView: View {
                         startPoint: .top, endPoint: .bottom
                     )
                 )
-                .frame(width: height * photo.aspect, alignment: .leading)
+                .frame(width: width, alignment: .leading)
+                .frame(maxWidth: width == nil ? .infinity : nil)
                 .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 7, bottomTrailingRadius: 7))
                 .allowsHitTesting(false)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
@@ -547,6 +601,80 @@ struct LibraryView: View {
         let photos = files.filter { Photo.imageExtensions.contains($0.pathExtension.lowercased()) }
         let raws = photos.filter { Photo.rawExtensions.contains($0.pathExtension.lowercased()) }
         return "\(raws.isEmpty ? photos.count : raws.count) photos · \(folder.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent)"
+    }
+
+    private func listRow(_ photo: Photo) -> some View {
+        let selected = library.selection.contains(photo.url)
+        return HStack(spacing: 11) {
+            Group {
+                if let cg = photo.thumbnail {
+                    Image(cg, scale: 1, label: Text(photo.name))
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else {
+                    Theme.panel
+                }
+            }
+            .frame(width: 58, height: 40)
+            .clipShape(RoundedRectangle(cornerRadius: 5))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(photo.name)
+                    .font(Theme.ui(12, .medium))
+                    .foregroundStyle(Theme.ink)
+                if let exif = photo.exifSummary {
+                    Text(exif).font(Theme.mono(9)).foregroundStyle(Theme.ink3)
+                }
+            }
+            Spacer()
+            if photo.hasEdits {
+                Circle().fill(Theme.amber).frame(width: 6, height: 6)
+            }
+            if photo.rating > 0 {
+                Text(String(repeating: "★", count: photo.rating))
+                    .font(.system(size: 9))
+                    .foregroundStyle(Theme.amber)
+            }
+            if let date = photo.captureDate {
+                Text(date.formatted(date: .omitted, time: .shortened))
+                    .font(Theme.mono(9))
+                    .foregroundStyle(Theme.ink3)
+                    .frame(width: 64, alignment: .trailing)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(selected ? Color.white.opacity(0.08) : (hoveredTile == photo.url ? Color.white.opacity(0.04) : .clear))
+        )
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(selected ? Theme.amber.opacity(0.6) : .clear))
+        .contentShape(Rectangle())
+        .clickCursor()
+        .onHover { inside in
+            hoveredTile = inside ? photo.url : (hoveredTile == photo.url ? nil : hoveredTile)
+        }
+        .gesture(TapGesture(count: 2).onEnded { library.edit(photo) })
+        .simultaneousGesture(TapGesture().modifiers(.command).onEnded {
+            if selected { library.selection.remove(photo.url) }
+            else { library.selection.insert(photo.url); library.lastSelected = photo.url }
+        })
+        .simultaneousGesture(TapGesture().onEnded {
+            library.selection = [photo.url]
+            library.lastSelected = photo.url
+        })
+        .contextMenu {
+            Button("Open in editor") { library.edit(photo) }
+            Button("Export…") {
+                library.selection.insert(photo.url)
+                onExport()
+            }
+            Divider()
+            Button("Copy edits") { library.copiedEdit = photo.edit }
+            Button("Paste edits") {
+                if let copied = library.copiedEdit { photo.edit = copied; Sidecar.write(for: photo) }
+            }
+            .disabled(library.copiedEdit == nil)
+        }
     }
 
     private func openSelectedInEditor() {
