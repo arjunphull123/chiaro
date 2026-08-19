@@ -14,6 +14,7 @@ struct ExportSheet: View {
     @State private var revealInFinder = true
     @State private var progress: (done: Int, total: Int)?
     @State private var finishedURL: URL?
+    @State private var failure: (count: Int, reason: String)?
 
     enum SizeChoice: String, CaseIterable, Identifiable {
         case full = "Full size"
@@ -145,6 +146,9 @@ struct ExportSheet: View {
                 if let progress {
                     Text("Exporting \(progress.done)/\(progress.total)…")
                         .font(Theme.mono(10)).foregroundStyle(Theme.amber)
+                } else if let failure {
+                    Text("\(failure.count) of \(photos.count) failed — \(failure.reason)")
+                        .font(Theme.mono(10)).foregroundStyle(Theme.danger)
                 } else if finishedURL != nil {
                     Text("Done ✓").font(Theme.mono(10)).foregroundStyle(Theme.amber)
                 }
@@ -267,6 +271,7 @@ struct ExportSheet: View {
     private func runExport() {
         progress = (0, photos.count)
         finishedURL = nil
+        failure = nil
         syncMaxDimension()
         var options = options
         let targets = photos
@@ -277,13 +282,29 @@ struct ExportSheet: View {
         }
         let finalOptions = options
         let reveal = revealInFinder
+        // Snapshot url/edit/name on the main actor — Photo is non-Sendable and
+        // main-actor-mutated, so the render queue must never touch it directly.
+        let jobs = targets.map { (url: $0.url, edit: $0.edit, name: $0.name) }
         Task {
             var last: URL?
-            for (i, photo) in targets.enumerated() {
-                last = await Offload.on(Offload.render) { try? Exporter.export(photo, options: finalOptions) }
-                progress = (i + 1, targets.count)
+            var failureCount = 0
+            var firstReason: String?
+            for (i, job) in jobs.enumerated() {
+                let result = await Offload.on(Offload.render) { () -> Result<URL, Error> in
+                    Result { try Exporter.export(url: job.url, edit: job.edit, name: job.name, options: finalOptions) }
+                }
+                switch result {
+                case .success(let url): last = url
+                case .failure(let error):
+                    failureCount += 1
+                    if firstReason == nil { firstReason = error.localizedDescription }
+                }
+                progress = (i + 1, jobs.count)
             }
             progress = nil
+            if failureCount > 0 {
+                failure = (failureCount, firstReason ?? "Unknown error")
+            }
             finishedURL = last
             if reveal, let last { NSWorkspace.shared.activateFileViewerSelecting([last]) }
         }

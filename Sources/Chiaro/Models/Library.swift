@@ -73,6 +73,43 @@ final class Library {
     var folderName: String { folderURL?.lastPathComponent ?? "" }
     var selectedPhotos: [Photo] { photos.filter { selection.contains($0.url) } }
 
+    // MARK: - Gallery filters
+    // Lifted out of LibraryView so EditView's arrow-key/nav-pill stepping can
+    // walk the same filtered set the gallery is showing (ADR-less mechanical fix).
+    var filterStarred = false
+    var filterEdited = false
+    /// Top-level subfolder filter (nil = everything).
+    var folderScope: String?
+    var searchText = ""
+
+    var visiblePhotos: [Photo] {
+        var result = photos
+        if filterStarred { result = result.filter(\.starred) }
+        if filterEdited { result = result.filter(\.hasEdits) }
+        if let folderScope {
+            result = result.filter { topFolder($0) == folderScope }
+        }
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        if !query.isEmpty {
+            result = result.filter { $0.name.localizedCaseInsensitiveContains(query) }
+        }
+        return result
+    }
+
+    /// Path of the photo's parent, relative to the opened folder ("" at root).
+    func relativeFolder(_ photo: Photo) -> String {
+        guard let root = folderURL else { return "" }
+        let parent = photo.url.deletingLastPathComponent().standardizedFileURL.path
+        let rootPath = root.standardizedFileURL.path
+        guard parent.hasPrefix(rootPath), parent != rootPath else { return "" }
+        return String(parent.dropFirst(rootPath.count + 1))
+    }
+
+    func topFolder(_ photo: Photo) -> String? {
+        let rel = relativeFolder(photo)
+        return rel.isEmpty ? nil : rel.split(separator: "/").first.map(String.init)
+    }
+
     static func noteRecentEdit(_ url: URL) {
         var paths = UserDefaults.standard.stringArray(forKey: "recentEdits") ?? []
         paths.removeAll { $0 == url.path }
@@ -132,6 +169,11 @@ final class Library {
         ) {
             for case let file as URL in enumerator {
                 if enumerator.level > 5 { enumerator.skipDescendants(); continue }
+                // Never ingest our own export output as library photos.
+                if file.lastPathComponent == "Chiaro Exports" {
+                    enumerator.skipDescendants()
+                    continue
+                }
                 guard Photo.imageExtensions.contains(file.pathExtension.lowercased()) else { continue }
                 urls.append(file)
                 if urls.count >= 10_000 { break }
@@ -349,8 +391,12 @@ final class Library {
         guard let copiedEdit else { return }
         let targets = editing.map { [$0] } ?? selectedPhotos
         for photo in targets {
-            photo.edit = copiedEdit
-            Sidecar.write(for: photo)
+            if let activeEditor, activeEditor.photo.url == photo.url {
+                activeEditor.commitDiscrete(copiedEdit)
+            } else {
+                photo.edit = copiedEdit
+                Sidecar.write(for: photo)
+            }
         }
     }
 }

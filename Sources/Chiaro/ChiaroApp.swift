@@ -226,13 +226,16 @@ struct ChiaroApp: App {
                         testEdit.blurF = 0.6
                         testEdit.relight = 20
                         let edit = testEdit
-                        await MainActor.run { photo.edit = edit }
+                        let (url, name) = await MainActor.run { () -> (URL, String) in
+                            photo.edit = edit
+                            return (photo.url, photo.name)
+                        }
                         do {
                             var options = ExportOptions()
                             options.destination = FileManager.default.temporaryDirectory
                                 .appendingPathComponent("ChiaroExportTest")
-                            let url = try Exporter.export(photo, options: options)
-                            print("EXPORTED: \(url.path)")
+                            let outURL = try Exporter.export(url: url, edit: edit, name: name, options: options)
+                            print("EXPORTED: \(outURL.path)")
                         } catch {
                             print("EXPORT FAILED: \(error)")
                         }

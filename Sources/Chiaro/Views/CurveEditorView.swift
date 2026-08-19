@@ -121,7 +121,7 @@ struct CurveEditorView: View {
                         return
                     }
                 }
-                guard let i = draggingIndex else { return }
+                guard let i = draggingIndex, i < edit.curve.count else { return }
                 var p = value(at: g.location, in: size)
                 let isFirst = i == 0, isLast = i == edit.curve.count - 1
                 if isFirst { p.x = 0 }

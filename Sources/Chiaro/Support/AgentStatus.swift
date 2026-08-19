@@ -39,10 +39,4 @@ final class AgentStatus {
         guard let lastSeen else { return false }
         return now.timeIntervalSince(lastSeen) < 600
     }
-
-    func lastSeenText(now: Date = Date()) -> String? {
-        guard let lastSeen else { return nil }
-        let minutes = Int(now.timeIntervalSince(lastSeen) / 60)
-        return minutes < 1 ? "active now" : "\(minutes)m ago"
-    }
 }

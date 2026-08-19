@@ -6,14 +6,7 @@ struct LibraryView: View {
     @Bindable var library: Library
     let onExport: () -> Void
 
-    @State private var searchText = ""
     @FocusState private var searchFocused: Bool
-    @State private var filterStarred = false
-    @State private var filterEdited = false
-
-    /// Top-level subfolder filter (nil = everything). Only meaningful when the
-    /// opened folder actually nests photos.
-    @State private var folderScope: String?
 
     enum ListSortKey: String { case name, starred, time, folder }
     @AppStorage("listSortKey") private var listSortRaw = ListSortKey.name.rawValue
@@ -25,46 +18,20 @@ struct LibraryView: View {
         case .name: photos.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         case .starred: photos.sorted { !$0.starred && $1.starred }
         case .time: photos.sorted { ($0.captureDate ?? .distantPast) < ($1.captureDate ?? .distantPast) }
-        case .folder: photos.sorted { relativeFolder($0).localizedStandardCompare(relativeFolder($1)) == .orderedAscending }
+        case .folder: photos.sorted { library.relativeFolder($0).localizedStandardCompare(library.relativeFolder($1)) == .orderedAscending }
         }
         return listSortAscending ? sorted : sorted.reversed()
     }
 
     private let gap: CGFloat = 8
 
-    private var visiblePhotos: [Photo] {
-        var result = library.photos
-        if filterStarred { result = result.filter(\.starred) }
-        if filterEdited { result = result.filter(\.hasEdits) }
-        if let folderScope {
-            result = result.filter { topFolder($0) == folderScope }
-        }
-        let query = searchText.trimmingCharacters(in: .whitespaces)
-        if !query.isEmpty {
-            result = result.filter { $0.name.localizedCaseInsensitiveContains(query) }
-        }
-        return result
-    }
-
-    /// Path of the photo's parent, relative to the opened folder ("" at root).
-    private func relativeFolder(_ photo: Photo) -> String {
-        guard let root = library.folderURL else { return "" }
-        let parent = photo.url.deletingLastPathComponent().standardizedFileURL.path
-        let rootPath = root.standardizedFileURL.path
-        guard parent.hasPrefix(rootPath), parent != rootPath else { return "" }
-        return String(parent.dropFirst(rootPath.count + 1))
-    }
-
-    private func topFolder(_ photo: Photo) -> String? {
-        let rel = relativeFolder(photo)
-        return rel.isEmpty ? nil : rel.split(separator: "/").first.map(String.init)
-    }
+    private var visiblePhotos: [Photo] { library.visiblePhotos }
 
     /// Direct subfolders that contain photos, with counts, alphabetical.
     private var subfolders: [(name: String, count: Int)] {
         var counts: [String: Int] = [:]
         for photo in library.photos {
-            if let top = topFolder(photo) { counts[top, default: 0] += 1 }
+            if let top = library.topFolder(photo) { counts[top, default: 0] += 1 }
         }
         return counts.sorted { $0.key.localizedStandardCompare($1.key) == .orderedAscending }
             .map { (name: $0.key, count: $0.value) }
@@ -99,8 +66,8 @@ struct LibraryView: View {
             galleryScroll
         }
         .onChange(of: library.folderURL) {
-            folderScope = nil
-            searchText = ""
+            library.folderScope = nil
+            library.searchText = ""
         }
     }
 
@@ -108,10 +75,10 @@ struct LibraryView: View {
     private var folderChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                Chip(title: "All photos", selected: folderScope == nil) { folderScope = nil }
+                Chip(title: "All photos", selected: library.folderScope == nil) { library.folderScope = nil }
                 ForEach(subfolders, id: \.name) { folder in
-                    Chip(title: "\(folder.name) · \(folder.count)", selected: folderScope == folder.name) {
-                        folderScope = folderScope == folder.name ? nil : folder.name
+                    Chip(title: "\(folder.name) · \(folder.count)", selected: library.folderScope == folder.name) {
+                        library.folderScope = library.folderScope == folder.name ? nil : folder.name
                     }
                 }
             }
@@ -131,7 +98,7 @@ struct LibraryView: View {
             columnTitle("Name", key: .name, width: nil, alignment: .leading)
             Spacer(minLength: 12)
             columnTitle("★", key: .starred, width: nil, alignment: .trailing)
-            if hasSubfolders && folderScope == nil {
+            if hasSubfolders && library.folderScope == nil {
                 columnTitle("Folder", key: .folder, width: 120, alignment: .trailing)
             }
             Text("Exposure")
@@ -179,8 +146,8 @@ struct LibraryView: View {
         GeometryReader { geo in
             let width = geo.size.width - 32
             ScrollView {
-                if sections.isEmpty && !searchText.isEmpty {
-                    Text("No photos match \u{201C}\(searchText)\u{201D}")
+                if sections.isEmpty && !library.searchText.isEmpty {
+                    Text("No photos match \u{201C}\(library.searchText)\u{201D}")
                         .font(Theme.ui(12))
                         .foregroundStyle(Theme.ink3)
                         .frame(maxWidth: .infinity)
@@ -231,8 +198,8 @@ struct LibraryView: View {
     }
 
     private func allChip() -> some View {
-        let active = !filterStarred && !filterEdited
-        return Button { filterStarred = false; filterEdited = false } label: {
+        let active = !library.filterStarred && !library.filterEdited
+        return Button { library.filterStarred = false; library.filterEdited = false } label: {
             Text("All")
                 .font(Theme.ui(10, .medium))
                 .foregroundStyle(active ? Theme.amber : Theme.ink3)
@@ -295,14 +262,14 @@ struct LibraryView: View {
             Spacer()
             HStack(spacing: 3) {
                 allChip()
-                toggleChip(active: filterStarred, help: "Starred only", toggle: { filterStarred.toggle() }) {
+                toggleChip(active: library.filterStarred, help: "Starred only", toggle: { library.filterStarred.toggle() }) {
                     Image(systemName: "star.fill")
                         .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(filterStarred ? Theme.amber : Theme.ink3)
+                        .foregroundStyle(library.filterStarred ? Theme.amber : Theme.ink3)
                 }
-                toggleChip(active: filterEdited, help: "Edited only", toggle: { filterEdited.toggle() }) {
+                toggleChip(active: library.filterEdited, help: "Edited only", toggle: { library.filterEdited.toggle() }) {
                     PinwheelMark()
-                        .fill(filterEdited ? Theme.amber : Theme.ink3)
+                        .fill(library.filterEdited ? Theme.amber : Theme.ink3)
                         .frame(width: 11, height: 11)
                 }
             }
@@ -403,22 +370,22 @@ struct LibraryView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(Theme.ink3)
-            TextField("Search", text: $searchText)
+            TextField("Search", text: $library.searchText)
                 .textFieldStyle(.plain)
                 .font(Theme.ui(11.5))
                 .foregroundStyle(Theme.ink)
                 .focused($searchFocused)
                 .onExitCommand {
-                    searchText = ""
+                    library.searchText = ""
                     searchFocused = false
                 }
                 .frame(width: 108)
-            if !searchText.isEmpty {
+            if !library.searchText.isEmpty {
                 Text("\(visiblePhotos.count)")
                     .font(Theme.mono(9))
                     .foregroundStyle(Theme.ink3)
                 Button {
-                    searchText = ""
+                    library.searchText = ""
                     searchFocused = false
                 } label: {
                     Image(systemName: "xmark.circle.fill")
@@ -502,8 +469,8 @@ struct LibraryView: View {
             if let date = photo.captureDate {
                 let key = switch library.zoom {
                 case .days: calendar.startOfDay(for: date)
-                case .months: calendar.date(from: calendar.dateComponents([.year, .month], from: date))!
-                case .years: calendar.date(from: calendar.dateComponents([.year], from: date))!
+                case .months: calendar.date(from: calendar.dateComponents([.year, .month], from: date)) ?? calendar.startOfDay(for: date)
+                case .years: calendar.date(from: calendar.dateComponents([.year], from: date)) ?? calendar.startOfDay(for: date)
                 }
                 byPeriod[key, default: []].append(photo)
             } else {
@@ -780,7 +747,7 @@ struct LibraryView: View {
                             .clickCursor()
                             .keyboardShortcut("o")
                     }
-                    Text("or drop a folder anywhere")
+                    Text("Or drop a folder anywhere")
                         .font(Theme.ui(11))
                         .foregroundStyle(Theme.ink3)
                 }
@@ -846,10 +813,10 @@ struct LibraryView: View {
     }
 
     private func heroSubtitle(_ item: RecentEditItem) -> String {
-        guard let date = item.editDate else { return "continue editing · ⏎" }
+        guard let date = item.editDate else { return "Continue editing · ⏎" }
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full
-        return "edited \(formatter.localizedString(for: date, relativeTo: Date())) · ⏎"
+        return "Edited \(formatter.localizedString(for: date, relativeTo: Date())) · ⏎"
     }
 
     private func recentThumb(_ item: RecentEditItem) -> some View {
@@ -934,8 +901,8 @@ struct LibraryView: View {
                     .font(.system(size: 8))
                     .foregroundStyle(Theme.amber)
             }
-            if hasSubfolders && folderScope == nil {
-                Text(relativeFolder(photo))
+            if hasSubfolders && library.folderScope == nil {
+                Text(library.relativeFolder(photo))
                     .font(Theme.mono(9))
                     .foregroundStyle(Theme.ink3)
                     .lineLimit(1)
@@ -1043,13 +1010,16 @@ private struct PhotoInteractions: ViewModifier {
             .contextMenu {
                 Button("Open in editor") { library.edit(photo) }
                 Button("Export…") {
-                    library.selection.insert(photo.url)
+                    library.selection = [photo.url]
                     onExport()
                 }
                 Divider()
                 Button("Copy edits") { library.copiedEdit = photo.edit }
                 Button("Paste edits") {
-                    if let copied = library.copiedEdit {
+                    guard let copied = library.copiedEdit else { return }
+                    if let editor = library.activeEditor, editor.photo.url == photo.url {
+                        editor.commitDiscrete(copied)
+                    } else {
                         photo.edit = copied
                         Sidecar.write(for: photo)
                     }

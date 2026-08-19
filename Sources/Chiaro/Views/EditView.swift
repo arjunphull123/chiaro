@@ -9,6 +9,7 @@ struct EditView: View {
     @State private var savingVersion = false
     @State private var versionName = ""
     @State private var versionsHovering = false
+    @State private var versionsCursorPushed = false
     @State private var reverting = false
     @FocusState private var focused: Bool
 
@@ -54,19 +55,19 @@ struct EditView: View {
             model.cropMode = false
             return .handled
         }
-        .onKeyPress(keys: ["p"], phases: [.down]) { _ in
-            guard !textEditing else { return .ignored }
+        .onKeyPress(keys: ["p"], phases: [.down]) { press in
+            guard !textEditing, press.modifiers.isEmpty else { return .ignored }
             model.photo.starred.toggle()
             model.saveNow()
             return .handled
         }
-        .onKeyPress(keys: ["j"], phases: [.down]) { _ in
-            guard !textEditing else { return .ignored }
+        .onKeyPress(keys: ["j"], phases: [.down]) { press in
+            guard !textEditing, press.modifiers.isEmpty else { return .ignored }
             model.showClipping.toggle()
             return .handled
         }
-        .onKeyPress(keys: ["z"], phases: [.down]) { _ in
-            guard !textEditing else { return .ignored }
+        .onKeyPress(keys: ["z"], phases: [.down]) { press in
+            guard !textEditing, press.modifiers.isEmpty else { return .ignored }
             if model.canvasZoom > 1 {
                 model.canvasZoom = 1
                 model.canvasPan = .zero
@@ -75,18 +76,22 @@ struct EditView: View {
             }
             return .handled
         }
-        .onKeyPress(keys: ["c"], phases: [.down]) { _ in
-            guard !textEditing else { return .ignored }
+        .onKeyPress(keys: ["c"], phases: [.down]) { press in
+            guard !textEditing, press.modifiers.isEmpty else { return .ignored }
             model.cropMode.toggle()
             return .handled
         }
         .onKeyPress(keys: ["\\"], phases: [.down, .up]) { press in
             guard !textEditing else { return .ignored }
+            // Modifiers only gate the down-stroke — the release must always go
+            // through, or a modifier held mid-press would leave this stuck on.
+            if press.phase == .down, !press.modifiers.isEmpty { return .ignored }
             model.showOriginal = press.phase == .down
             return .handled
         }
         .onKeyPress(keys: [" "], phases: [.down, .up, .repeat]) { press in
             guard !textEditing else { return .ignored }
+            if press.phase == .down, !press.modifiers.isEmpty { return .ignored }
             model.spacePan = press.phase != .up
             return .handled
         }
@@ -142,7 +147,7 @@ struct EditView: View {
             guard abs(dx) > abs(event.scrollingDeltaY), dx != 0 else { return event }
             if model.cropMode {
                 // The arc ruler follows the scroll.
-                model.edit.straighten = (model.edit.straighten - Double(dx) / 8).clamped(to: -45...45)
+                model.scrubStraighten(deltaX: -dx)
                 return nil
             }
             guard model.armed != nil || model.armedHSL != nil else { return event }
@@ -157,7 +162,7 @@ struct EditView: View {
         HStack(spacing: 12) {
             Button { step(-1) } label: { chevron("chevron.left") }
                 .buttonStyle(.plain).clickCursor()
-            Text("\(photoIndex + 1) / \(library.photos.count)")
+            Text("\(photoIndex + 1) / \(navPhotos.count)")
                 .font(Theme.mono(10))
                 .foregroundStyle(Theme.ink2)
                 .monospacedDigit()
@@ -177,8 +182,15 @@ struct EditView: View {
             .contentShape(Rectangle())
     }
 
+    /// Arrow-key/nav-pill stepping walks the gallery's filtered set, falling
+    /// back to every photo if the open one has been filtered out from under it.
+    private var navPhotos: [Photo] {
+        library.visiblePhotos.contains(where: { $0.url == model.photo.url })
+            ? library.visiblePhotos : library.photos
+    }
+
     private var photoIndex: Int {
-        library.photos.firstIndex(where: { $0.url == model.photo.url }) ?? 0
+        navPhotos.firstIndex(where: { $0.url == model.photo.url }) ?? 0
     }
 
     private var toolbar: some View {
@@ -212,7 +224,7 @@ struct EditView: View {
             }
             if library.copiedEdit != nil {
                 iconAction("Paste edits", icon: "doc.on.clipboard") {
-                    if let copied = library.copiedEdit { model.edit = copied }
+                    if let copied = library.copiedEdit { model.commitDiscrete(copied) }
                 }
             }
             versionsMenu
@@ -221,7 +233,7 @@ struct EditView: View {
             exportButton
         }
         .alert("Revert to original", isPresented: $reverting) {
-            Button("Revert", role: .destructive) { model.edit = EditState() }
+            Button("Revert", role: .destructive) { model.commitDiscrete(EditState()) }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Removes every edit on this photo — the original file is never touched")
@@ -273,7 +285,19 @@ struct EditView: View {
         }
         .onHover { inside in
             withAnimation(.easeOut(duration: 0.12)) { versionsHovering = inside }
-            if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            if inside {
+                NSCursor.pointingHand.push()
+                versionsCursorPushed = true
+            } else if versionsCursorPushed {
+                NSCursor.pop()
+                versionsCursorPushed = false
+            }
+        }
+        .onDisappear {
+            if versionsCursorPushed {
+                NSCursor.pop()
+                versionsCursorPushed = false
+            }
         }
         .help("Versions — save and switch between edit states")
         .alert("Save version", isPresented: $savingVersion) {
@@ -295,18 +319,6 @@ struct EditView: View {
         tint: Color? = nil, action: @escaping () -> Void
     ) -> some View {
         HoverLabelButton(title: title, icon: icon, active: active, disabled: disabled, tint: tint, action: action)
-    }
-
-    private func glassAction(_ title: String, icon: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: icon).font(.system(size: 10, weight: .semibold))
-                Text(title)
-            }
-        }
-        .buttonStyle(GlassButtonStyle())
-        .clickCursor()
-        .disabled(disabled)
     }
 
     private var exportButton: some View {
@@ -375,11 +387,8 @@ struct EditView: View {
     }
 
     private func nudgeOrStep(_ direction: Int) {
-        if let armed = model.armed {
-            let span = armed.range.upperBound - armed.range.lowerBound
-            armed.set(armed.value(in: model.edit) + Double(direction) * span / 200, in: &model.edit)
-        } else if model.armedHSL != nil {
-            model.scrub(deltaX: CGFloat(direction) * 2.1, snapping: false)
+        if model.armed != nil || model.armedHSL != nil || model.cropMode {
+            model.nudge(direction)
         } else {
             step(direction)
         }
@@ -392,8 +401,9 @@ struct EditView: View {
     }
 
     private func step(_ delta: Int) {
-        guard let index = library.photos.firstIndex(where: { $0.url == model.photo.url }) else { return }
-        let next = (index + delta + library.photos.count) % library.photos.count
-        library.edit(library.photos[next])
+        let list = navPhotos
+        guard let index = list.firstIndex(where: { $0.url == model.photo.url }) else { return }
+        let next = (index + delta + list.count) % list.count
+        library.edit(list[next])
     }
 }

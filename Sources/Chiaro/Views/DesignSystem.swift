@@ -81,6 +81,7 @@ struct HoverLabelButton: View {
     var tint: Color?
     let action: () -> Void
     @State private var hovering = false
+    @State private var cursorPushed = false
 
     var body: some View {
         Button(action: action) {
@@ -113,7 +114,19 @@ struct HoverLabelButton: View {
         }
         .onHover { inside in
             withAnimation(.easeOut(duration: 0.12)) { hovering = inside }
-            if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            if inside {
+                NSCursor.pointingHand.push()
+                cursorPushed = true
+            } else if cursorPushed {
+                NSCursor.pop()
+                cursorPushed = false
+            }
+        }
+        .onDisappear {
+            if cursorPushed {
+                NSCursor.pop()
+                cursorPushed = false
+            }
         }
     }
 }
@@ -188,18 +201,21 @@ struct AppMark: View {
 struct AppIconView: View {
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 1024 * 0.2237, style: .continuous)
+            // Apple's icon grid: the tile is 824/1024 with transparent margin —
+            // filling the canvas makes the icon loom over its dock neighbors.
+            RoundedRectangle(cornerRadius: 824 * 0.2237, style: .continuous)
                 .fill(
                     RadialGradient(
                         colors: [Color(hex: 0x2F2F35), Color(hex: 0x141416)],
                         center: UnitPoint(x: 0.32, y: 0.22),
-                        startRadius: 60, endRadius: 1150
+                        startRadius: 50, endRadius: 930
                     )
                 )
+                .frame(width: 824, height: 824)
             PinwheelMark()
                 .fill(Theme.amber)
-                .frame(width: 620, height: 620)
-                .shadow(color: .black.opacity(0.5), radius: 30, y: 14)
+                .frame(width: 560, height: 560)
+                .shadow(color: .black.opacity(0.5), radius: 26, y: 12)
         }
         .frame(width: 1024, height: 1024)
     }

@@ -33,8 +33,31 @@ extension View {
 
     /// Pointing-hand cursor on hover — every clickable control should read as one.
     func clickCursor() -> some View {
-        onHover { inside in
-            if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
-        }
+        modifier(ClickCursorModifier())
+    }
+}
+
+/// Push/pop cursor tracking that can't leak: a view removed from the hierarchy
+/// while hovered never gets an onHover(false), so it pops in onDisappear instead.
+private struct ClickCursorModifier: ViewModifier {
+    @State private var pushed = false
+
+    func body(content: Content) -> some View {
+        content
+            .onHover { inside in
+                if inside {
+                    NSCursor.pointingHand.push()
+                    pushed = true
+                } else if pushed {
+                    NSCursor.pop()
+                    pushed = false
+                }
+            }
+            .onDisappear {
+                if pushed {
+                    NSCursor.pop()
+                    pushed = false
+                }
+            }
     }
 }

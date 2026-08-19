@@ -154,7 +154,12 @@ struct EditState: Codable, Equatable {
             curve = pts.sorted { $0.x < $1.x }
         }
         if let rect = try c.decodeIfPresent(CropRect.self, forKey: CodingKeys(stringValue: "crop")!) {
-            crop = rect
+            // A hand-edited sidecar can carry a degenerate rect — clamp so the
+            // render extent is never empty (mirrors the MCP set_edit clamping).
+            crop = CropRect(
+                x: rect.x.clamped(to: 0...0.95), y: rect.y.clamped(to: 0...0.95),
+                w: rect.w.clamped(to: 0.05...1), h: rect.h.clamped(to: 0.05...1)
+            )
         }
         locals = try c.decodeIfPresent([LocalAdjustment].self, forKey: CodingKeys(stringValue: "locals")!) ?? []
         if let bands = try c.decodeIfPresent([HSLBand].self, forKey: CodingKeys(stringValue: "hsl")!) {
@@ -251,17 +256,15 @@ enum EditParameter: String, CaseIterable, Identifiable {
     }
 
     /// Detent positions for haptic feedback while scrubbing (ADR 0005).
-    var detents: [Double] {
+    /// Snap target: neutral only — round numbers get ticks, not magnetism.
+    var detents: [Double] { [defaultValue] }
+
+    /// Smallest displayed increment — arrow keys nudge exactly one of these.
+    var nudgeStep: Double {
         switch self {
-        case .blurF:
-            // whole f-stops f/16 -> f/1.4
-            [16.0, 11, 8, 5.6, 4, 2.8, 2, 1.4].map { f in
-                log(16.0 / f) / log(16.0 / 1.4)
-            }
-        case .exposure: [-2, -1, 0, 1, 2]
-        case .vignette, .sharpness, .noiseReduction: []
-        case .focusDepth: [0.5]
-        default: [0]
+        case .exposure, .blurF, .focusDepth: 0.01
+        case .straighten: 0.1
+        default: 1
         }
     }
 

@@ -16,14 +16,27 @@ final class EditViewModel {
                 if Date().timeIntervalSince(lastEditAt) > 0.8 {
                     undoStack.append(oldValue)
                     if undoStack.count > 100 { undoStack.removeFirst() }
-                    redoStack.removeAll()
                 }
+                redoStack.removeAll()
                 lastEditAt = Date()
+                // Any change that isn't auto-enhance's own assignment invalidates
+                // the toggle — "Auto" is only true while its exact edit still holds.
+                if !isAutoEnhancing {
+                    autoApplied = false
+                    preAutoEdit = nil
+                }
             }
             photo.edit = edit
             scheduleRender()
             scheduleSave()
         }
+    }
+
+    /// Bypasses coalescing: forces this change to start a fresh undo step even
+    /// inside the 0.8s window (versions, presets, paste, revert, auto-enhance).
+    func commitDiscrete(_ new: EditState) {
+        lastEditAt = .distantPast
+        edit = new
     }
 
     func undo() {
@@ -32,6 +45,7 @@ final class EditViewModel {
         isRestoringEdit = true
         edit = previous
         isRestoringEdit = false
+        lastEditAt = Date()
     }
 
     func redo() {
@@ -40,6 +54,7 @@ final class EditViewModel {
         isRestoringEdit = true
         edit = next
         isRestoringEdit = false
+        lastEditAt = Date()
     }
     /// Which color-mix control is armed (drives the same glass dial).
     enum HSLComponent: String {
@@ -163,6 +178,10 @@ final class EditViewModel {
         armed = nil
         autoApplied = false
         preAutoEdit = nil
+        cropMode = false
+        cropAspect = nil
+        cropAspectName = nil
+        showClipping = false
         preview = nil
         originalPreview = nil
         basePreview = nil
@@ -272,7 +291,7 @@ final class EditViewModel {
     }
 
     func applyVersion(_ snapshot: Sidecar.Snapshot) {
-        edit = snapshot.edit
+        commitDiscrete(snapshot.edit)
     }
 
     func deleteVersion(_ snapshot: Sidecar.Snapshot) {
@@ -284,10 +303,16 @@ final class EditViewModel {
     /// whatever was there before.
     var autoApplied = false
     private var preAutoEdit: EditState?
+    /// Guards edit.didSet's staleness check against auto-enhance's own assignment.
+    private var isAutoEnhancing = false
 
     func autoEnhance() {
         if autoApplied {
-            if let preAutoEdit { edit = preAutoEdit }
+            if let preAutoEdit {
+                isAutoEnhancing = true
+                commitDiscrete(preAutoEdit)
+                isAutoEnhancing = false
+            }
             autoApplied = false
             return
         }
@@ -300,7 +325,9 @@ final class EditViewModel {
             }
             guard let self, let enhanced else { return }
             self.preAutoEdit = current
-            self.edit = enhanced
+            self.isAutoEnhancing = true
+            self.commitDiscrete(enhanced)
+            self.isAutoEnhancing = false
             self.autoApplied = true
         }
     }
@@ -406,43 +433,68 @@ final class EditViewModel {
     private var scrubRaw: Double?
     private var scrubAnchor: Double?
 
-    func scrub(deltaX: CGFloat, snapping: Bool = true) {
+    /// Shared core: accumulate the unsnapped position, capture at the neutral
+    /// detent with symmetric resistance.
+    private func scrubbed(old: Double, deltaX: CGFloat, unitPerPx: Double,
+                          range: ClosedRange<Double>, detent: Double, window: Double) -> Double {
+        if scrubRaw == nil || scrubAnchor != old { scrubRaw = old }
+        let raw = (scrubRaw! + Double(deltaX) * unitPerPx).clamped(to: range)
+        scrubRaw = raw
+        return abs(raw - detent) < window ? detent : raw
+    }
+
+    func scrub(deltaX: CGFloat) {
         if let armedHSL {
             let keyPath = armedHSL.component.keyPath
             let old = edit.hsl[armedHSL.band][keyPath: keyPath]
-            var new: Double
-            if snapping {
-                if scrubRaw == nil || scrubAnchor != old { scrubRaw = old }
-                let raw = (scrubRaw! + Double(deltaX) / 420 * 200).clamped(to: -100...100)
-                scrubRaw = raw
-                new = abs(raw) < 6 ? 0 : raw
-            } else {
-                new = (old + Double(deltaX) / 420 * 200).clamped(to: -100...100)
-                scrubRaw = nil
-            }
+            let new = scrubbed(old: old, deltaX: deltaX, unitPerPx: 200 / 420,
+                               range: -100...100, detent: 0, window: 6)
             edit.hsl[armedHSL.band][keyPath: keyPath] = new
             scrubAnchor = new
+            HapticDetents.ticks(span: 200, from: old, to: new, detent: 0)
             return
         }
         guard let armed else { return }
         let span = armed.range.upperBound - armed.range.lowerBound
         let old = armed.value(in: edit)
-        var new: Double
-        if snapping {
-            if scrubRaw == nil || scrubAnchor != old { scrubRaw = old }
-            let raw = (scrubRaw! + Double(deltaX) / 420 * span).clamped(to: armed.range)
-            scrubRaw = raw
-            new = raw
-            let detents = armed.detents.isEmpty ? [armed.defaultValue] : armed.detents
-            for detent in detents where abs(raw - detent) < span * 0.03 {
-                new = detent
-            }
-        } else {
-            new = old + Double(deltaX) / 420 * span
-            scrubRaw = nil
-        }
+        let new = scrubbed(old: old, deltaX: deltaX, unitPerPx: span / 420,
+                           range: armed.range, detent: armed.defaultValue, window: span * 0.03)
         armed.set(new, in: &edit)
         scrubAnchor = armed.value(in: edit)
-        HapticDetents.tickIfCrossed(parameter: armed, from: old, to: armed.value(in: edit))
+        HapticDetents.ticks(span: span, from: old, to: armed.value(in: edit), detent: armed.defaultValue)
+    }
+
+    func scrubStraighten(deltaX: CGFloat) {
+        let old = edit.straighten
+        let new = scrubbed(old: old, deltaX: deltaX, unitPerPx: 1 / 8,
+                           range: -45...45, detent: 0, window: 1)
+        edit.straighten = new
+        scrubAnchor = new
+        HapticDetents.ticks(span: 90, from: old, to: new, detent: 0)
+    }
+
+    func scrubFocusDepth(deltaX: CGFloat) {
+        let old = edit.focusDepth
+        let new = scrubbed(old: old, deltaX: deltaX, unitPerPx: 1 / 260,
+                           range: 0...1, detent: 0.5, window: 0.03)
+        edit.focusDepth = new
+        scrubAnchor = new
+        HapticDetents.ticks(span: 1, from: old, to: new, detent: 0.5)
+    }
+
+    /// Arrow keys: exactly one minimum display unit, no snapping — the
+    /// refinement tool after a coarse scrub.
+    func nudge(_ direction: Int) {
+        if let armedHSL {
+            let keyPath = armedHSL.component.keyPath
+            let old = edit.hsl[armedHSL.band][keyPath: keyPath]
+            edit.hsl[armedHSL.band][keyPath: keyPath] = (old + Double(direction)).clamped(to: -100...100)
+        } else if let armed {
+            armed.set(armed.value(in: edit) + Double(direction) * armed.nudgeStep, in: &edit)
+        } else if cropMode {
+            edit.straighten = (edit.straighten + Double(direction) * EditParameter.straighten.nudgeStep)
+                .clamped(to: -45...45)
+        }
+        scrubRaw = nil
     }
 }

@@ -198,18 +198,24 @@ struct CanvasView: View {
     private var dialActive: Bool { model.armed != nil || model.armedHSL != nil }
 
     /// Crop mode controls: aspect dropdown, straighten arc, reset, done.
+    /// Same grammar as the dial cards — the value being set sits centered up top.
     private var cropPanel: some View {
-        VStack(spacing: 9) {
-            HStack(spacing: 10) {
-                aspectMenu
-                Spacer()
-                Button("Auto") { model.autoLevel() }
-                    .buttonStyle(.plain)
-                    .font(Theme.ui(10.5, .medium))
-                    .foregroundStyle(Theme.amber)
-                    .clickCursor()
-                    .help("Level the horizon automatically")
-                if model.edit.straighten != 0 {
+        VStack(spacing: 8) {
+            ZStack {
+                HStack {
+                    aspectMenu
+                    Spacer()
+                    Button("Auto") { model.autoLevel() }
+                        .buttonStyle(GlassButtonStyle(tint: Theme.amber))
+                        .clickCursor()
+                        .help("Level the horizon automatically")
+                }
+                HStack(spacing: 5) {
+                    Text(EditParameter.straighten.format(model.edit.straighten))
+                        .font(Theme.mono(17, .medium))
+                        .foregroundStyle(Theme.amber)
+                        .monospacedDigit()
+                        .fixedSize()
                     Button { model.edit.straighten = 0 } label: {
                         Image(systemName: "arrow.counterclockwise")
                             .font(.system(size: 9, weight: .semibold))
@@ -217,13 +223,10 @@ struct CanvasView: View {
                     }
                     .buttonStyle(.plain)
                     .clickCursor()
+                    .disabled(model.edit.straighten == 0)
+                    .opacity(model.edit.straighten == 0 ? 0.3 : 1)
                     .help("Clear straighten")
                 }
-                Text(EditParameter.straighten.format(model.edit.straighten))
-                    .font(Theme.mono(10))
-                    .foregroundStyle(model.edit.straighten == 0 ? Theme.ink3 : Theme.amber)
-                    .frame(width: 42, alignment: .trailing)
-                    .monospacedDigit()
             }
             .frame(width: 264)
             ArcRuler(value: straightenBinding)
@@ -260,8 +263,11 @@ struct CanvasView: View {
             get: { model.edit.straighten },
             set: { newValue in
                 let old = model.edit.straighten
-                model.edit.straighten = newValue
-                HapticDetents.tickIfCrossed(parameter: .straighten, from: old, to: newValue)
+                // The arc keeps its own unsnapped anchor, so capture alone
+                // gives the detent feel — no accumulator needed here.
+                let snapped = abs(newValue) < 0.5 ? 0 : newValue
+                model.edit.straighten = snapped
+                HapticDetents.ticks(span: 90, from: old, to: snapped, detent: 0)
             }
         )
     }
@@ -327,6 +333,11 @@ struct CanvasView: View {
     /// Gizmo for the selected local adjustment: draggable geometry over the photo.
     @ViewBuilder private func localGizmo(index: Int, fitSize: CGSize) -> some View {
         let local = model.edit.locals[index]
+        // The drag closures below escape past this render pass — capture the
+        // adjustment's id, not this index, and re-resolve it when they fire
+        // (an agent's set_edit can shrink `locals` mid-drag).
+        let id = local.id
+        let resolve: () -> Int? = { model.edit.locals.firstIndex(where: { $0.id == id }) }
         ZStack {
             switch local.kind {
             case .radial:
@@ -336,14 +347,17 @@ struct CanvasView: View {
                     .position(x: local.ax * fitSize.width, y: local.ay * fitSize.height)
                     .allowsHitTesting(false)
                 gizmoHandle(x: local.ax, y: local.ay, fitSize: fitSize) { u, v in
-                    model.edit.locals[index].ax = u
-                    model.edit.locals[index].ay = v
+                    guard let i = resolve() else { return }
+                    model.edit.locals[i].ax = u
+                    model.edit.locals[i].ay = v
                 }
                 gizmoHandle(x: local.ax + local.bx, y: local.ay, fitSize: fitSize) { u, _ in
-                    model.edit.locals[index].bx = max(0.02, abs(u - local.ax))
+                    guard let i = resolve() else { return }
+                    model.edit.locals[i].bx = max(0.02, abs(u - local.ax))
                 }
                 gizmoHandle(x: local.ax, y: local.ay + local.by, fitSize: fitSize) { _, v in
-                    model.edit.locals[index].by = max(0.02, abs(v - local.ay))
+                    guard let i = resolve() else { return }
+                    model.edit.locals[i].by = max(0.02, abs(v - local.ay))
                 }
             case .linear:
                 Path { path in
@@ -353,12 +367,14 @@ struct CanvasView: View {
                 .stroke(Theme.amber.opacity(0.85), style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
                 .allowsHitTesting(false)
                 gizmoHandle(x: local.ax, y: local.ay, fitSize: fitSize) { u, v in
-                    model.edit.locals[index].ax = u
-                    model.edit.locals[index].ay = v
+                    guard let i = resolve() else { return }
+                    model.edit.locals[i].ax = u
+                    model.edit.locals[i].ay = v
                 }
                 gizmoHandle(x: local.bx, y: local.by, fitSize: fitSize) { u, v in
-                    model.edit.locals[index].bx = u
-                    model.edit.locals[index].by = v
+                    guard let i = resolve() else { return }
+                    model.edit.locals[i].bx = u
+                    model.edit.locals[i].by = v
                 }
             case .subject:
                 EmptyView()
@@ -427,9 +443,7 @@ struct CanvasView: View {
             t: model.edit.focusDepth,
             detents: [0.5],
             doneHelp: "Exit 3D focus (esc)",
-            onDrag: { dx in
-                model.edit.focusDepth = (model.edit.focusDepth + Double(dx) / 260).clamped(to: 0...1)
-            },
+            onDrag: { dx in model.scrubFocusDepth(deltaX: dx) },
             onReset: { model.edit.focusDepth = EditParameter.focusDepth.defaultValue },
             onDone: { model.depthSceneCommand = .exit }
         )

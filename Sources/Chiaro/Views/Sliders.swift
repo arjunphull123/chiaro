@@ -13,6 +13,7 @@ struct AdjustmentRow: View {
     @State private var typing = false
     @State private var typedText = ""
     @FocusState private var typingFocused: Bool
+    @State private var cursorPushed = false
 
     private var value: Double { parameter.value(in: edit) }
     private var isArmed: Bool { armed == parameter }
@@ -76,9 +77,19 @@ struct AdjustmentRow: View {
             if inside {
                 hovered = parameter
                 NSCursor.pointingHand.push()
-            } else if hovered == parameter {
-                hovered = nil
+                cursorPushed = true
+            } else {
+                if hovered == parameter { hovered = nil }
+                if cursorPushed {
+                    NSCursor.pop()
+                    cursorPushed = false
+                }
+            }
+        }
+        .onDisappear {
+            if cursorPushed {
                 NSCursor.pop()
+                cursorPushed = false
             }
         }
         .help("Click to adjust — drag the photo or the dial, scroll sideways, or click the value to type. Double-click resets.")
@@ -111,11 +122,20 @@ struct AdjustmentRow: View {
 }
 
 enum HapticDetents {
-    static func tickIfCrossed(parameter: EditParameter, from: Double, to: Double) {
-        guard from != to else { return }
+    /// Firm tick crossing neutral; soft tick per minor ruler tick (span/48),
+    /// so the slider's movement is felt, not just seen.
+    static func ticks(span: Double, from: Double, to: Double, detent: Double) {
+        guard from != to, span > 0 else { return }
         let lo = min(from, to), hi = max(from, to)
-        if parameter.detents.contains(where: { $0 >= lo && $0 <= hi }) {
+        if detent >= lo, detent <= hi {
             NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+        } else if floor(from / (span / 48)) != floor(to / (span / 48)) {
+            NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
         }
+    }
+
+    static func tickIfCrossed(parameter: EditParameter, from: Double, to: Double) {
+        ticks(span: parameter.range.upperBound - parameter.range.lowerBound,
+              from: from, to: to, detent: parameter.defaultValue)
     }
 }

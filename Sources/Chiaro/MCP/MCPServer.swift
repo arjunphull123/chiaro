@@ -11,33 +11,46 @@ final class MCPServer {
     static let shared = MCPServer()
     static let preferredPort: UInt16 = 24242
 
-    private var listener: NWListener?
+    private nonisolated(unsafe) var listener: NWListener?
     private(set) nonisolated(unsafe) var port: UInt16 = 0
     @MainActor weak var library: Library?
 
     @MainActor
     func start(library: Library) {
         self.library = library
-        for candidate in [Self.preferredPort, 0] {
-            guard let l = try? NWListener(
-                using: .tcp,
-                on: NWEndpoint.Port(rawValue: candidate) ?? .any
-            ) else { continue }
-            listener = l
-            break
+        startListener(on: Self.preferredPort, isFallback: false)
+    }
+
+    /// Bind failure (port in use) arrives asynchronously via stateUpdateHandler,
+    /// not the initializer — a preferred-port failure falls back to any free
+    /// port exactly once; a fallback failure just gives up.
+    private func startListener(on candidate: UInt16, isFallback: Bool) {
+        guard let l = try? NWListener(
+            using: .tcp,
+            on: NWEndpoint.Port(rawValue: candidate) ?? .any
+        ) else {
+            if !isFallback { startListener(on: 0, isFallback: true) }
+            return
         }
-        guard let listener else { return }
-        listener.newConnectionHandler = { [weak self] connection in
+        listener = l
+        l.newConnectionHandler = { [weak self] connection in
             connection.start(queue: .global())
             self?.receive(on: connection, buffer: Data())
         }
-        listener.stateUpdateHandler = { [weak self] state in
-            if case .ready = state, let self {
-                self.port = self.listener?.port?.rawValue ?? 0
+        l.stateUpdateHandler = { [weak self] state in
+            guard let self else { return }
+            switch state {
+            case .ready:
+                self.port = l.port?.rawValue ?? 0
                 self.writeDiscoveryFile()
+            case .failed:
+                l.cancel()
+                if !isFallback { self.startListener(on: 0, isFallback: true) }
+            default:
+                break
             }
         }
-        listener.start(queue: .global())
+        l.start(queue: .global())
     }
 
     func stop() {
@@ -305,7 +318,7 @@ final class MCPServer {
         ],
         [
             "name": "get_edit",
-            "description": "Read a photo's full EditState (all adjustment values) and starred flag.",
+            "description": "Read a photo's full EditState (all adjustment values) and starred flag. Sparse: only non-default values appear.",
             "inputSchema": [
                 "type": "object",
                 "properties": ["name": ["type": "string", "description": "photo name, e.g. DSC04091"]],
@@ -594,8 +607,9 @@ final class MCPServer {
                     .appendingPathComponent("Chiaro Exports")
             }
             let finalOptions = options
+            let url = p.url, edit = p.edit, exportName = p.name
             let out = await Offload.on(Offload.render) { () -> Result<URL, Error> in
-                Result { try Exporter.export(p, options: finalOptions) }
+                Result { try Exporter.export(url: url, edit: edit, name: exportName, options: finalOptions) }
             }
             return try text(["exported": out.get().path])
         default:

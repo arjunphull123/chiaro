@@ -11,10 +11,10 @@ enum ExportFormat: String, CaseIterable, Identifiable {
     var hasQuality: Bool { self == .jpeg || self == .heif }
     var blurb: String {
         switch self {
-        case .jpeg: "universal — web, LinkedIn, print labs"
-        case .heif: "half the size at the same quality"
-        case .tiff: "lossless, for print or re-editing"
-        case .original: "the untouched RAW file, copied as-is"
+        case .jpeg: "Universal — web, LinkedIn, print labs"
+        case .heif: "Half the size at the same quality"
+        case .tiff: "Lossless, for print or re-editing"
+        case .original: "The untouched RAW file, copied as-is"
         }
     }
     func fileExtension(sourceURL: URL) -> String {
@@ -34,9 +34,9 @@ enum ExportColorSpace: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var blurb: String {
         switch self {
-        case .srgb: "recommended — safe everywhere"
-        case .displayP3: "wide gamut for Apple screens"
-        case .adobeRGB: "for print labs that ask for it"
+        case .srgb: "Recommended — safe everywhere"
+        case .displayP3: "Wide gamut for Apple screens"
+        case .adobeRGB: "For print labs that ask for it"
         }
     }
     var cgColorSpace: CGColorSpace {
@@ -63,32 +63,33 @@ struct ExportOptions {
 
 enum Exporter {
     /// Full-resolution render through the same pipeline as the preview (SPEC.md).
-    static func export(_ photo: Photo, options: ExportOptions) throws -> URL {
+    /// Takes value snapshots — not a `Photo` — so callers must read `url`/`edit`/`name`
+    /// on the main actor before offloading; `Photo` is non-Sendable and main-actor-mutated.
+    static func export(url: URL, edit: EditState, name: String, options: ExportOptions) throws -> URL {
         let folder = options.destination
-            ?? photo.url.deletingLastPathComponent().appendingPathComponent("Chiaro Exports")
+            ?? url.deletingLastPathComponent().appendingPathComponent("Chiaro Exports")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let out = folder.appendingPathComponent(photo.name)
-            .appendingPathExtension(options.format.fileExtension(sourceURL: photo.url))
+        // Two photos with the same stem (different subfolders) must not clobber
+        // each other in one batch — number the collision instead of overwriting.
+        let out = uniqueURL(in: folder, stem: name, ext: options.format.fileExtension(sourceURL: url))
 
         if options.format == .original {
-            try? FileManager.default.removeItem(at: out)
-            try FileManager.default.copyItem(at: photo.url, to: out)
+            try FileManager.default.copyItem(at: url, to: out)
             return out
         }
 
         let engine = RawEngine.shared
-        guard let full = engine.fullImage(for: photo.url) else {
+        guard let full = engine.fullImage(for: url) else {
             throw CocoaError(.fileReadCorruptFile)
         }
-        let edit = photo.edit
         var mask: CIImage?
         if edit.blurF > 0 || edit.relight != 0 {
             mask = PortraitEngine.shared.mask(
-                for: photo.url, image: full,
+                for: url, image: full,
                 kind: edit.blurMode == .person ? .person : .subject)
         }
         let depth = edit.blurMode == .depth && edit.blurF > 0
-            ? DepthEngine.shared.depthMap(for: photo.url, image: full) : nil
+            ? DepthEngine.shared.depthMap(for: url, image: full) : nil
         var rendered = RenderPipeline.render(base: full, edit: edit, personMask: mask, depthMap: depth)
         if let maxDim = options.maxDimension {
             let scale = maxDim / Double(max(rendered.extent.width, rendered.extent.height))
@@ -120,6 +121,16 @@ enum Exporter {
         }
         applyMetadataPolicy(to: out, options: options)
         return out
+    }
+
+    private static func uniqueURL(in folder: URL, stem: String, ext: String) -> URL {
+        var candidate = folder.appendingPathComponent(stem).appendingPathExtension(ext)
+        var n = 2
+        while FileManager.default.fileExists(atPath: candidate.path) {
+            candidate = folder.appendingPathComponent("\(stem)-\(n)").appendingPathExtension(ext)
+            n += 1
+        }
+        return candidate
     }
 
     /// Post-write metadata pass: set print PPI, optionally strip everything else.

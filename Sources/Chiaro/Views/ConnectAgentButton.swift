@@ -128,9 +128,12 @@ struct AgentConnectPopover: View {
     /// Once an agent has done things, the popover becomes its activity log.
     private var historyContent: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("\(AgentStatus.shared.displayName) in Chiaro")
-                .font(Theme.ui(14, .semibold))
-                .foregroundStyle(Theme.ink)
+            HStack(spacing: 7) {
+                AgentStatus.shared.brand.icon.frame(width: 14, height: 14)
+                Text("\(AgentStatus.shared.displayName) in Chiaro")
+                    .font(Theme.ui(14, .semibold))
+                    .foregroundStyle(Theme.ink)
+            }
             ScrollView {
                 VStack(alignment: .leading, spacing: 7) {
                     ForEach(AgentStatus.shared.actions) { action in

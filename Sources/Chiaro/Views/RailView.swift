@@ -519,6 +519,11 @@ struct RailView: View {
         let value = model.edit.locals[index][keyPath: keyPath]
         let isEV = range.upperBound <= 3
         let fieldID = "local-\(index)-\(label)"
+        // The gestures below escape past this render pass — resolve the index
+        // fresh by id when they fire, since `locals` can shrink meanwhile
+        // (an agent's set_edit clearing them mid-drag).
+        let id = model.edit.locals[index].id
+        func resolve() -> Int? { model.edit.locals.firstIndex(where: { $0.id == id }) }
         return HStack {
             Text(label)
                 .font(Theme.ui(11.5))
@@ -536,8 +541,8 @@ struct RailView: View {
                         DispatchQueue.main.async { typingField = fieldID }
                     }
                     .onSubmit {
-                        if let typed = Double(typingValue) {
-                            model.edit.locals[index][keyPath: keyPath] = typed.clamped(to: range)
+                        if let typed = Double(typingValue), let i = resolve() {
+                            model.edit.locals[i][keyPath: keyPath] = typed.clamped(to: range)
                         }
                         typingField = nil
                     }
@@ -563,19 +568,23 @@ struct RailView: View {
         .gesture(
             DragGesture(minimumDistance: 1)
                 .onChanged { g in
+                    guard let i = resolve() else { return }
                     if localScrubStart == nil {
-                        localScrubStart = (g.startLocation.x, model.edit.locals[index][keyPath: keyPath])
+                        localScrubStart = (g.startLocation.x, model.edit.locals[i][keyPath: keyPath])
                     }
                     guard let start = localScrubStart else { return }
                     let span = range.upperBound - range.lowerBound
                     let delta = Double(g.location.x - start.x) / 260 * span
                     var new = (start.value + delta).clamped(to: range)
                     if abs(new) < 2 { new = 0 }
-                    model.edit.locals[index][keyPath: keyPath] = new
+                    model.edit.locals[i][keyPath: keyPath] = new
                 }
                 .onEnded { _ in localScrubStart = nil }
         )
-        .onTapGesture(count: 2) { model.edit.locals[index][keyPath: keyPath] = 0 }
+        .onTapGesture(count: 2) {
+            guard let i = resolve() else { return }
+            model.edit.locals[i][keyPath: keyPath] = 0
+        }
         .clickCursor()
     }
 
@@ -610,8 +619,9 @@ struct RailView: View {
                     let selected = preset.matches(model.edit)
                     Button {
                         // Clicking the active preset clears it back to neutral.
-                        model.edit = (selected ? Preset(name: "", edit: EditState()) : preset)
-                            .applied(to: model.edit)
+                        model.commitDiscrete(
+                            (selected ? Preset(name: "", edit: EditState()) : preset).applied(to: model.edit)
+                        )
                     } label: {
                         Text(preset.name)
                             .font(Theme.ui(10.5, selected ? .medium : .regular))
@@ -698,7 +708,7 @@ struct RailView: View {
 
     private var actions: some View {
         Button {
-            model.edit = .neutral
+            model.commitDiscrete(.neutral)
         } label: {
             Text("Reset all").frame(maxWidth: .infinity)
         }
