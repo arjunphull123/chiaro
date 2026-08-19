@@ -92,19 +92,15 @@ enum RenderPipeline {
         // Focus peaking (preview only, never export): amber wash over the
         // in-focus plane while the Focus control is armed.
         if focusPeaking, edit.blurMode == .depth, let depthMap {
-            let target = 1 - edit.focusDepth
-            let focusPlane = CIImage(color: CIColor(red: target, green: target, blue: target))
-                .cropped(to: image.extent)
-            // Peaking shows the sharp zone: inside the Range deadband, plus a
-            // small soft shoulder.
-            let edge = edit.focusRange * 0.4 + 0.04
+            // Peaking shows the sharp zone: everything nearer than the far
+            // edge, with a small soft shoulder.
+            let farEdge = (1 - edit.focusDepth) - edit.focusRange * 0.4 - 0.04
             let inFocus = depthMap.cropped(to: image.extent)
-                .applyingFilter("CIColorAbsoluteDifference", parameters: ["inputImage2": focusPlane])
                 .applyingFilter("CIColorMatrix", parameters: [
-                    "inputRVector": CIVector(x: -12, y: 0, z: 0, w: 0),
-                    "inputGVector": CIVector(x: -12, y: 0, z: 0, w: 0),
-                    "inputBVector": CIVector(x: -12, y: 0, z: 0, w: 0),
-                    "inputBiasVector": CIVector(x: edge * 12, y: edge * 12, z: edge * 12, w: 0),
+                    "inputRVector": CIVector(x: 12, y: 0, z: 0, w: 0),
+                    "inputGVector": CIVector(x: 12, y: 0, z: 0, w: 0),
+                    "inputBVector": CIVector(x: 12, y: 0, z: 0, w: 0),
+                    "inputBiasVector": CIVector(x: -farEdge * 12, y: -farEdge * 12, z: -farEdge * 12, w: 0),
                 ])
                 .applyingFilter("CIColorClamp")
             let amber = CIImage(color: CIColor(red: 0.91, green: 0.64, blue: 0.24, alpha: 0.45))
@@ -293,21 +289,18 @@ enum RenderPipeline {
             // the person.
             let amountMask: CIImage?
             if edit.blurMode == .depth, let depthMap {
-                // Distance from the focus plane, minus the sharp-zone deadband
-                // (Range), ramped to full blur.
-                let deadband = edit.focusRange * 0.4
+                // One-sided: everything from the focus plane toward the camera
+                // stays sharp — blur ramps only beyond the sharp zone's far
+                // edge. (Two-sided optics blur noses; nobody wants that.)
+                let farEdge = (1 - edit.focusDepth) - edit.focusRange * 0.4
                 let gain: CGFloat = 2.4
-                let focusPlane = CIImage(color: CIColor(
-                    red: 1 - edit.focusDepth, green: 1 - edit.focusDepth, blue: 1 - edit.focusDepth
-                )).cropped(to: image.extent)
                 amountMask = depthMap.cropped(to: image.extent)
-                    .applyingFilter("CIColorAbsoluteDifference", parameters: ["inputImage2": focusPlane])
                     .applyingFilter("CIColorMatrix", parameters: [
-                        "inputRVector": CIVector(x: gain, y: 0, z: 0, w: 0),
-                        "inputGVector": CIVector(x: gain, y: 0, z: 0, w: 0),
-                        "inputBVector": CIVector(x: gain, y: 0, z: 0, w: 0),
+                        "inputRVector": CIVector(x: -gain, y: 0, z: 0, w: 0),
+                        "inputGVector": CIVector(x: -gain, y: 0, z: 0, w: 0),
+                        "inputBVector": CIVector(x: -gain, y: 0, z: 0, w: 0),
                         "inputBiasVector": CIVector(
-                            x: -deadband * gain, y: -deadband * gain, z: -deadband * gain, w: 0),
+                            x: farEdge * gain, y: farEdge * gain, z: farEdge * gain, w: 0),
                     ])
                     .applyingFilter("CIColorClamp")
             } else {

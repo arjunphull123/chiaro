@@ -26,7 +26,7 @@ final class DepthEngine: @unchecked Sendable {
     /// Normalized disparity map for the photo (1 = near, 0 = far), scaled to
     /// `extent`. Blocking — call from an Offload queue, never the cooperative pool.
     func depthMap(for url: URL, image: CIImage) -> CIImage? {
-        normalizedMap(for: url, image: image).map { scaled($0, to: image.extent) }
+        normalizedMap(for: url, image: image).map { scaled($0, to: image.extent, guide: image) }
     }
 
     /// The cached native-resolution normalized map (model output size).
@@ -152,7 +152,15 @@ final class DepthEngine: @unchecked Sendable {
         return (1 - disparity).clamped(to: 0...1)
     }
 
-    private func scaled(_ map: CIImage, to extent: CGRect) -> CIImage {
+    /// Edge-preserving upsample guided by the photo — depth edges snap to
+    /// image edges (hair, glasses) instead of smearing across them.
+    private func scaled(_ map: CIImage, to extent: CGRect, guide: CIImage) -> CIImage {
+        let upsampled = guide.applyingFilter("CIEdgePreserveUpsampleFilter", parameters: [
+            "inputSmallImage": map,
+        ])
+        if upsampled.extent.width >= extent.width - 1 {
+            return upsampled.clampedToExtent().cropped(to: extent)
+        }
         let sx = extent.width / map.extent.width
         let sy = extent.height / map.extent.height
         return map

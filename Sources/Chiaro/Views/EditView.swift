@@ -75,6 +75,7 @@ struct EditView: View {
                     .buttonStyle(GlassIconButtonStyle(tint: model.cropMode ? Theme.amber : Theme.ink2))
                     .clickCursor()
                     .help("Crop & straighten (C)")
+                cleanupButton
                 glassIcon("arrow.uturn.backward", disabled: !model.canUndo, help: "Undo (⌘Z)") { model.undo() }
                 glassIcon("arrow.uturn.forward", disabled: !model.canRedo, help: "Redo (⇧⌘Z)") { model.redo() }
                 glassAction("Copy edits", icon: "doc.on.doc", disabled: model.edit.isNeutral) {
@@ -108,7 +109,8 @@ struct EditView: View {
     private func installScrollMonitor() {
         guard scrollMonitor == nil else { return }
         scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
-            guard !library.agentActive, let parameter = model.armed else { return event }
+            guard !library.agentActive, !model.depthSceneVisible, !model.cleanupMode,
+                  let parameter = model.armed else { return event }
             let dx = event.scrollingDeltaX
             guard abs(dx) > abs(event.scrollingDeltaY), dx != 0 else { return event }
             let span = parameter.range.upperBound - parameter.range.lowerBound
@@ -166,6 +168,36 @@ struct EditView: View {
         .buttonStyle(GlassButtonStyle())
         .clickCursor()
         .disabled(disabled)
+    }
+
+    /// Clean up is a mode like crop — it lives with the utilities. First
+    /// click downloads the model (40 MB); after that it toggles the brush.
+    @ViewBuilder private var cleanupButton: some View {
+        switch CleanupModelStore.shared.availability {
+        case .missing, .failed:
+            Button { CleanupModelStore.shared.downloadIfNeeded() } label: {
+                Image(systemName: "bandage")
+            }
+            .buttonStyle(GlassIconButtonStyle())
+            .clickCursor()
+            .help("Clean up — first use downloads the on-device model (40 MB)")
+        case .downloading(let progress):
+            ProgressView(value: progress)
+                .progressViewStyle(.circular)
+                .controlSize(.small)
+                .frame(width: 30, height: 28)
+                .help("Downloading the cleanup model…")
+        case .preparing:
+            ProgressView()
+                .controlSize(.small)
+                .frame(width: 30, height: 28)
+                .help("Preparing the cleanup model…")
+        case .ready:
+            Button { model.cleanupMode.toggle() } label: { Image(systemName: "bandage") }
+                .buttonStyle(GlassIconButtonStyle(tint: model.cleanupMode ? Theme.amber : Theme.ink2))
+                .clickCursor()
+                .help("Clean up — brush over distractions to remove them")
+        }
     }
 
     private var exportButton: some View {

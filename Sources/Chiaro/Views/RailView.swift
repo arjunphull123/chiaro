@@ -40,6 +40,7 @@ struct RailView: View {
                 Group {
                     HistogramView(data: model.histogram)
                     presetsSection
+                    colorMixSection
                     section(
                         "Light", [.exposure, .contrast, .highlights, .shadows, .whites, .blacks],
                         help: "Brightness and tonal balance"
@@ -50,11 +51,9 @@ struct RailView: View {
                         "Color", [.temp, .tint, .vibrance, .saturation],
                         help: "White balance and color strength"
                     )
-                    colorMixSection
                     localSection
                     section("Effects", [.clarity, .vignette], help: "Punch and framing")
                     section("Detail", [.sharpness, .noiseReduction], help: "Fine texture and grain cleanup")
-                    cleanupSection
                     actions
                     scrubHint
                 }
@@ -131,11 +130,11 @@ struct RailView: View {
 
     private var portraitSection: some View {
         VStack(alignment: .leading, spacing: 3) {
-            sectionLabel("Depth", help: "Background blur — by lifted subject or by scene depth — and subject light")
+            sectionLabel("Background blur", help: "What stays sharp: the lifted subject, detected people, or everything nearer than the focus plane")
             HStack(spacing: 6) {
                 Chip(title: "Subject", selected: model.edit.blurMode == .subject) { model.setBlurMode(.subject) }
                 Chip(title: "Person", selected: model.edit.blurMode == .person) { model.setBlurMode(.person) }
-                Chip(title: "Scene ML", selected: model.edit.blurMode == .depth) { model.setBlurMode(.depth) }
+                Chip(title: "Depth", selected: model.edit.blurMode == .depth) { model.setBlurMode(.depth) }
             }
             .padding(.bottom, 4)
             if model.edit.blurMode == .depth {
@@ -226,6 +225,7 @@ struct RailView: View {
             }
             .buttonStyle(.plain)
             .clickCursor()
+            .padding(.bottom, 6)
             .help("See the scene in 3D — drag to orbit, grab a handle to move a focus plane")
             AdjustmentRow(parameter: .blurF, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
             AdjustmentRow(parameter: .focusDepth, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
@@ -268,22 +268,47 @@ struct RailView: View {
         }
     }
 
+    @State private var typingValue = ""
+    @FocusState private var typingField: String?
+
     /// Scrub row for one component of the selected band — same feel as
-    /// AdjustmentRow, bound into the hsl array.
+    /// AdjustmentRow, bound into the hsl array. Click the value to type it.
     private func bandRow(_ label: String, keyPath: WritableKeyPath<HSLBand, Double>) -> some View {
         let value = model.edit.hsl[selectedBand][keyPath: keyPath]
+        let fieldID = "hsl-\(selectedBand)-\(label)"
         return HStack {
             Text(label)
                 .font(Theme.ui(11.5))
                 .foregroundStyle(Theme.ink2)
             Spacer()
-            Text(value == 0 ? "0" : String(format: "%+.0f", value))
-                .font(Theme.mono(10, .medium))
-                .foregroundStyle(value == 0 ? Theme.ink3 : Theme.amber)
-                .monospacedDigit()
-                .padding(.horizontal, 7)
-                .padding(.vertical, 3)
-                .background(Capsule().fill(Color.white.opacity(0.05)))
+            if typingField == fieldID {
+                TextField("", text: $typingValue)
+                    .textFieldStyle(.plain)
+                    .font(Theme.mono(10, .medium))
+                    .foregroundStyle(Theme.amber)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 44)
+                    .focused($typingField, equals: fieldID)
+                    .onSubmit {
+                        if let typed = Double(typingValue) {
+                            model.edit.hsl[selectedBand][keyPath: keyPath] = typed.clamped(to: -100...100)
+                        }
+                        typingField = nil
+                    }
+                    .onExitCommand { typingField = nil }
+            } else {
+                Text(value == 0 ? "0" : String(format: "%+.0f", value))
+                    .font(Theme.mono(10, .medium))
+                    .foregroundStyle(value == 0 ? Theme.ink3 : Theme.amber)
+                    .monospacedDigit()
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Color.white.opacity(0.05)))
+                    .onTapGesture {
+                        typingValue = value == 0 ? "" : String(format: "%.0f", value)
+                        typingField = fieldID
+                    }
+            }
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 5)
@@ -308,7 +333,7 @@ struct RailView: View {
     private var localSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 5) {
-                Text("Local")
+                Text("Masking")
                     .font(Theme.ui(12, .medium))
                     .foregroundStyle(Theme.ink2)
                 Rectangle().fill(Theme.hairline).frame(height: 1)
@@ -326,32 +351,42 @@ struct RailView: View {
                 .clickCursor()
             }
             .padding(.top, 10)
-            if !model.edit.locals.isEmpty {
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 5), GridItem(.flexible(), spacing: 5)], spacing: 5) {
-                    ForEach(Array(model.edit.locals.enumerated()), id: \.element.id) { index, local in
-                        let selected = model.selectedLocalID == local.id
-                        Button {
-                            model.selectedLocalID = selected ? nil : local.id
-                        } label: {
-                            Text("\(local.kind.rawValue.prefix(1).uppercased() + local.kind.rawValue.dropFirst()) \(index + 1)")
-                                .font(Theme.ui(10.5, selected ? .medium : .regular))
-                                .foregroundStyle(selected ? Theme.amber : Theme.ink2)
-                                .lineLimit(1)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 6)
-                                .background(Capsule().fill(Color.white.opacity(selected ? 0.08 : 0.03)))
-                                .overlay(Capsule().stroke(selected ? Theme.amber.opacity(0.5) : Theme.hairline))
-                        }
-                        .buttonStyle(.plain)
-                        .clickCursor()
-                        .contextMenu {
-                            Button("Delete") {
-                                model.edit.locals.removeAll { $0.id == local.id }
-                                if selected { model.selectedLocalID = nil }
-                            }
-                        }
+            ForEach(Array(model.edit.locals.enumerated()), id: \.element.id) { index, local in
+                let selected = model.selectedLocalID == local.id
+                HStack(spacing: 6) {
+                    Image(systemName: local.kind == .radial ? "circle.dashed"
+                        : local.kind == .linear ? "line.diagonal" : "person.crop.square.badge.camera")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(selected ? Theme.amber : Theme.ink3)
+                    Text("\(local.kind.rawValue.prefix(1).uppercased() + local.kind.rawValue.dropFirst()) \(index + 1)")
+                        .font(Theme.ui(11.5, selected ? .medium : .regular))
+                        .foregroundStyle(selected ? Theme.amber : Theme.ink2)
+                    Spacer()
+                    Button {
+                        model.edit.locals.removeAll { $0.id == local.id }
+                        if selected { model.selectedLocalID = nil }
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(Theme.ink3)
                     }
+                    .buttonStyle(.plain)
+                    .clickCursor()
+                    .help("Delete this mask")
                 }
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(selected ? Theme.amber.opacity(0.1) : Color.white.opacity(0.03))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7)
+                        .stroke(selected ? Theme.amber.opacity(0.5) : .clear)
+                )
+                .contentShape(Rectangle())
+                .onTapGesture { model.selectedLocalID = selected ? nil : local.id }
+                .clickCursor()
             }
             if let index = model.edit.locals.firstIndex(where: { $0.id == model.selectedLocalID }) {
                 localRow("Exposure", index: index, keyPath: \.exposure, range: -3...3)
@@ -518,7 +553,11 @@ struct RailView: View {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 5), GridItem(.flexible(), spacing: 5)], spacing: 5) {
                 ForEach(PresetStore.shared.all) { preset in
                     let selected = preset.matches(model.edit)
-                    Button { model.edit = preset.applied(to: model.edit) } label: {
+                    Button {
+                        // Clicking the active preset clears it back to neutral.
+                        model.edit = (selected ? Preset(name: "", edit: EditState()) : preset)
+                            .applied(to: model.edit)
+                    } label: {
                         Text(preset.name)
                             .font(Theme.ui(10.5, selected ? .medium : .regular))
                             .foregroundStyle(selected ? Theme.amber : Theme.ink2)

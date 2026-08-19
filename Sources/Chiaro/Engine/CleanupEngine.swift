@@ -42,7 +42,8 @@ final class CleanupEngine: @unchecked Sendable {
         let extent = image.extent
         guard let maskImage = Self.rasterize(strokes: strokes, extent: extent) else { return image }
 
-        // Context window: the strokes' bounding box, tripled, squared off.
+        // Context window: the strokes' bounding box with margin, squared off —
+        // tighter windows give the 512px model more effective resolution.
         var bounds = CGRect.null
         for stroke in strokes {
             for point in stroke.points {
@@ -54,22 +55,26 @@ final class CleanupEngine: @unchecked Sendable {
                 ))
             }
         }
-        let side = max(bounds.width, bounds.height) * 3
+        let side = max(bounds.width, bounds.height) * 2.2
         let crop = CGRect(
             x: bounds.midX - side / 2, y: bounds.midY - side / 2,
             width: side, height: side
         ).intersection(extent)
         guard crop.width > 8, crop.height > 8 else { return image }
 
+        // LaMa was trained on generous masks — dilate the strokes slightly.
+        let dilated = maskImage.applyingFilter("CIMorphologyMaximum", parameters: [
+            kCIInputRadiusKey: extent.width / 250,
+        ]).cropped(to: extent)
         guard let output = infer(
             model: model,
             image: image.cropped(to: crop),
-            mask: maskImage.cropped(to: crop),
+            mask: dilated.cropped(to: crop),
             crop: crop
         ) else { return image }
 
         // Feathered composite: the inpainted patch only where the strokes are.
-        let feathered = maskImage
+        let feathered = dilated
             .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: extent.width / 400])
             .cropped(to: extent)
         let blend = CIFilter(name: "CIBlendWithMask", parameters: [

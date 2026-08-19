@@ -108,7 +108,9 @@ final class EditViewModel {
     private var maskKind: PortraitEngine.MaskKind = .subject
     /// 3D depth scene visibility, and one-shot commands routed to it
     /// (exit / view presets) — the scene lives behind an NSViewRepresentable.
-    var depthSceneVisible = false
+    var depthSceneVisible = false {
+        didSet { if depthSceneVisible { armed = nil } }
+    }
     var depthSceneCommand: DepthSceneCommand?
     /// Orbit state, shared with the orientation cube.
     var sceneYaw: CGFloat = DepthScene.restYaw
