@@ -85,7 +85,7 @@ enum RenderPipeline {
         }
         // Focus peaking (preview only, never export): amber wash over the
         // in-focus plane while the Focus control is armed.
-        if focusPeaking, edit.depthBlur, let depthMap {
+        if focusPeaking, edit.blurMode == .depth, let depthMap {
             let target = 1 - edit.focusDepth
             let focusPlane = CIImage(color: CIColor(red: target, green: target, blue: target))
                 .cropped(to: image.extent)
@@ -204,7 +204,7 @@ enum RenderPipeline {
             // distance from the focus plane; subject mode blurs everything but
             // the person.
             let amountMask: CIImage?
-            if edit.depthBlur, let depthMap {
+            if edit.blurMode == .depth, let depthMap {
                 // Distance from the focus plane, minus the sharp-zone deadband
                 // (Range), ramped to full blur.
                 let deadband = edit.focusRange * 0.4

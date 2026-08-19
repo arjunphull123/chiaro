@@ -26,10 +26,15 @@ final class DepthEngine: @unchecked Sendable {
     /// Normalized disparity map for the photo (1 = near, 0 = far), scaled to
     /// `extent`. Blocking — call from an Offload queue, never the cooperative pool.
     func depthMap(for url: URL, image: CIImage) -> CIImage? {
+        normalizedMap(for: url, image: image).map { scaled($0, to: image.extent) }
+    }
+
+    /// The cached native-resolution normalized map (model output size).
+    func normalizedMap(for url: URL, image: CIImage) -> CIImage? {
         lock.lock()
         if let cached = cache[url] {
             lock.unlock()
-            return scaled(cached, to: image.extent)
+            return cached
         }
         guard let model else { lock.unlock(); return nil }
         lock.unlock()
@@ -67,7 +72,71 @@ final class DepthEngine: @unchecked Sendable {
         cache[url] = normalized
         if cache.count > 12 { cache.removeValue(forKey: cache.keys.first!) }
         lock.unlock()
-        return scaled(normalized, to: image.extent)
+        return normalized
+    }
+
+    /// Downsampled disparity + color grid for the 3D depth scene, plus the
+    /// depth histogram for the focal-range strip. Blocking — Offload only.
+    struct PointGrid: Sendable {
+        var width: Int
+        var height: Int
+        var aspect: Float
+        var disparity: [Float]     // width*height, row-major from top-left
+        var colors: [UInt8]        // RGBA8, same order
+        var histogram: [Float]     // normalized 0…1 counts over disparity bins
+    }
+
+    func pointGrid(for url: URL, image: CIImage, width: Int = 128, bins: Int = 48) -> PointGrid? {
+        guard let map = normalizedMap(for: url, image: image) else { return nil }
+        let aspect = Float(image.extent.width / image.extent.height)
+        let height = max(2, Int((Float(width) / aspect).rounded()))
+        let context = RawEngine.shared.context
+
+        func resampled(_ source: CIImage) -> CIImage {
+            let sx = CGFloat(width) / source.extent.width
+            let sy = CGFloat(height) / source.extent.height
+            return source
+                .transformed(by: .init(scaleX: sx, y: sy))
+                .cropped(to: CGRect(x: 0, y: 0, width: width, height: height))
+        }
+
+        var depth = [Float](repeating: 0, count: width * height * 4)
+        context.render(
+            resampled(map), toBitmap: &depth, rowBytes: width * 16,
+            bounds: CGRect(x: 0, y: 0, width: width, height: height),
+            format: .RGBAf, colorSpace: nil
+        )
+        var colors = [UInt8](repeating: 0, count: width * height * 4)
+        context.render(
+            resampled(image), toBitmap: &colors, rowBytes: width * 4,
+            bounds: CGRect(x: 0, y: 0, width: width, height: height),
+            format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)
+        )
+
+        var disparity = [Float](repeating: 0, count: width * height)
+        var histogram = [Float](repeating: 0, count: bins)
+        // Core Image renders bottom-up; flip to top-left row-major.
+        for row in 0..<height {
+            let sourceRow = height - 1 - row
+            for col in 0..<width {
+                let d = depth[(sourceRow * width + col) * 4]
+                disparity[row * width + col] = d
+                let bin = min(bins - 1, max(0, Int(d * Float(bins))))
+                histogram[bin] += 1
+            }
+        }
+        let peak = histogram.max() ?? 1
+        if peak > 0 { for i in 0..<bins { histogram[i] /= peak } }
+
+        var flippedColors = [UInt8](repeating: 0, count: width * height * 4)
+        for row in 0..<height {
+            let sourceRow = height - 1 - row
+            let src = (sourceRow * width) * 4
+            let dst = (row * width) * 4
+            flippedColors.replaceSubrange(dst..<(dst + width * 4), with: colors[src..<(src + width * 4)])
+        }
+        return PointGrid(width: width, height: height, aspect: aspect,
+                         disparity: disparity, colors: flippedColors, histogram: histogram)
     }
 
     /// Mean disparity inside the person mask → focusDepth (0 near … 1 far).

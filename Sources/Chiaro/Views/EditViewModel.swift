@@ -52,8 +52,8 @@ final class EditViewModel {
     /// next canvas click sets the focus plane, then it disarms itself.
     var focusPicking = false {
         didSet {
-            guard focusPicking != oldValue else { return }
-            if focusPicking { NSCursor.crosshair.push() } else { NSCursor.pop() }
+            guard focusPicking != oldValue, !focusPicking else { return }
+            NSCursor.arrow.set()
         }
     }
     /// Held-space pan: drag moves the photo even while a parameter is armed.
@@ -96,6 +96,12 @@ final class EditViewModel {
 
     private var basePreview: CIImage?
     private var personMask: CIImage?
+    private var maskKind: PortraitEngine.MaskKind = .subject
+    /// Focos-style 3D depth scene visibility.
+    var depthSceneVisible = false
+    /// Depth histogram for the focal-range strip (48 bins, 0 near … 1 far).
+    var depthHistogram: [Float]?
+    private var histogramURL: URL?
     private var renderGeneration = 0
     private var saveItem: DispatchWorkItem?
     private var saveActivity: NSObjectProtocol?
@@ -129,6 +135,9 @@ final class EditViewModel {
         basePreview = nil
         personMask = nil
         hasPerson = nil
+        depthHistogram = nil
+        histogramURL = nil
+        depthSceneVisible = false
         isLoading = true
         load()
     }
@@ -149,11 +158,54 @@ final class EditViewModel {
             self.isLoading = false
             self.scheduleRender()
 
-            let mask = await Offload.on(Offload.vision) { PortraitEngine.shared.mask(for: url, image: base) }
-            guard self.photo.url == url else { return }
+            self.maskKind = self.edit.blurMode == .person ? .person : .subject
+            self.reloadMask()
+        }
+    }
+
+    private func reloadMask() {
+        guard let basePreview else { return }
+        let url = photo.url
+        let kind = maskKind
+        Task { [weak self] in
+            let mask = await Offload.on(Offload.vision) {
+                PortraitEngine.shared.mask(for: url, image: basePreview, kind: kind)
+            }
+            guard let self, self.photo.url == url, self.maskKind == kind else { return }
             self.personMask = mask
             self.hasPerson = mask != nil
             if self.edit.blurF > 0 || self.edit.relight != 0 { self.scheduleRender() }
+        }
+    }
+
+    /// Point grid for the 3D scene — heavy, so built on demand off-pool.
+    func depthGrid() async -> DepthEngine.PointGrid? {
+        guard let basePreview else { return nil }
+        let url = photo.url
+        return await Offload.on(Offload.render) {
+            DepthEngine.shared.pointGrid(for: url, image: basePreview)
+        }
+    }
+
+    func loadDepthHistogram() {
+        guard histogramURL != photo.url, let basePreview else { return }
+        histogramURL = photo.url
+        let url = photo.url
+        Task { [weak self] in
+            let grid = await Offload.on(Offload.render) {
+                DepthEngine.shared.pointGrid(for: url, image: basePreview, width: 64)
+            }
+            guard let self, self.photo.url == url else { return }
+            self.depthHistogram = grid?.histogram
+        }
+    }
+
+    func setBlurMode(_ mode: BlurMode) {
+        if mode == .depth {
+            enableDepthBlur()
+        } else {
+            edit.blurMode = mode
+            depthSceneVisible = false
         }
     }
 
@@ -161,7 +213,7 @@ final class EditViewModel {
     /// the person mask becomes the focus plane, so the first render is sharp
     /// where it should be instead of blurring the person (focus defaults mid-scene).
     func enableDepthBlur() {
-        edit.depthBlur = true
+        edit.blurMode = .depth
         // Auto-focus only on first use — switching Subject ↔ Depth must not
         // stomp a focus the user already set.
         guard edit.focusDepth == EditParameter.focusDepth.defaultValue, let basePreview else { return }
@@ -172,7 +224,7 @@ final class EditViewModel {
                 guard let depth = DepthEngine.shared.depthMap(for: url, image: basePreview) else { return nil }
                 return DepthEngine.subjectFocus(depth: depth, mask: mask)
             }
-            guard let self, let focus, self.edit.depthBlur else { return }
+            guard let self, let focus, self.edit.blurMode == .depth else { return }
             self.edit.focusDepth = focus
         }
     }
@@ -180,7 +232,7 @@ final class EditViewModel {
     /// Click-to-focus: sample the depth map at a normalized canvas point
     /// (u, v top-down) and move the focus plane there.
     func focusAt(u: Double, v: Double) {
-        guard edit.depthBlur, let basePreview, (0...1).contains(u), (0...1).contains(v) else { return }
+        guard edit.blurMode == .depth, let basePreview, (0...1).contains(u), (0...1).contains(v) else { return }
         let url = photo.url
         let editNow = edit
         let skipCrop = cropMode
@@ -206,6 +258,11 @@ final class EditViewModel {
 
     private func scheduleRender() {
         guard let basePreview else { return }
+        let neededKind: PortraitEngine.MaskKind = edit.blurMode == .person ? .person : .subject
+        if neededKind != maskKind {
+            maskKind = neededKind
+            reloadMask()
+        }
         KeepAwake.poke()
         renderGeneration += 1
         let generation = renderGeneration
@@ -213,10 +270,10 @@ final class EditViewModel {
         let mask = personMask
         let skipCrop = cropMode
         let url = photo.url
-        let peaking = (armed == .focusDepth || armed == .focusRange) && edit.depthBlur
+        let peaking = (armed == .focusDepth || armed == .focusRange) && edit.blurMode == .depth
         Task { [weak self] in
             let result = await Offload.on(Offload.render) { () -> (CGImage, HistogramData)? in
-                let depth = edit.depthBlur && (edit.blurF > 0 || peaking)
+                let depth = edit.blurMode == .depth && (edit.blurF > 0 || peaking)
                     ? DepthEngine.shared.depthMap(for: url, image: basePreview) : nil
                 let output = RenderPipeline.render(base: basePreview, edit: edit, personMask: mask, depthMap: depth, skipCrop: skipCrop, focusPeaking: peaking)
                 guard let cg = RawEngine.shared.context.createCGImage(output, from: output.extent) else { return nil }

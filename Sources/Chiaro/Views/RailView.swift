@@ -10,7 +10,10 @@ struct RailView: View {
         VStack(alignment: .leading, spacing: 0) {
             // Pinned above the fold: agent presence and the photo's identity.
             VStack(alignment: .leading, spacing: 12) {
-                AgentRailStatus(library: library)
+                HStack(spacing: 10) {
+                    AppMark(size: 30)
+                    AgentRailStatus(library: library)
+                }
                 photoHeader
                     .opacity(library.agentActive ? 0.4 : 1)
             }
@@ -78,10 +81,6 @@ struct RailView: View {
                         .padding(.horizontal, 5).padding(.vertical, 2)
                         .background(RoundedRectangle(cornerRadius: 4).stroke(Theme.amber.opacity(0.5)))
                 }
-                Spacer()
-                // The editor's only brand moment: the mark, on chrome the
-                // photo can never slide behind.
-                AppMark(size: 14).opacity(0.8)
             }
             if let exif = model.photo.exifSummary {
                 Text(exif)
@@ -130,11 +129,12 @@ struct RailView: View {
         VStack(alignment: .leading, spacing: 3) {
             sectionLabel("Portrait", help: "Background blur — by lifted subject or by scene depth — and subject light")
             HStack(spacing: 6) {
-                Chip(title: "Subject", selected: !model.edit.depthBlur) { model.edit.depthBlur = false }
-                Chip(title: "Depth", selected: model.edit.depthBlur) { model.enableDepthBlur() }
+                Chip(title: "Subject", selected: model.edit.blurMode == .subject) { model.setBlurMode(.subject) }
+                Chip(title: "Person", selected: model.edit.blurMode == .person) { model.setBlurMode(.person) }
+                Chip(title: "Depth ML", selected: model.edit.blurMode == .depth) { model.setBlurMode(.depth) }
             }
             .padding(.bottom, 4)
-            if model.edit.depthBlur {
+            if model.edit.blurMode == .depth {
                 depthContent
             } else {
                 subjectContent
@@ -145,11 +145,11 @@ struct RailView: View {
     @ViewBuilder private var subjectContent: some View {
         switch model.hasPerson {
         case .none:
-            Text("finding subject…")
+            Text(model.edit.blurMode == .person ? "finding person…" : "finding subject…")
                 .font(Theme.mono(10)).foregroundStyle(Theme.ink3)
                 .frame(height: 24)
         case .some(false):
-            Text("no subject found in this photo")
+            Text(model.edit.blurMode == .person ? "no person found in this photo" : "no subject found in this photo")
                 .font(Theme.mono(10)).foregroundStyle(Theme.ink3)
                 .frame(height: 24)
         case .some(true):
@@ -192,6 +192,8 @@ struct RailView: View {
                     .clickCursor()
             }
         case .ready:
+            FocalRangeStrip(model: model)
+                .onAppear { model.loadDepthHistogram() }
             AdjustmentRow(parameter: .blurF, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
             HStack(spacing: 6) {
                 AdjustmentRow(parameter: .focusDepth, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
@@ -213,6 +215,11 @@ struct RailView: View {
             }
             AdjustmentRow(parameter: .focusRange, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
             AdjustmentRow(parameter: .relight, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
+            Chip(title: model.depthSceneVisible ? "Close 3D focus" : "3D focus", selected: model.depthSceneVisible) {
+                model.depthSceneVisible.toggle()
+            }
+            .padding(.top, 4)
+            .help("See the scene in 3D — drag the plane to focus, scroll for range")
         }
     }
 
@@ -246,5 +253,91 @@ struct RailView: View {
             .foregroundStyle(Theme.ink3)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.top, 6)
+    }
+}
+
+
+/// Lightroom-style focal range: the scene's depth distribution as bars, with
+/// a draggable window — body moves Focus, edges resize Range.
+private struct FocalRangeStrip: View {
+    @Bindable var model: EditViewModel
+    @State private var dragZone: Zone?
+    @State private var startFocus = 0.0
+    @State private var startRange = 0.0
+
+    private enum Zone { case body, left, right }
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let half = model.edit.focusRange * 0.4
+            let left = (model.edit.focusDepth - half).clamped(to: 0...1) * w
+            let right = (model.edit.focusDepth + half).clamped(to: 0...1) * w
+            ZStack(alignment: .leading) {
+                if let bins = model.depthHistogram {
+                    Canvas { context, size in
+                        let barW = size.width / CGFloat(bins.count)
+                        for (i, v) in bins.enumerated() {
+                            // Histogram is indexed by disparity (1 = near);
+                            // x-axis runs near → far to match the Focus slider.
+                            let x = size.width - CGFloat(i + 1) * barW
+                            let h = max(1.5, CGFloat(v) * (size.height - 4))
+                            context.fill(
+                                Path(roundedRect: CGRect(x: x + 0.5, y: size.height - h, width: barW - 1, height: h), cornerRadius: 1),
+                                with: .color(.white.opacity(0.22))
+                            )
+                        }
+                    }
+                } else {
+                    Text("reading depth…")
+                        .font(Theme.mono(9)).foregroundStyle(Theme.ink3)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Theme.amber.opacity(0.14))
+                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(Theme.amber.opacity(0.65), lineWidth: 1))
+                    .frame(width: max(6, right - left))
+                    .offset(x: left)
+                RoundedRectangle(cornerRadius: 1).fill(Theme.amber)
+                    .frame(width: 2, height: 12)
+                    .offset(x: model.edit.focusDepth.clamped(to: 0...1) * w - 1)
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { g in
+                        if dragZone == nil {
+                            let x = g.startLocation.x
+                            if abs(x - left) < 7 { dragZone = .left }
+                            else if abs(x - right) < 7 { dragZone = .right }
+                            else {
+                                dragZone = .body
+                                if x < left || x > right {
+                                    model.edit.focusDepth = (x / w).clamped(to: 0...1)
+                                }
+                            }
+                            startFocus = model.edit.focusDepth
+                            startRange = model.edit.focusRange
+                            model.armed = .focusDepth // peaking while dragging
+                        }
+                        let dx = Double(g.translation.width / w)
+                        switch dragZone {
+                        case .body:
+                            model.edit.focusDepth = (startFocus + dx).clamped(to: 0...1)
+                        case .left:
+                            model.edit.focusRange = (startRange - dx / 0.4).clamped(to: 0...1)
+                        case .right:
+                            model.edit.focusRange = (startRange + dx / 0.4).clamped(to: 0...1)
+                        case nil:
+                            break
+                        }
+                    }
+                    .onEnded { _ in dragZone = nil }
+            )
+        }
+        .frame(height: 40)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Color.black.opacity(0.25)))
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.hairline))
+        .help("The scene's depth, near to far — drag the window to focus, its edges to widen")
     }
 }

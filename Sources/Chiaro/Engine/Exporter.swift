@@ -83,9 +83,11 @@ enum Exporter {
         let edit = photo.edit
         var mask: CIImage?
         if edit.blurF > 0 || edit.relight != 0 {
-            mask = PortraitEngine.shared.mask(for: photo.url, image: full)
+            mask = PortraitEngine.shared.mask(
+                for: photo.url, image: full,
+                kind: edit.blurMode == .person ? .person : .subject)
         }
-        let depth = edit.depthBlur && edit.blurF > 0
+        let depth = edit.blurMode == .depth && edit.blurF > 0
             ? DepthEngine.shared.depthMap(for: photo.url, image: full) : nil
         var rendered = RenderPipeline.render(base: full, edit: edit, personMask: mask, depthMap: depth)
         if let maxDim = options.maxDimension {

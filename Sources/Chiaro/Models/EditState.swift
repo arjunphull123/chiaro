@@ -16,6 +16,13 @@ struct CropRect: Codable, Equatable {
     static let full = CropRect(x: 0, y: 0, w: 1, h: 1)
 }
 
+/// How portrait blur decides what stays sharp.
+enum BlurMode: String, Codable {
+    case subject   // foreground instance lift — any salient subject
+    case person    // person segmentation only
+    case depth     // Depth Anything focus plane
+}
+
 /// The complete, serializable description of one photo's edit (ADR 0003).
 /// Every UI input path mutates this; the render pipeline is a pure function of it.
 struct EditState: Codable, Equatable {
@@ -41,7 +48,7 @@ struct EditState: Codable, Equatable {
     var blurF: Double = 0         // 0...1 (0 = off/f16, 1 = f1.4)
     var relight: Double = 0       // -100...100
     var maskReach: Double = 0     // -100...100: grow (+) or shrink (−) the subject mask
-    var depthBlur: Bool = false   // blur by scene depth instead of the subject mask
+    var blurMode: BlurMode = .subject
     var focusDepth: Double = 0.5  // 0 = nearest, 1 = farthest — the plane kept sharp
     var focusRange: Double = 0.25 // width of the sharp zone around the focus plane
     // Tone curve: control points, always including endpoints
@@ -70,8 +77,11 @@ struct EditState: Codable, Equatable {
         if let rect = try c.decodeIfPresent(CropRect.self, forKey: CodingKeys(stringValue: "crop")!) {
             crop = rect
         }
-        if let flag = try c.decodeIfPresent(Bool.self, forKey: CodingKeys(stringValue: "depthBlur")!) {
-            depthBlur = flag
+        if let raw = try c.decodeIfPresent(String.self, forKey: CodingKeys(stringValue: "blurMode")!),
+           let mode = BlurMode(rawValue: raw) {
+            blurMode = mode
+        } else if try c.decodeIfPresent(Bool.self, forKey: CodingKeys(stringValue: "depthBlur")!) == true {
+            blurMode = .depth // pre-BlurMode sidecars
         }
     }
 
@@ -93,8 +103,8 @@ struct EditState: Codable, Equatable {
         if crop != .full {
             try c.encode(crop, forKey: CodingKeys(stringValue: "crop")!)
         }
-        if depthBlur {
-            try c.encode(true, forKey: CodingKeys(stringValue: "depthBlur")!)
+        if blurMode != .subject {
+            try c.encode(blurMode.rawValue, forKey: CodingKeys(stringValue: "blurMode")!)
         }
     }
 }

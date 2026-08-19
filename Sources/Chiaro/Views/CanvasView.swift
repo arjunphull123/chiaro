@@ -19,7 +19,19 @@ struct CanvasView: View {
             let fitRegion = CGSize(width: geo.size.width - Theme.railWidth, height: geo.size.height)
             ZStack {
                 Color.black.opacity(0.001) // hit target for gestures on empty canvas
-                if let cg = model.showOriginal ? model.originalPreview : model.preview {
+                if model.depthSceneVisible && model.edit.blurMode == .depth {
+                    DepthSceneView(model: model)
+                        .frame(width: fitRegion.width, height: fitRegion.height)
+                        .position(x: fitRegion.width / 2, y: fitRegion.height / 2)
+                        .overlay(alignment: .bottom) {
+                            Text("drag up or down to move focus · sideways to orbit · scroll for range")
+                                .font(Theme.mono(9))
+                                .foregroundStyle(Theme.ink3)
+                                .padding(.bottom, 46)
+                                .padding(.trailing, Theme.railWidth)
+                                .allowsHitTesting(false)
+                        }
+                } else if let cg = model.showOriginal ? model.originalPreview : model.preview {
                     let imageSize = CGSize(width: cg.width, height: cg.height)
                     let fitScale = min(
                         (fitRegion.width - 48) / imageSize.width,
@@ -50,24 +62,10 @@ struct CanvasView: View {
                 }
             }
             .contentShape(Rectangle())
-            .gesture(dragGesture)
+            .gesture(dragGesture(fitRegion))
             .gesture(magnifyGesture)
             .onTapGesture(count: 2) { if !model.cropMode { toggleZoom() } }
-            .onTapGesture(count: 1, coordinateSpace: .local) { location in
-                guard model.focusPicking, !model.cropMode, !model.spacePan,
-                      let cg = model.preview else { return }
-                defer { model.focusPicking = false }
-                let imageSize = CGSize(width: cg.width, height: cg.height)
-                let fitScale = min(
-                    (fitRegion.width - 48) / imageSize.width,
-                    (fitRegion.height - 48) / imageSize.height
-                )
-                let fitSize = CGSize(width: imageSize.width * fitScale, height: imageSize.height * fitScale)
-                let center = CGPoint(x: fitRegion.width / 2 + pan.width, y: fitRegion.height / 2 + pan.height)
-                let u = (location.x - center.x) / (fitSize.width * zoom) + 0.5
-                let v = (location.y - center.y) / (fitSize.height * zoom) + 0.5
-                model.focusAt(u: u, v: v)
-            }
+
             .overlay(alignment: .bottom) {
                 Group {
                     if model.cropMode { cropPanel } else { readout }
@@ -84,15 +82,20 @@ struct CanvasView: View {
                 .padding(.top, 52)
                 .padding(.leading, 16)
             }
+            .onContinuousHover { phase in
+                if model.focusPicking, case .active = phase { NSCursor.crosshair.set() }
+            }
             .onChange(of: model.photo.url) { resetView() }
             .onChange(of: model.cropMode) { resetView() }
         }
     }
 
-    private var dragGesture: some Gesture {
-        DragGesture(minimumDistance: 1)
+    private func dragGesture(_ fitRegion: CGSize) -> some Gesture {
+        DragGesture(minimumDistance: 0)
             .onChanged { g in
-                if model.spacePan {
+                if model.focusPicking {
+                    return // resolves as a click on mouse-up
+                } else if model.spacePan {
                     gesturePan = g.translation
                 } else if model.armed != nil {
                     let dx = g.location.x - (lastScrubX ?? g.startLocation.x)
@@ -102,11 +105,37 @@ struct CanvasView: View {
                     gesturePan = g.translation
                 }
             }
-            .onEnded { _ in
+            .onEnded { g in
+                if model.focusPicking {
+                    if abs(g.translation.width) < 4, abs(g.translation.height) < 4,
+                       let (u, v) = normalizedPoint(g.location, in: fitRegion) {
+                        model.focusAt(u: u, v: v)
+                    }
+                    model.focusPicking = false
+                    NSCursor.arrow.set()
+                    return
+                }
                 lastScrubX = nil
                 pan = CGSize(width: pan.width + gesturePan.width, height: pan.height + gesturePan.height)
                 gesturePan = .zero
             }
+    }
+
+    /// Canvas point → normalized image coordinates (v top-down), accounting
+    /// for fit, zoom, and pan.
+    private func normalizedPoint(_ location: CGPoint, in fitRegion: CGSize) -> (Double, Double)? {
+        guard let cg = model.preview else { return nil }
+        let imageSize = CGSize(width: cg.width, height: cg.height)
+        let fitScale = min(
+            (fitRegion.width - 48) / imageSize.width,
+            (fitRegion.height - 48) / imageSize.height
+        )
+        let fitSize = CGSize(width: imageSize.width * fitScale, height: imageSize.height * fitScale)
+        let center = CGPoint(x: fitRegion.width / 2 + pan.width, y: fitRegion.height / 2 + pan.height)
+        let u = (location.x - center.x) / (fitSize.width * zoom) + 0.5
+        let v = (location.y - center.y) / (fitSize.height * zoom) + 0.5
+        guard (0...1).contains(u), (0...1).contains(v) else { return nil }
+        return (Double(u), Double(v))
     }
 
     private var magnifyGesture: some Gesture {

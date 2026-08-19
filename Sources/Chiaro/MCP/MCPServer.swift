@@ -224,9 +224,10 @@ final class MCPServer {
                            "w": ["type": "number"], "h": ["type": "number"]],
             "description": "normalized crop {x,y,w,h}, 0-1, y from top, applied after straighten",
         ] as [String: Any]
-        props["depthBlur"] = [
-            "type": "boolean",
-            "description": "blur by scene depth instead of the subject mask; pair with focusDepth (0 near, 1 far). Requires the depth model downloaded in the app — otherwise blur is skipped",
+        props["blurMode"] = [
+            "type": "string",
+            "enum": ["subject", "person", "depth"],
+            "description": "what stays sharp: subject (any lifted foreground), person (people only), or depth (focus plane — pair with focusDepth 0 near…1 far and focusRange; needs the depth model downloaded in the app)",
         ]
         props["curve"] = [
             "type": "array",
@@ -372,9 +373,14 @@ final class MCPServer {
                     )
                     continue
                 }
-                if key == "depthBlur" {
-                    guard let flag = value as? Bool else { throw ToolError("depthBlur must be a boolean") }
-                    edit.depthBlur = flag
+                if key == "blurMode" || key == "depthBlur" {
+                    if let raw = value as? String, let mode = BlurMode(rawValue: raw) {
+                        edit.blurMode = mode
+                    } else if let flag = value as? Bool {
+                        edit.blurMode = flag ? .depth : .subject
+                    } else {
+                        throw ToolError("blurMode must be one of subject, person, depth")
+                    }
                     continue
                 }
                 if key == "curve" {
@@ -420,9 +426,11 @@ final class MCPServer {
                 guard let base = RawEngine.shared.preview(for: url) else { return nil }
                 var mask: CIImage?
                 if edit.blurF > 0 || edit.relight != 0 {
-                    mask = PortraitEngine.shared.mask(for: url, image: base)
+                    mask = PortraitEngine.shared.mask(
+                        for: url, image: base,
+                        kind: edit.blurMode == .person ? .person : .subject)
                 }
-                let depth = edit.depthBlur && edit.blurF > 0
+                let depth = edit.blurMode == .depth && edit.blurF > 0
                     ? DepthEngine.shared.depthMap(for: url, image: base) : nil
                 var out = RenderPipeline.render(base: base, edit: edit, personMask: mask, depthMap: depth)
                 let scale = maxDim / Double(max(out.extent.width, out.extent.height))
