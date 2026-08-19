@@ -6,6 +6,9 @@ import SceneKit
 /// faces, Geist labels, amber edges — the design system in miniature.
 struct ViewCubeView: NSViewRepresentable {
     @Bindable var model: EditViewModel
+    // Explicit so SwiftUI re-invokes updates when the orbit changes.
+    var yaw: CGFloat
+    var pitch: CGFloat
 
     func makeNSView(context: Context) -> SCNView {
         let view = SCNView()
@@ -30,7 +33,7 @@ struct ViewCubeView: NSViewRepresentable {
         guard let cube = view.scene?.rootNode.childNode(withName: "cube", recursively: false) else { return }
         SCNTransaction.begin()
         SCNTransaction.animationDuration = 0.18
-        cube.eulerAngles = SCNVector3(model.scenePitch, -model.sceneYaw, 0)
+        cube.eulerAngles = SCNVector3(pitch, -yaw, 0)
         SCNTransaction.commit()
     }
 

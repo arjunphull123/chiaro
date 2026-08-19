@@ -131,7 +131,7 @@ struct RailView: View {
             HStack(spacing: 6) {
                 Chip(title: "Subject", selected: model.edit.blurMode == .subject) { model.setBlurMode(.subject) }
                 Chip(title: "Person", selected: model.edit.blurMode == .person) { model.setBlurMode(.person) }
-                Chip(title: "Depth ML", selected: model.edit.blurMode == .depth) { model.setBlurMode(.depth) }
+                Chip(title: "Lens", selected: model.edit.blurMode == .depth) { model.setBlurMode(.depth) }
             }
             .padding(.bottom, 4)
             if model.edit.blurMode == .depth {
@@ -202,7 +202,7 @@ struct RailView: View {
                 HStack(spacing: 7) {
                     Image(systemName: "cube")
                         .font(.system(size: 11, weight: .semibold))
-                    Text(model.depthSceneVisible ? "Close 3D focus" : "3D focus")
+                    Text(model.depthSceneVisible ? "Close 3D scene" : "Open 3D scene")
                         .font(Theme.ui(11, .medium))
                 }
                 .foregroundStyle(model.depthSceneVisible ? Theme.amber : Theme.ink2)
@@ -221,24 +221,7 @@ struct RailView: View {
             .clickCursor()
             .help("See the scene in 3D — drag to orbit, grab a handle to move a focus plane")
             AdjustmentRow(parameter: .blurF, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
-            HStack(spacing: 6) {
-                AdjustmentRow(parameter: .focusDepth, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
-                Button { model.focusPicking.toggle() } label: {
-                    Image(systemName: "scope")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(model.focusPicking ? Theme.amber : Theme.ink2)
-                        .frame(width: 26, height: 26)
-                        .background(
-                            RoundedRectangle(cornerRadius: 7)
-                                .fill(model.focusPicking ? Theme.amber.opacity(0.15) : Color.white.opacity(0.04))
-                        )
-                        .overlay(RoundedRectangle(cornerRadius: 7)
-                            .stroke(model.focusPicking ? Theme.amber.opacity(0.6) : Theme.hairline))
-                }
-                .buttonStyle(.plain)
-                .clickCursor()
-                .help("Pick focus — then click the photo once")
-            }
+            AdjustmentRow(parameter: .focusDepth, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
             AdjustmentRow(parameter: .focusRange, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
             AdjustmentRow(parameter: .relight, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
         }

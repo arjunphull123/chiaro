@@ -211,18 +211,30 @@ struct DepthSceneView: NSViewRepresentable {
     /// camera matches it so enter/exit reads as the photo itself folding
     /// into space.
     var fitFraction: CGFloat
+    // Passed explicitly (not read off the model inside updateNSView) so
+    // SwiftUI reliably re-invokes updates when they change.
+    var yaw: CGFloat
+    var pitch: CGFloat
+    var focusDepth: Double
+    var focusRange: Double
 
     func makeNSView(context: Context) -> SCNView {
         let view = ScrollableSCNView()
         view.backgroundColor = .clear
         view.antialiasingMode = .multisampling4X
-        view.onScroll = { [weak coordinator = context.coordinator] delta in
-            coordinator?.zoom(by: delta)
+        // Trackpad two-finger scroll orbits; a mouse wheel zooms. Pinch zooms.
+        view.onScroll = { [weak coordinator = context.coordinator] dx, dy, precise in
+            if precise {
+                coordinator?.orbit(byX: dx, y: dy)
+            } else {
+                coordinator?.zoom(by: dy * 8)
+            }
         }
         let pan = NSPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.pan(_:)))
         view.addGestureRecognizer(pan)
-        let click = NSClickGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.click(_:)))
-        view.addGestureRecognizer(click)
+        let magnify = NSMagnificationGestureRecognizer(
+            target: context.coordinator, action: #selector(Coordinator.magnify(_:)))
+        view.addGestureRecognizer(magnify)
         context.coordinator.view = view
         return view
     }
@@ -236,7 +248,7 @@ struct DepthSceneView: NSViewRepresentable {
             coordinator.rebuildCloud()
         }
         if let scene = view.scene, !coordinator.isAnimating {
-            DepthScene.updatePlanes(in: scene, focusDepth: model.edit.focusDepth, focusRange: model.edit.focusRange)
+            DepthScene.updatePlanes(in: scene, focusDepth: focusDepth, focusRange: focusRange)
             coordinator.applyOrbit()
         }
         if let command = model.depthSceneCommand {
@@ -255,7 +267,6 @@ struct DepthSceneView: NSViewRepresentable {
         weak var view: SCNView?
         var builtURL: URL?
         var fitFraction: CGFloat = 0.85
-        private var grid: DepthEngine.PointGrid?
         /// Choreography guard: while entering/exiting/snapping, gestures and
         /// SwiftUI-driven position sync stay out of the camera's way.
         var isAnimating = false
@@ -298,7 +309,6 @@ struct DepthSceneView: NSViewRepresentable {
             let model = model
             Task {
                 guard let grid = await model.depthGrid() else { return }
-                self.grid = grid
                 let scene = DepthScene.build(
                     grid: grid, focusDepth: model.edit.focusDepth, focusRange: model.edit.focusRange)
                 self.view?.scene = scene
@@ -488,82 +498,34 @@ struct DepthSceneView: NSViewRepresentable {
             refresh()
         }
 
-        /// Click a dot to focus there: nearest cloud point in screen space
-        /// becomes the focus plane, with a brief pulse where it landed.
-        @objc func click(_ gesture: NSClickGestureRecognizer) {
-            guard let view, let grid, !isAnimating else { return }
-            let location = gesture.location(in: view)
-            // Handles own their clicks (they're for dragging).
-            let hitNames = view.hitTest(location, options: [
-                .searchMode: SCNHitTestSearchMode.all.rawValue,
-                .ignoreHiddenNodes: false,
-            ]).compactMap(\.node.name)
-            guard !hitNames.contains(where: { $0.contains("handle") }) else { return }
-
-            var best: (distance: CGFloat, index: Int)?
-            for row in stride(from: 0, to: grid.height, by: 2) {
-                for col in stride(from: 0, to: grid.width, by: 2) {
-                    let i = row * grid.width + col
-                    let u = Float(col) / Float(grid.width - 1)
-                    let v = Float(row) / Float(grid.height - 1)
-                    let world = SCNVector3(
-                        CGFloat((u - 0.5) * grid.aspect),
-                        CGFloat(0.5 - v) + DepthScene.sceneLift,
-                        CGFloat((grid.disparity[i] - 0.5) * DepthScene.zSpan)
-                    )
-                    let projected = view.projectPoint(world)
-                    let dx = CGFloat(projected.x) - location.x
-                    let dy = CGFloat(projected.y) - location.y
-                    let distance = dx * dx + dy * dy
-                    if best == nil || distance < best!.distance {
-                        best = (distance, i)
-                    }
-                }
-            }
-            guard let best, best.distance < 24 * 24 else { return }
-            let disparity = Double(grid.disparity[best.index])
-            model.edit.focusDepth = (1 - disparity).clamped(to: 0...1)
-            refresh()
-            pulse(at: best.index, grid: grid)
-        }
-
-        private func pulse(at index: Int, grid: DepthEngine.PointGrid) {
-            guard let rig = view?.scene?.rootNode.childNode(withName: "rig", recursively: false) else { return }
-            let col = index % grid.width
-            let row = index / grid.width
-            let u = Float(col) / Float(grid.width - 1)
-            let v = Float(row) / Float(grid.height - 1)
-            let node = SCNNode(geometry: SCNSphere(radius: 0.03))
-            let material = SCNMaterial()
-            material.diffuse.contents = DepthScene.amber
-            material.lightingModel = .constant
-            node.geometry?.materials = [material]
-            node.position = SCNVector3(
-                CGFloat((u - 0.5) * grid.aspect),
-                CGFloat(0.5 - v),
-                CGFloat((grid.disparity[index] - 0.5) * DepthScene.zSpan)
-            )
-            node.renderingOrder = 103
-            rig.addChildNode(node)
-            node.runAction(.sequence([
-                .group([.scale(to: 2.4, duration: 0.45), .fadeOut(duration: 0.45)]),
-                .removeFromParentNode(),
-            ]))
-        }
-
         func zoom(by delta: CGFloat) {
             guard !isAnimating else { return }
             radius = (radius - delta / 160).clamped(to: 1.3...4.2)
             applyOrbit()
         }
+
+        func orbit(byX dx: CGFloat, y dy: CGFloat) {
+            guard !isAnimating else { return }
+            model.sceneYaw = (model.sceneYaw - dx / 180).clamped(to: -.pi / 2 ... .pi / 2)
+            model.scenePitch = (model.scenePitch + dy / 180).clamped(to: -0.1 ... .pi / 2 - 0.06)
+            applyOrbit()
+        }
+
+        @objc func magnify(_ gesture: NSMagnificationGestureRecognizer) {
+            guard !isAnimating else { return }
+            radius = (radius / (1 + gesture.magnification)).clamped(to: 1.3...4.2)
+            gesture.magnification = 0
+            applyOrbit()
+        }
     }
 }
 
-/// SCNView that forwards scroll to zoom instead of eating it.
+/// SCNView that forwards scroll instead of eating it — trackpad deltas are
+/// precise (orbit), mouse-wheel ticks are not (zoom).
 final class ScrollableSCNView: SCNView {
-    var onScroll: ((CGFloat) -> Void)?
+    var onScroll: ((CGFloat, CGFloat, Bool) -> Void)?
     override func scrollWheel(with event: NSEvent) {
-        onScroll?(event.scrollingDeltaY)
+        onScroll?(event.scrollingDeltaX, event.scrollingDeltaY, event.hasPreciseScrollingDeltas)
     }
 }
 

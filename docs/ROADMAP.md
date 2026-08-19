@@ -44,6 +44,11 @@ deferred (ADR 0003); personal tool first — no signing/App Store constraints ye
       get_preview, export · discovery at ~/.chiaro/mcp.json · repo .mcp.json
 - [x] Agent presence pill + soft input lock while an agent edits
 - [x] Portrait mask refinement (Mask slider: grow/shrink subject boundary)
-- Albums as JSON manifests + MCP album tools (design agreed 2026-08-19, ADR pending)
-- Generative remove / inpainting via pluggable provider layer
-- Auto-culling (blink/focus detection, best-of-burst)
+- Albums: cut by owner decision (2026-08-19)
+- SAM-assisted focus selection: drag a box on the photo → on-device SAM 2 mask →
+  Focus/Range wrap the object's depth interval (planes stay the render model)
+- Clean up (object removal): on-device inpainting (LaMa-class Core ML model,
+  on-demand download like Depth Anything); cloud provider layer deferred to
+  post-release. Positioning: AI-driven editing, not generative content
+- Auto-culling: not an in-app feature — an agent workflow over MCP
+  (get_preview + a set_rating tool; agent picks the keepers)

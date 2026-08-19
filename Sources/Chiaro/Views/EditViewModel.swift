@@ -48,14 +48,6 @@ final class EditViewModel {
             scheduleRender()
         }
     }
-    /// One-shot click-to-focus: armed by the scope button next to Focus, the
-    /// next canvas click sets the focus plane, then it disarms itself.
-    var focusPicking = false {
-        didSet {
-            guard focusPicking != oldValue, !focusPicking else { return }
-            NSCursor.arrow.set()
-        }
-    }
     /// Held-space pan: drag moves the photo even while a parameter is armed.
     var spacePan = false {
         didSet {
@@ -214,33 +206,6 @@ final class EditViewModel {
             }
             guard let self, let focus, self.edit.blurMode == .depth else { return }
             self.edit.focusDepth = focus
-        }
-    }
-
-    /// Click-to-focus: sample the depth map at a normalized canvas point
-    /// (u, v top-down) and move the focus plane there.
-    func focusAt(u: Double, v: Double) {
-        guard edit.blurMode == .depth, let basePreview, (0...1).contains(u), (0...1).contains(v) else { return }
-        let url = photo.url
-        let editNow = edit
-        let skipCrop = cropMode
-        Task { [weak self] in
-            let disparity = await Offload.on(Offload.render) { () -> Double? in
-                guard let raw = DepthEngine.shared.depthMap(for: url, image: basePreview) else { return nil }
-                let depth = RenderPipeline.applyGeometry(raw, edit: editNow, skipCrop: skipCrop)
-                let e = depth.extent
-                let x = e.origin.x + u * (e.width - 1)
-                let y = e.origin.y + (1 - v) * (e.height - 1)
-                var px = [Float](repeating: 0, count: 4)
-                RawEngine.shared.context.render(
-                    depth, toBitmap: &px, rowBytes: 16,
-                    bounds: CGRect(x: x, y: y, width: 1, height: 1),
-                    format: .RGBAf, colorSpace: nil
-                )
-                return Double(px[0])
-            }
-            guard let self, let disparity else { return }
-            self.edit.focusDepth = (1 - disparity).clamped(to: 0...1)
         }
     }
 

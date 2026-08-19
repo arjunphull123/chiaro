@@ -20,10 +20,14 @@ struct CanvasView: View {
             ZStack {
                 Color.black.opacity(0.001) // hit target for gestures on empty canvas
                 if model.depthSceneVisible && model.edit.blurMode == .depth {
-                    DepthSceneView(model: model, fitFraction: fitFraction(in: fitRegion))
+                    DepthSceneView(
+                        model: model, fitFraction: fitFraction(in: fitRegion),
+                        yaw: model.sceneYaw, pitch: model.scenePitch,
+                        focusDepth: model.edit.focusDepth, focusRange: model.edit.focusRange
+                    )
                         .frame(width: fitRegion.width, height: fitRegion.height)
                         .overlay(alignment: .topTrailing) {
-                            ViewCubeView(model: model)
+                            ViewCubeView(model: model, yaw: model.sceneYaw, pitch: model.scenePitch)
                                 .frame(width: 78, height: 78)
                                 .padding(.top, 54)
                                 .padding(.trailing, 10)
@@ -86,9 +90,6 @@ struct CanvasView: View {
                 .padding(.top, 52)
                 .padding(.leading, 16)
             }
-            .onContinuousHover { phase in
-                if model.focusPicking, case .active = phase { NSCursor.crosshair.set() }
-            }
             .onChange(of: model.photo.url) { resetView() }
             .onChange(of: model.cropMode) { resetView() }
         }
@@ -109,9 +110,7 @@ struct CanvasView: View {
     private func dragGesture(_ fitRegion: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { g in
-                if model.focusPicking {
-                    return // resolves as a click on mouse-up
-                } else if model.spacePan {
+                if model.spacePan {
                     gesturePan = g.translation
                 } else if model.armed != nil {
                     let dx = g.location.x - (lastScrubX ?? g.startLocation.x)
@@ -121,37 +120,11 @@ struct CanvasView: View {
                     gesturePan = g.translation
                 }
             }
-            .onEnded { g in
-                if model.focusPicking {
-                    if abs(g.translation.width) < 4, abs(g.translation.height) < 4,
-                       let (u, v) = normalizedPoint(g.location, in: fitRegion) {
-                        model.focusAt(u: u, v: v)
-                    }
-                    model.focusPicking = false
-                    NSCursor.arrow.set()
-                    return
-                }
+            .onEnded { _ in
                 lastScrubX = nil
                 pan = CGSize(width: pan.width + gesturePan.width, height: pan.height + gesturePan.height)
                 gesturePan = .zero
             }
-    }
-
-    /// Canvas point → normalized image coordinates (v top-down), accounting
-    /// for fit, zoom, and pan.
-    private func normalizedPoint(_ location: CGPoint, in fitRegion: CGSize) -> (Double, Double)? {
-        guard let cg = model.preview else { return nil }
-        let imageSize = CGSize(width: cg.width, height: cg.height)
-        let fitScale = min(
-            (fitRegion.width - 48) / imageSize.width,
-            (fitRegion.height - 48) / imageSize.height
-        )
-        let fitSize = CGSize(width: imageSize.width * fitScale, height: imageSize.height * fitScale)
-        let center = CGPoint(x: fitRegion.width / 2 + pan.width, y: fitRegion.height / 2 + pan.height)
-        let u = (location.x - center.x) / (fitSize.width * zoom) + 0.5
-        let v = (location.y - center.y) / (fitSize.height * zoom) + 0.5
-        guard (0...1).contains(u), (0...1).contains(v) else { return nil }
-        return (Double(u), Double(v))
     }
 
     private var magnifyGesture: some Gesture {
@@ -263,7 +236,7 @@ struct CanvasView: View {
     /// spatially (planes, dots) — and its checkmark exits the scene.
     private var depthSceneCard: some View {
         dialCard(
-            label: "3D focus · range",
+            label: "Range",
             value: EditParameter.focusRange.format(model.edit.focusRange),
             t: model.edit.focusRange,
             detents: [0.25],
