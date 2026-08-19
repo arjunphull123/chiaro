@@ -93,34 +93,35 @@ struct ChiaroApp: App {
         .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button("Open Folder…") {
+                Button("Open folder…") {
                     let panel = NSOpenPanel()
                     panel.canChooseDirectories = true
                     panel.canChooseFiles = false
                     if panel.runModal() == .OK, let url = panel.url { library.open(url) }
                 }
                 .keyboardShortcut("o")
-                Button("Close Library") { library.close() }
+                Button("Close library") { library.close() }
                     .keyboardShortcut("w")
                     .disabled(library.folderURL == nil)
             }
             CommandGroup(replacing: .undoRedo) {
-                Button("Undo Edit") { library.activeEditor?.undo() }
+                Button("Undo edit") { library.activeEditor?.undo() }
                     .keyboardShortcut("z")
                     .disabled(!(library.activeEditor?.canUndo ?? false))
-                Button("Redo Edit") { library.activeEditor?.redo() }
+                Button("Redo edit") { library.activeEditor?.redo() }
                     .keyboardShortcut("z", modifiers: [.command, .shift])
                     .disabled(!(library.activeEditor?.canRedo ?? false))
             }
             CommandGroup(after: .pasteboard) {
-                Button("Copy Edit") { library.copyEdit() }
+                Button("Copy edits") { library.copyEdit() }
                     .keyboardShortcut("c", modifiers: [.command, .shift])
-                Button("Paste Edit") { library.pasteEdit() }
+                Button("Paste edits") { library.pasteEdit() }
                     .keyboardShortcut("v", modifiers: [.command, .shift])
                     .disabled(library.copiedEdit == nil)
                 Divider()
                 Button("Export…") { exporting = true }
                     .keyboardShortcut("e")
+                    .disabled(library.editing == nil && library.selection.isEmpty)
             }
         }
     }

@@ -24,7 +24,7 @@ struct ExportSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(photos.count == 1 ? "Export \(photos[0].name)" : "Export \(photos.count) Photos")
+            Text(photos.count == 1 ? "Export \(photos[0].name)" : "Export \(photos.count) photos")
                 .font(Theme.ui(15, .semibold))
                 .foregroundStyle(Theme.ink)
 
@@ -153,7 +153,7 @@ struct ExportSheet: View {
                     .buttonStyle(OutlineButtonStyle())
                     .clickCursor()
                     .keyboardShortcut(.escape)
-                Button(photos.count == 1 ? "Export Photo" : "Export \(photos.count) Photos") {
+                Button(photos.count == 1 ? "Export Photo" : "Export \(photos.count) photos") {
                     runExport()
                 }
                 .buttonStyle(AmberButtonStyle())

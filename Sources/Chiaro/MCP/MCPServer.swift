@@ -232,6 +232,29 @@ final class MCPServer {
         return props
     }()
 
+    /// Onboarding prompt for the Connect-agent popover. Lives beside
+    /// toolDefinitions so tool renames can't silently drift out of it.
+    static var onboardingPrompt: String {
+        let url = "http://127.0.0.1:\(shared.port == 0 ? preferredPort : shared.port)/mcp"
+        return """
+        You are being connected to Chiaro, a RAW photo editor running on this Mac. \
+        It serves MCP at \(url) (streamable HTTP; discovery file at ~/.chiaro/mcp.json).
+
+        1. Connect using your MCP support. Claude Code: `claude mcp add --transport http chiaro \(url)`. \
+        Other agents: add an HTTP MCP server named "chiaro" with that URL to your MCP configuration.
+        2. Confirm the connection by calling the list_photos tool — Chiaro shows you as \
+        connected the moment your first request arrives.
+        3. Then tell the user you are connected, briefly summarize what is in their library, \
+        and ask what they would like to do.
+
+        Working notes: get_edit reads a photo's settings. get_preview returns the photo rendered \
+        with its current edit — look before and after every change. set_edit changes only the \
+        parameters you send and accepts an `intent` string that is shown to the user live. \
+        open_photo displays a photo in the editor so the user can watch. export writes the \
+        finished file. All edits are non-destructive and render live.
+        """
+    }
+
     static let toolDefinitions: [[String: Any]] = [
         [
             "name": "list_photos",

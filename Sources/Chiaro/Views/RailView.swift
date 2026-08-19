@@ -83,7 +83,7 @@ struct RailView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 5) {
                 Text("Curve")
-                    .font(Theme.serif(13))
+                    .font(Theme.serif(13, .semibold))
                     .foregroundStyle(Theme.ink2)
                 Rectangle().fill(Theme.hairline).frame(height: 1)
                 if model.edit.curve != CurvePoint.identity {
@@ -132,7 +132,7 @@ struct RailView: View {
     private func sectionLabel(_ title: String, help: String) -> some View {
         HStack(spacing: 5) {
             Text(title)
-                .font(Theme.serif(13))
+                .font(Theme.serif(13, .semibold))
                 .foregroundStyle(Theme.ink2)
             Rectangle().fill(Theme.hairline).frame(height: 1)
         }
@@ -145,14 +145,9 @@ struct RailView: View {
         Button {
             model.edit = .neutral
         } label: {
-            Text("Reset all")
-                .font(Theme.ui(11))
-                .foregroundStyle(model.edit.isNeutral ? Theme.ink3 : Theme.ink2)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 7)
-                .background(RoundedRectangle(cornerRadius: 7).stroke(Theme.hairline))
+            Text("Reset all").frame(maxWidth: .infinity)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(OutlineButtonStyle())
         .clickCursor()
         .disabled(model.edit.isNeutral)
         .padding(.top, 14)

@@ -7,6 +7,8 @@ final class Library {
     var folderURL: URL?
     var photos: [Photo] = []
     var selection: Set<URL> = []
+    /// The most recently clicked photo — "Open in editor" targets this.
+    var lastSelected: URL?
     var editing: Photo?
     var copiedEdit: EditState?
     /// The live edit session, when the edit view is open — lets external inputs
@@ -45,6 +47,19 @@ final class Library {
 
     var folderName: String { folderURL?.lastPathComponent ?? "" }
     var selectedPhotos: [Photo] { photos.filter { selection.contains($0.url) } }
+
+    static func noteRecentEdit(_ url: URL) {
+        var paths = UserDefaults.standard.stringArray(forKey: "recentEdits") ?? []
+        paths.removeAll { $0 == url.path }
+        paths.insert(url.path, at: 0)
+        UserDefaults.standard.set(Array(paths.prefix(12)), forKey: "recentEdits")
+    }
+
+    static func recentEdits() -> [URL] {
+        (UserDefaults.standard.stringArray(forKey: "recentEdits") ?? [])
+            .map(URL.init(fileURLWithPath:))
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+    }
 
     static func recentFolders() -> [URL] {
         (UserDefaults.standard.stringArray(forKey: "recentFolders") ?? [])
@@ -228,6 +243,7 @@ final class Library {
     func edit(_ photo: Photo) {
         let target = localized(photo)
         selection = [target.url]
+        lastSelected = target.url
         if let activeEditor { activeEditor.switchTo(target) } else { editing = target }
     }
 

@@ -1,9 +1,17 @@
 import SwiftUI
 
+/// All styles dim themselves when disabled — call sites never re-implement it.
+private struct EnabledDim: ViewModifier {
+    @Environment(\.isEnabled) private var isEnabled
+    func body(content: Content) -> some View {
+        content.opacity(isEnabled ? 1 : 0.45)
+    }
+}
+
 // The component vocabulary. Every button in the app is one of these four;
 // ad-hoc button chrome is a bug. Copy is sentence case, no trailing periods.
 
-/// Primary action: filled amber, near-black text. One per surface.
+/// Primary action: amber-tinted Liquid Glass, near-black text. One per surface.
 struct AmberButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -11,12 +19,13 @@ struct AmberButtonStyle: ButtonStyle {
             .foregroundStyle(Color(hex: 0x131315))
             .padding(.horizontal, 14)
             .padding(.vertical, 7)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Theme.amber))
+            .chiaroGlass(cornerRadius: 8, tint: Theme.amber)
             .opacity(configuration.isPressed ? 0.75 : 1)
+            .modifier(EnabledDim())
     }
 }
 
-/// Secondary action: quiet outline, ink text.
+/// Secondary action: plain glass, ink text.
 struct OutlineButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -24,8 +33,9 @@ struct OutlineButtonStyle: ButtonStyle {
             .foregroundStyle(Theme.ink2)
             .padding(.horizontal, 14)
             .padding(.vertical, 7)
-            .background(RoundedRectangle(cornerRadius: 8).stroke(Theme.hairline))
+            .chiaroGlass(cornerRadius: 8)
             .opacity(configuration.isPressed ? 0.7 : 1)
+            .modifier(EnabledDim())
     }
 }
 
@@ -42,6 +52,7 @@ struct GlassButtonStyle: ButtonStyle {
             .padding(.vertical, 7)
             .chiaroGlass(cornerRadius: 10)
             .opacity(configuration.isPressed ? 0.75 : 1)
+            .modifier(EnabledDim())
     }
 }
 
@@ -56,6 +67,7 @@ struct GlassIconButtonStyle: ButtonStyle {
             .frame(width: 30, height: 28)
             .chiaroGlass(cornerRadius: 10)
             .opacity(configuration.isPressed ? 0.75 : 1)
+            .modifier(EnabledDim())
     }
 }
 

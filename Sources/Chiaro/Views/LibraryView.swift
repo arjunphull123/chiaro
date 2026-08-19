@@ -78,25 +78,23 @@ struct LibraryView: View {
             .clickCursor()
             .help("Back to the start screen (⌘W)")
             Text(library.folderName)
-                .font(Theme.ui(19, .semibold))
+                .font(Theme.serif(20, .semibold))
                 .foregroundStyle(Theme.ink)
             Text("\(library.photos.count) photos · \(library.photos.filter(\.isRAW).count) RAW")
                 .font(Theme.mono(10))
                 .foregroundStyle(Theme.ink3)
             Spacer()
             zoomSlider
-            Button("Open Folder…") { openFolder() }
+            Button("Open folder…") { openFolder() }
                 .buttonStyle(OutlineButtonStyle())
                 .clickCursor()
                 .help("⌘O")
-            Button("Open in Editor") {
-                if let photo = library.selectedPhotos.first { library.edit(photo) }
-            }
-            .buttonStyle(AmberButtonStyle())
-            .clickCursor()
-            .disabled(library.selection.isEmpty)
-            .opacity(library.selection.isEmpty ? 0.4 : 1)
-            .help("Edit the selected photo (⏎)")
+            Button("Open in editor") { openSelectedInEditor() }
+                .buttonStyle(AmberButtonStyle())
+                .clickCursor()
+                .keyboardShortcut(.defaultAction)
+                .disabled(library.selection.isEmpty)
+                .help("Edit the selected photo (⏎)")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 11)
@@ -238,11 +236,25 @@ struct LibraryView: View {
         })
         .simultaneousGesture(TapGesture().modifiers(.command).onEnded {
             if selected { library.selection.remove(photo.url) }
-            else { library.selection.insert(photo.url) }
+            else { library.selection.insert(photo.url); library.lastSelected = photo.url }
         })
         .simultaneousGesture(TapGesture().onEnded {
             library.selection = [photo.url]
+            library.lastSelected = photo.url
         })
+        .contextMenu {
+            Button("Open in editor") { library.edit(photo) }
+            Button("Export…") {
+                library.selection.insert(photo.url)
+                onExport()
+            }
+            Divider()
+            Button("Copy edits") { library.copiedEdit = photo.edit }
+            Button("Paste edits") {
+                if let copied = library.copiedEdit { photo.edit = copied; Sidecar.write(for: photo) }
+            }
+            .disabled(library.copiedEdit == nil)
+        }
     }
 
     private struct SourceItem: Identifiable {
@@ -274,20 +286,68 @@ struct LibraryView: View {
         sources = items
     }
 
-    private var emptyState: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Chiaro")
-                    .font(Theme.ui(44, .semibold))
-                    .foregroundStyle(Theme.ink)
-                Rectangle().fill(Theme.amber).frame(width: 44, height: 3)
-                    .padding(.top, 10)
-                Text("A quiet, fast RAW editor. Your originals are never touched.")
-                    .font(Theme.ui(13.5))
-                    .foregroundStyle(Theme.ink2)
-                    .padding(.top, 14)
+    // MARK: - Home (start screen): flat rows on the translucent ground
 
+    private struct RecentEditItem: Identifiable {
+        let id: URL
+        var image: CGImage?
+        var editDate: Date?
+    }
+    @State private var recentEdits: [RecentEditItem] = []
+
+    private func refreshRecentEdits() {
+        let urls = Array(Library.recentEdits().prefix(7))
+        recentEdits = urls.map { RecentEditItem(id: $0, image: nil, editDate: Sidecar.lastEditDate(for: $0)) }
+        for url in urls {
+            Task {
+                let image = await Offload.on(Offload.render) { Library.scan(url).image }
+                if let index = recentEdits.firstIndex(where: { $0.id == url }) {
+                    recentEdits[index].image = image
+                }
+            }
+        }
+    }
+
+    private func openRecentEdit(_ url: URL) {
+        library.open(url.deletingLastPathComponent())
+        if let photo = library.photos.first(where: { $0.url == url }) {
+            library.edit(photo)
+        }
+    }
+
+    private var emptyState: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Chiaro")
+                    .font(Theme.serif(21, .semibold))
+                    .foregroundStyle(Theme.ink)
+                Spacer()
+                ConnectAgentButton()
+            }
+            .padding(.top, 12)
+            .padding(.bottom, 6)
+
+            Spacer(minLength: 10)
+
+            VStack(alignment: .leading, spacing: 11) {
+                if let hero = recentEdits.first {
+                    heroCard(hero)
+                }
+                if recentEdits.count > 1 {
+                    Text("Recent edits")
+                        .font(Theme.serif(14, .semibold))
+                        .foregroundStyle(Theme.ink2)
+                        .padding(.top, 8)
+                    HStack(spacing: 8) {
+                        ForEach(recentEdits.dropFirst()) { item in
+                            recentThumb(item)
+                        }
+                    }
+                }
+                Text("Sources")
+                    .font(Theme.serif(14, .semibold))
+                    .foregroundStyle(Theme.ink2)
+                    .padding(.top, 8)
                 VStack(spacing: 6) {
                     ForEach(sources) { source in
                         sourceRow(
@@ -296,26 +356,38 @@ struct LibraryView: View {
                         )
                     }
                 }
-                .padding(.top, 28)
-
                 HStack(spacing: 12) {
-                    Button("Open Folder…") { openFolder() }
-                        .buttonStyle(AmberButtonStyle())
-                        .clickCursor()
-                        .keyboardShortcut("o")
+                    // Primary only when there's nothing to resume.
+                    if recentEdits.isEmpty {
+                        Button("Open folder…") { openFolder() }
+                            .buttonStyle(AmberButtonStyle())
+                            .clickCursor()
+                            .keyboardShortcut("o")
+                    } else {
+                        Button("Open folder…") { openFolder() }
+                            .buttonStyle(OutlineButtonStyle())
+                            .clickCursor()
+                            .keyboardShortcut("o")
+                    }
                     Text("or drop a folder anywhere")
                         .font(Theme.ui(11))
                         .foregroundStyle(Theme.ink3)
                 }
-                .padding(.top, 22)
+                .padding(.top, 8)
             }
-            .frame(width: 400)
-            Spacer()
-            Spacer()
+            .frame(width: 620)
+            .frame(maxWidth: .infinity)
+
+            Spacer(minLength: 10)
+            Spacer(minLength: 10)
         }
+        .padding(.horizontal, 28)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
-        .onAppear { refreshSources() }
+        .onAppear {
+            refreshSources()
+            refreshRecentEdits()
+        }
         .dropDestination(for: URL.self) { urls, _ in
             guard let url = urls.first,
                   (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
@@ -323,6 +395,67 @@ struct LibraryView: View {
             library.open(url)
             return true
         }
+    }
+
+    private func heroCard(_ item: RecentEditItem) -> some View {
+        Button {
+            openRecentEdit(item.id)
+        } label: {
+            ZStack(alignment: .bottomLeading) {
+                Group {
+                    if let cg = item.image {
+                        Image(cg, scale: 1, label: Text(item.id.lastPathComponent))
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } else {
+                        Theme.panel
+                    }
+                }
+                .frame(width: 620, height: 260)
+                LinearGradient(colors: [.clear, .black.opacity(0.75)], startPoint: .center, endPoint: .bottom)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.id.deletingPathExtension().lastPathComponent)
+                        .font(Theme.ui(14, .semibold))
+                        .foregroundStyle(.white)
+                    Text(heroSubtitle(item))
+                        .font(Theme.mono(9.5))
+                        .foregroundStyle(.white.opacity(0.65))
+                }
+                .padding(14)
+            }
+            .frame(width: 620, height: 260)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .clickCursor()
+    }
+
+    private func heroSubtitle(_ item: RecentEditItem) -> String {
+        guard let date = item.editDate else { return "continue editing · ⏎" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return "edited \(formatter.localizedString(for: date, relativeTo: Date())) · ⏎"
+    }
+
+    private func recentThumb(_ item: RecentEditItem) -> some View {
+        Button {
+            openRecentEdit(item.id)
+        } label: {
+            Group {
+                if let cg = item.image {
+                    Image(cg, scale: 1, label: Text(item.id.lastPathComponent))
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else {
+                    Theme.panel
+                }
+            }
+            .frame(width: 97, height: 68)
+            .clipShape(RoundedRectangle(cornerRadius: 7))
+        }
+        .buttonStyle(.plain)
+        .clickCursor()
+        .help(item.id.deletingPathExtension().lastPathComponent)
     }
 
     private func sourceRow(icon: String, tint: Color, title: String, subtitle: String, url: URL) -> some View {
@@ -357,6 +490,13 @@ struct LibraryView: View {
         let photos = files.filter { Photo.imageExtensions.contains($0.pathExtension.lowercased()) }
         let raws = photos.filter { Photo.rawExtensions.contains($0.pathExtension.lowercased()) }
         return "\(raws.isEmpty ? photos.count : raws.count) photos · \(folder.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent)"
+    }
+
+    private func openSelectedInEditor() {
+        let target = library.lastSelected.flatMap { url in
+            library.photos.first { $0.url == url && library.selection.contains(url) }
+        } ?? library.photos.first { library.selection.contains($0.url) }
+        if let target { library.edit(target) }
     }
 
     private func openFolder() {

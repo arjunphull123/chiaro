@@ -39,6 +39,15 @@ enum Sidecar {
         }
     }
 
+    static func lastEditDate(for photoURL: URL) -> Date? {
+        for location in [besideURL(photoURL), storeURL(photoURL)] {
+            if let date = try? location.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate {
+                return date
+            }
+        }
+        return nil
+    }
+
     // MARK: - Locations
 
     private static func preferredURL(_ photoURL: URL) -> URL {

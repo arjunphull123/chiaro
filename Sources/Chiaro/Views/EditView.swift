@@ -36,11 +36,11 @@ struct EditView: View {
                     .help("Crop & straighten (C)")
                 glassIcon("arrow.uturn.backward", disabled: !model.canUndo, help: "Undo (⌘Z)") { model.undo() }
                 glassIcon("arrow.uturn.forward", disabled: !model.canRedo, help: "Redo (⇧⌘Z)") { model.redo() }
-                glassAction("Copy Edits", icon: "doc.on.doc", disabled: model.edit.isNeutral) {
+                glassAction("Copy edits", icon: "doc.on.doc", disabled: model.edit.isNeutral) {
                     library.copiedEdit = model.edit
                 }
                 if library.copiedEdit != nil {
-                    glassAction("Paste Edits", icon: "doc.on.clipboard") {
+                    glassAction("Paste edits", icon: "doc.on.clipboard") {
                         if let copied = library.copiedEdit { model.edit = copied }
                     }
                 }
@@ -136,7 +136,7 @@ struct EditView: View {
 
     private func glassIcon(_ icon: String, disabled: Bool, help: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { Image(systemName: icon) }
-            .buttonStyle(GlassIconButtonStyle(tint: disabled ? Theme.ink3 : Theme.ink2))
+            .buttonStyle(GlassIconButtonStyle())
             .clickCursor()
             .disabled(disabled)
             .help(help)
@@ -149,7 +149,7 @@ struct EditView: View {
                 Text(title)
             }
         }
-        .buttonStyle(GlassButtonStyle(tint: disabled ? Theme.ink3 : Theme.ink2))
+        .buttonStyle(GlassButtonStyle())
         .clickCursor()
         .disabled(disabled)
     }

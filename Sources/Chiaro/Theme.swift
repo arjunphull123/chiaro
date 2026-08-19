@@ -42,8 +42,12 @@ enum Theme {
     }
 
     /// Fraunces: the header/brand voice. Sentence case, never uppercase.
-    static func serif(_ size: CGFloat) -> Font {
-        .custom("Fraunces", size: size)
+    /// Two bundled static instances — variable axes don't survive Google's TTF export.
+    static func serif(_ size: CGFloat, _ weight: Font.Weight = .semibold) -> Font {
+        switch weight {
+        case .semibold, .bold: .custom("Fraunces-SemiBold", size: size)
+        default: .custom("Fraunces-Regular", size: size)
+        }
     }
 }
 

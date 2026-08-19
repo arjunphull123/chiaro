@@ -1,11 +1,11 @@
 import SwiftUI
 
 
-/// "Connect Agent": copyable orientation prompt pointing any coding agent at the
+/// "Connect agent": copyable orientation prompt pointing any coding agent at the
 /// local MCP server (ADR 0008). The server self-describes via tools/list schemas;
 /// this prompt is just the address and etiquette.
 /// One pill at the top of the edit rail, cycling through the agent lifecycle:
-/// "Connect Agent" → "<client> connected" → "🔒 Agent is editing…" (+ intent).
+/// "Connect agent" → "<client> connected" → "🔒 Agent is editing…" (+ intent).
 struct AgentRailStatus: View {
     let library: Library
     @State private var showing = false
@@ -89,7 +89,7 @@ struct ConnectAgentButton: View {
                             .font(.system(size: 10))
                             .foregroundStyle(Theme.ink3)
                     }
-                    Text(connected ? AgentStatus.shared.displayName + " is connected" : "Connect Agent")
+                    Text(connected ? AgentStatus.shared.displayName + " is connected" : "Connect agent")
                         .font(Theme.ui(12, .medium))
                 }
                 .foregroundStyle(connected ? Theme.ink : Theme.ink2)
@@ -110,26 +110,7 @@ struct ConnectAgentButton: View {
 struct AgentConnectPopover: View {
     @State private var copied = false
 
-    private var prompt: String {
-        let url = "http://127.0.0.1:\(MCPServer.shared.port == 0 ? MCPServer.preferredPort : MCPServer.shared.port)/mcp"
-        return """
-        You are being connected to Chiaro, a RAW photo editor running on this Mac. \
-        It serves MCP at \(url) (streamable HTTP; discovery file at ~/.chiaro/mcp.json).
-
-        1. Connect using your MCP support. Claude Code: `claude mcp add --transport http chiaro \(url)`. \
-        Other agents: add an HTTP MCP server named "chiaro" with that URL to your MCP configuration.
-        2. Confirm the connection by calling the list_photos tool — Chiaro shows you as \
-        connected the moment your first request arrives.
-        3. Then tell the user you are connected, briefly summarize what is in their library, \
-        and ask what they would like to do.
-
-        Working notes: get_edit reads a photo's settings. get_preview returns the photo rendered \
-        with its current edit — look before and after every change. set_edit changes only the \
-        parameters you send and accepts an `intent` string that is shown to the user live. \
-        open_photo displays a photo in the editor so the user can watch. export writes the \
-        finished file. All edits are non-destructive and render live.
-        """
-    }
+    private var prompt: String { MCPServer.onboardingPrompt }
 
     var body: some View {
         Group {

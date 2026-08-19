@@ -53,9 +53,12 @@ final class EditViewModel {
     }
     /// Locked pixel aspect (w/h) while cropping; nil = free.
     var cropAspect: Double?
+    /// Chip identity — two chips can share a nil aspect (Free vs unknown Original).
+    var cropAspectName: String?
 
-    func applyCropAspect(_ aspect: Double?) {
+    func applyCropAspect(_ aspect: Double?, name: String? = nil) {
         cropAspect = aspect
+        cropAspectName = name
         guard let aspect, let frame = preview else { return }
         let frameAspect = Double(frame.width) / Double(frame.height)
         let k = aspect / frameAspect
@@ -165,6 +168,7 @@ final class EditViewModel {
         let photo = photo
         let item = DispatchWorkItem { [weak self] in
             Sidecar.write(for: photo)
+            if photo.hasEdits { Library.noteRecentEdit(photo.url) }
             self?.endSaveActivity()
         }
         saveItem = item
@@ -181,6 +185,7 @@ final class EditViewModel {
     func saveNow() {
         saveItem?.cancel()
         Sidecar.write(for: photo)
+        if photo.hasEdits { Library.noteRecentEdit(photo.url) }
         endSaveActivity()
     }
 

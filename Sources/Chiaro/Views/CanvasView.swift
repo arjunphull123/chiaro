@@ -148,7 +148,9 @@ struct CanvasView: View {
     }
 
     private var originalAspect: Double? {
-        model.photo.pixelSize.map { Double($0.width) / Double($0.height) }
+        if let size = model.photo.pixelSize { return Double(size.width) / Double(size.height) }
+        if let cg = model.preview { return Double(cg.width) / Double(cg.height) }
+        return nil
     }
 
     private var straightenBinding: Binding<Double> {
@@ -163,8 +165,8 @@ struct CanvasView: View {
     }
 
     private func aspectChip(_ title: String, _ aspect: Double?) -> some View {
-        Chip(title: title, selected: model.cropAspect == aspect) {
-            model.applyCropAspect(aspect)
+        Chip(title: title, selected: model.cropAspectName == title) {
+            model.applyCropAspect(aspect, name: title)
         }
     }
 
