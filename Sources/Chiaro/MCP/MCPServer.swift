@@ -229,6 +229,10 @@ final class MCPServer {
             "enum": ["subject", "person", "depth"],
             "description": "what stays sharp: subject (any lifted foreground), person (people only), or depth (focus plane — pair with focusDepth 0 near…1 far and focusRange; needs the depth model downloaded in the app)",
         ]
+        props["hsl"] = [
+            "type": "object",
+            "description": "color mixer: per-band {h,s,l} each -100...100 — bands: \(HSLBand.names.joined(separator: ", ")). Partial objects fine, e.g. {\"orange\": {\"s\": -30}, \"blue\": {\"l\": 20}}",
+        ]
         props["curve"] = [
             "type": "array",
             "items": ["type": "array", "items": ["type": "number"]],
@@ -457,6 +461,29 @@ final class MCPServer {
                         edit.blurMode = flag ? .depth : .subject
                     } else {
                         throw ToolError("blurMode must be one of subject, person, depth")
+                    }
+                    continue
+                }
+                if key == "hsl" {
+                    guard let bandsDict = value as? [String: [String: Any]] else {
+                        throw ToolError("hsl must be {band: {h,s,l}} — bands: \(HSLBand.names.joined(separator: ", "))")
+                    }
+                    for (bandName, components) in bandsDict {
+                        guard let index = HSLBand.names.firstIndex(of: bandName) else {
+                            throw ToolError("unknown hsl band \(bandName); valid: \(HSLBand.names.joined(separator: ", "))")
+                        }
+                        for (component, raw) in components {
+                            guard let number = raw as? Double ?? (raw as? Int).map(Double.init) else {
+                                throw ToolError("hsl values must be numbers")
+                            }
+                            let clamped = number.clamped(to: -100...100)
+                            switch component {
+                            case "h": edit.hsl[index].h = clamped
+                            case "s": edit.hsl[index].s = clamped
+                            case "l": edit.hsl[index].l = clamped
+                            default: throw ToolError("hsl components are h, s, l")
+                            }
+                        }
                     }
                     continue
                 }

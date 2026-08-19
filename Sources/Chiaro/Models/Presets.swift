@@ -22,6 +22,7 @@ struct Preset: Codable, Identifiable, Equatable {
             parameter.set(parameter.value(in: edit), in: &subset)
         }
         subset.curve = edit.curve
+        subset.hsl = edit.hsl
         return Preset(name: name, edit: subset)
     }
 
@@ -32,6 +33,7 @@ struct Preset: Codable, Identifiable, Equatable {
             parameter.set(parameter.value(in: self.edit), in: &result)
         }
         result.curve = self.edit.curve
+        result.hsl = self.edit.hsl
         return result
     }
 
@@ -39,6 +41,7 @@ struct Preset: Codable, Identifiable, Equatable {
     func matches(_ edit: EditState) -> Bool {
         Self.carried.allSatisfy { $0.value(in: edit) == $0.value(in: self.edit) }
             && edit.curve == self.edit.curve
+            && edit.hsl == self.edit.hsl
     }
 }
 

@@ -52,6 +52,9 @@ enum RenderPipeline {
             f.amount = Float(edit.vibrance / 100)
             image = f.outputImage ?? image
         }
+        if edit.hsl.contains(where: { !$0.isNeutral }) {
+            image = HSLCube.apply(image, bands: edit.hsl)
+        }
         if edit.clarity != 0 {
             let f = CIFilter.unsharpMask()
             f.inputImage = image

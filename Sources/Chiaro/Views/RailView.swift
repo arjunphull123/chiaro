@@ -49,6 +49,7 @@ struct RailView: View {
                         "Color", [.temp, .tint, .vibrance, .saturation],
                         help: "White balance and color strength"
                     )
+                    colorMixSection
                     portraitSection
                     section("Effects", [.clarity, .vignette], help: "Punch and framing")
                     section("Detail", [.sharpness, .noiseReduction], help: "Fine texture and grain cleanup")
@@ -229,6 +230,76 @@ struct RailView: View {
             AdjustmentRow(parameter: .focusRange, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
             AdjustmentRow(parameter: .relight, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
         }
+    }
+
+    @State private var selectedBand = 0
+    @State private var bandScrubStart: (x: CGFloat, value: Double)?
+
+    private var colorMixSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionLabel("Color mix", help: "Per-hue adjustments — pick a band, then shift its hue, saturation, and luminance")
+            HStack(spacing: 6) {
+                ForEach(0..<8, id: \.self) { i in
+                    let active = !model.edit.hsl[i].isNeutral
+                    Button { selectedBand = i } label: {
+                        Circle()
+                            .fill(Color(hue: HSLBand.centers[i] / 360, saturation: 0.75, brightness: 0.85))
+                            .frame(width: 16, height: 16)
+                            .overlay(
+                                Circle().stroke(
+                                    selectedBand == i ? Theme.amber : (active ? Theme.ink2 : .clear),
+                                    lineWidth: selectedBand == i ? 2 : 1.5
+                                )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .clickCursor()
+                    .help(HSLBand.names[i].prefix(1).uppercased() + HSLBand.names[i].dropFirst())
+                }
+                Spacer()
+            }
+            .padding(.bottom, 2)
+            bandRow("Hue", keyPath: \.h)
+            bandRow("Saturation", keyPath: \.s)
+            bandRow("Luminance", keyPath: \.l)
+        }
+    }
+
+    /// Scrub row for one component of the selected band — same feel as
+    /// AdjustmentRow, bound into the hsl array.
+    private func bandRow(_ label: String, keyPath: WritableKeyPath<HSLBand, Double>) -> some View {
+        let value = model.edit.hsl[selectedBand][keyPath: keyPath]
+        return HStack {
+            Text(label)
+                .font(Theme.ui(11.5))
+                .foregroundStyle(Theme.ink2)
+            Spacer()
+            Text(value == 0 ? "0" : String(format: "%+.0f", value))
+                .font(Theme.mono(10, .medium))
+                .foregroundStyle(value == 0 ? Theme.ink3 : Theme.amber)
+                .monospacedDigit()
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(Color.white.opacity(0.05)))
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(RoundedRectangle(cornerRadius: 7).fill(Color.white.opacity(0.03)))
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 1)
+                .onChanged { g in
+                    if bandScrubStart == nil {
+                        bandScrubStart = (g.startLocation.x, model.edit.hsl[selectedBand][keyPath: keyPath])
+                    }
+                    guard let start = bandScrubStart else { return }
+                    let delta = Double(g.location.x - start.x) / 1.6
+                    model.edit.hsl[selectedBand][keyPath: keyPath] = (start.value + delta).clamped(to: -100...100)
+                }
+                .onEnded { _ in bandScrubStart = nil }
+        )
+        .onTapGesture(count: 2) { model.edit.hsl[selectedBand][keyPath: keyPath] = 0 }
+        .clickCursor()
     }
 
     @State private var savingPreset = false

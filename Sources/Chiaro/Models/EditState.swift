@@ -23,6 +23,19 @@ enum BlurMode: String, Codable {
     case depth     // Depth Anything focus plane
 }
 
+/// One band of the color mixer: hue shift, saturation, luminance, each
+/// -100…100, applied to pixels whose hue falls in the band.
+struct HSLBand: Codable, Equatable {
+    var h: Double = 0
+    var s: Double = 0
+    var l: Double = 0
+    var isNeutral: Bool { h == 0 && s == 0 && l == 0 }
+
+    static let names = ["red", "orange", "yellow", "green", "aqua", "blue", "purple", "magenta"]
+    /// Band centers in hue degrees.
+    static let centers: [Double] = [0, 30, 60, 120, 180, 240, 285, 330]
+}
+
 /// The complete, serializable description of one photo's edit (ADR 0003).
 /// Every UI input path mutates this; the render pipeline is a pure function of it.
 struct EditState: Codable, Equatable {
@@ -51,6 +64,8 @@ struct EditState: Codable, Equatable {
     var blurMode: BlurMode = .subject
     var focusDepth: Double = 0.5  // 0 = nearest, 1 = farthest — the plane kept sharp
     var focusRange: Double = 0.25 // width of the sharp zone around the focus plane
+    // Color mixer: 8 hue bands (see HSLBand.names)
+    var hsl: [HSLBand] = Array(repeating: HSLBand(), count: 8)
     // Tone curve: control points, always including endpoints
     var curve: [CurvePoint] = CurvePoint.identity
     // Geometry
@@ -102,6 +117,9 @@ struct EditState: Codable, Equatable {
         }
         if crop != .full {
             try c.encode(crop, forKey: CodingKeys(stringValue: "crop")!)
+        }
+        if hsl.contains(where: { !$0.isNeutral }) {
+            try c.encode(hsl, forKey: CodingKeys(stringValue: "hsl")!)
         }
         if blurMode != .subject {
             try c.encode(blurMode.rawValue, forKey: CodingKeys(stringValue: "blurMode")!)
