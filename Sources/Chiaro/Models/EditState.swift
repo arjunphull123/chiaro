@@ -121,8 +121,6 @@ struct EditState: Codable, Equatable {
     var blurMode: BlurMode = .subject
     var focusDepth: Double = 0.5  // 0 = nearest, 1 = farthest — the plane kept sharp
     var focusRange: Double = 0.25 // width of the sharp zone around the focus plane
-    // Backdrop: studio background behind the lifted subject ("none" = off)
-    var backdrop: String = "none"
     // Local adjustments: masked corrections, applied after global ones
     var locals: [LocalAdjustment] = []
     // Color mixer: 8 hue bands (see HSLBand.names)
@@ -187,9 +185,6 @@ struct EditState: Codable, Equatable {
         if crop != .full {
             try c.encode(crop, forKey: CodingKeys(stringValue: "crop")!)
         }
-        if backdrop != "none" {
-            try c.encode(backdrop, forKey: CodingKeys(stringValue: "backdrop")!)
-        }
         if !locals.isEmpty {
             try c.encode(locals, forKey: CodingKeys(stringValue: "locals")!)
         }
@@ -221,7 +216,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .noiseReduction: "Noise"
-        case .blurF: "Blur ƒ"
+        case .blurF: "Blur"
         case .temp: "Temp"
         case .relight: "Relight"
         case .maskReach: "Mask"

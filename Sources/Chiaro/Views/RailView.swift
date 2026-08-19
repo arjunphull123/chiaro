@@ -59,7 +59,6 @@ struct RailView: View {
                         help: "Brightness and tonal balance"
                     )
                     portraitSection
-                    backdropSection
                     curveSection
                     section(
                         "Color", [.temp, .tint, .vibrance, .saturation],
@@ -472,50 +471,6 @@ struct RailView: View {
         .help("Masked corrections — a radial or linear region, or the detected subject")
     }
 
-    private var backdropSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            sectionLabel("Backdrop", help: "Replace the background behind the lifted subject with a studio gradient")
-            if !isCollapsed("Backdrop") {
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 5), GridItem(.flexible(), spacing: 5), GridItem(.flexible(), spacing: 5)], spacing: 5) {
-                    backdropPill("None", "none")
-                    backdropPill("Studio", "studio")
-                    backdropPill("Charcoal", "charcoal")
-                    backdropPill("Cream", "cream")
-                    backdropPill("Navy", "navy")
-                    backdropPill("White", "white")
-                }
-                if model.hasPerson == false {
-                    Text("No subject found in this photo")
-                        .font(Theme.ui(10.5)).foregroundStyle(Theme.ink3)
-                }
-            }
-        }
-    }
-
-    private func backdropPill(_ title: String, _ style: String) -> some View {
-        let selected = model.edit.backdrop == style
-        return Button { model.edit.backdrop = style } label: {
-            HStack(spacing: 5) {
-                if let colors = RenderPipeline.backdropStyles[style] {
-                    Circle()
-                        .fill(Color(red: colors.top.red, green: colors.top.green, blue: colors.top.blue))
-                        .frame(width: 9, height: 9)
-                        .overlay(Circle().stroke(Theme.hairline))
-                }
-                Text(title)
-                    .font(Theme.ui(10.5, selected ? .medium : .regular))
-                    .lineLimit(1)
-            }
-            .foregroundStyle(selected ? Theme.amber : Theme.ink2)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 6)
-            .background(Capsule().fill(Color.white.opacity(selected ? 0.08 : 0.03)))
-            .overlay(Capsule().stroke(selected ? Theme.amber.opacity(0.5) : Theme.hairline))
-        }
-        .buttonStyle(.plain)
-        .clickCursor()
-    }
-
     private func modePill(_ title: String, _ mode: BlurMode) -> some View {
         let selected = model.edit.blurMode == mode
         return Button { model.setBlurMode(mode) } label: {
@@ -670,7 +625,7 @@ struct RailView: View {
         }
     }
 
-    static let allSections = ["Presets", "Color mix", "Light", "Background blur", "Backdrop", "Curve", "Color", "Masking", "Effects", "Detail"]
+    static let allSections = ["Presets", "Color mix", "Light", "Background blur", "Curve", "Color", "Masking", "Effects", "Detail"]
     @AppStorage("collapsedSections") private var collapsedRaw = RailView.allSections.joined(separator: ",")
 
     private func isCollapsed(_ title: String) -> Bool {

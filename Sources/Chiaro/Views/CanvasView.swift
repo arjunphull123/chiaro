@@ -405,7 +405,7 @@ struct CanvasView: View {
                     .onChanged { g in
                         let dx = g.location.x - (lastDialX ?? g.startLocation.x)
                         lastDialX = g.location.x
-                        onDrag(-dx) // the scale follows the finger
+                        onDrag(dx)
                     }
                     .onEnded { _ in lastDialX = nil }
             )

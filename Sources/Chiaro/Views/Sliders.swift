@@ -34,9 +34,14 @@ struct AdjustmentRow: View {
                     .multilineTextAlignment(.trailing)
                     .frame(width: 52)
                     .focused($typingFocused)
+                    // Focus only once the field exists — setting it earlier
+                    // loses the race and the field dismisses itself.
+                    .onAppear { typingFocused = true }
                     .onSubmit { commitTyped() }
                     .onExitCommand { typing = false }
-                    .onChange(of: typingFocused) { if !typingFocused { typing = false } }
+                    .onChange(of: typingFocused) { was, now in
+                        if was, !now { commitTyped() }
+                    }
             } else {
                 Text(parameter.format(value))
                     .font(Theme.mono(10))
@@ -86,7 +91,6 @@ struct AdjustmentRow: View {
             : value
         typedText = value == parameter.defaultValue ? "" : String(format: "%.4g", raw)
         typing = true
-        typingFocused = true
     }
 
     private func commitTyped() {

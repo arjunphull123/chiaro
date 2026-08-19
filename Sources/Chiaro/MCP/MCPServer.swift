@@ -214,7 +214,7 @@ final class MCPServer {
             "blurF": "Background blur", "relight": "Background blur", "maskReach": "Background blur",
             "focusDepth": "Background blur", "focusRange": "Background blur",
             "blurMode": "Background blur", "depthBlur": "Background blur",
-            "backdrop": "Backdrop", "locals": "Masking",
+            "locals": "Masking",
         ]
         let sections = Set(keys.compactMap { map[$0] })
         guard !sections.isEmpty else { return }
@@ -258,11 +258,6 @@ final class MCPServer {
         props["locals"] = [
             "type": "array",
             "description": "local adjustments: [{kind: radial|linear|subject, ax, ay, bx, by (normalized, y from top; radial: a=center b=radii, linear: gradient a→b), feather 0-100, invert, exposure -3..3, contrast/highlights/shadows/temp/tint/saturation/clarity -100..100}]. Empty array clears",
-        ]
-        props["backdrop"] = [
-            "type": "string",
-            "enum": ["none", "studio", "charcoal", "cream", "navy", "white"],
-            "description": "studio backdrop behind the lifted subject — headshot background replacement",
         ]
         props["rotation"] = [
             "type": "integer",
@@ -525,14 +520,6 @@ final class MCPServer {
                     }
                     continue
                 }
-                if key == "backdrop" {
-                    guard let style = value as? String,
-                          style == "none" || RenderPipeline.backdropStyles[style] != nil else {
-                        throw ToolError("backdrop must be none, studio, charcoal, cream, navy, or white")
-                    }
-                    edit.backdrop = style
-                    continue
-                }
                 if key == "rotation" {
                     guard let degrees = value as? Int, [0, 90, 180, 270].contains(degrees) else {
                         throw ToolError("rotation must be 0, 90, 180, or 270")
@@ -598,7 +585,7 @@ final class MCPServer {
             let jpeg = await Offload.on(Offload.render) { () -> Data? in
                 guard let base = RawEngine.shared.preview(for: url) else { return nil }
                 var mask: CIImage?
-                if edit.blurF > 0 || edit.relight != 0 || edit.backdrop != "none" {
+                if edit.blurF > 0 || edit.relight != 0 {
                     mask = PortraitEngine.shared.mask(
                         for: url, image: base,
                         kind: edit.blurMode == .person ? .person : .subject)

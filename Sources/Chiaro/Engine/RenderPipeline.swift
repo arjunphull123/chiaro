@@ -82,9 +82,6 @@ enum RenderPipeline {
         if edit.blurF > 0 || edit.relight != 0 {
             image = portrait(image, edit: edit, personMask: personMask, depthMap: depthMap, scale: scale)
         }
-        if edit.backdrop != "none", let personMask {
-            image = backdropComposite(image, mask: personMask, style: edit.backdrop)
-        }
         if edit.vignette > 0 {
             let f = CIFilter.vignette()
             f.inputImage = image
@@ -281,31 +278,6 @@ enum RenderPipeline {
             gradient.color1 = CIColor.black
             return gradient.outputImage?.cropped(to: extent)
         }
-    }
-
-    /// Studio backdrop styles: vertical gradients behind the lifted subject.
-    static let backdropStyles: [String: (top: CIColor, bottom: CIColor)] = [
-        "studio": (CIColor(red: 0.58, green: 0.58, blue: 0.60), CIColor(red: 0.33, green: 0.33, blue: 0.36)),
-        "charcoal": (CIColor(red: 0.24, green: 0.24, blue: 0.26), CIColor(red: 0.10, green: 0.10, blue: 0.12)),
-        "cream": (CIColor(red: 0.94, green: 0.91, blue: 0.86), CIColor(red: 0.83, green: 0.78, blue: 0.70)),
-        "navy": (CIColor(red: 0.18, green: 0.22, blue: 0.31), CIColor(red: 0.07, green: 0.09, blue: 0.15)),
-        "white": (CIColor(red: 1, green: 1, blue: 1), CIColor(red: 0.90, green: 0.90, blue: 0.92)),
-    ]
-
-    private static func backdropComposite(_ image: CIImage, mask: CIImage, style: String) -> CIImage {
-        guard let colors = backdropStyles[style] else { return image }
-        let extent = image.extent
-        let gradient = CIFilter.smoothLinearGradient()
-        gradient.point0 = CGPoint(x: extent.midX, y: extent.maxY)
-        gradient.point1 = CGPoint(x: extent.midX, y: extent.minY)
-        gradient.color0 = colors.top
-        gradient.color1 = colors.bottom
-        guard let backdrop = gradient.outputImage?.cropped(to: extent) else { return image }
-        let blend = CIFilter.blendWithMask()
-        blend.inputImage = image
-        blend.backgroundImage = backdrop
-        blend.maskImage = mask.cropped(to: extent)
-        return blend.outputImage?.cropped(to: extent) ?? image
     }
 
     private static func portrait(_ image: CIImage, edit: EditState, personMask: CIImage?, depthMap: CIImage?, scale: CGFloat) -> CIImage {
