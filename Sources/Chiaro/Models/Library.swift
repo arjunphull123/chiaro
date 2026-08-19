@@ -33,12 +33,15 @@ final class Library {
         DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: item)
     }
 
-    /// Library grouping granularity — Photos-style zoom levels.
-    enum Zoom: String, CaseIterable, Identifiable {
-        case days = "Days", months = "Months", years = "Years"
-        var id: String { rawValue }
+    /// Continuous library zoom (0 = tiny thumbs/years … 1 = large thumbs/days).
+    /// One value drives both thumbnail size and grouping granularity; the header
+    /// slider and trackpad pinch both write it.
+    var zoomLevel: Double = 0.8
+
+    enum Zoom { case days, months, years }
+    var zoom: Zoom {
+        if zoomLevel < 0.3 { .years } else if zoomLevel < 0.58 { .months } else { .days }
     }
-    var zoom: Zoom = .days
 
     var folderName: String { folderURL?.lastPathComponent ?? "" }
     var selectedPhotos: [Photo] { photos.filter { selection.contains($0.url) } }

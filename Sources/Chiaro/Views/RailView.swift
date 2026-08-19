@@ -161,37 +161,23 @@ struct RailView: View {
     }
 
     private var actions: some View {
-        VStack(spacing: 7) {
-            HStack(spacing: 7) {
-                secondaryButton("Copy Edit", disabled: model.edit.isNeutral) {
-                    library.copiedEdit = model.edit
-                }
-                secondaryButton("Paste Edit", disabled: library.copiedEdit == nil) {
-                    if let copied = library.copiedEdit { model.edit = copied }
-                }
-            }
-            secondaryButton("Reset all", disabled: model.edit.isNeutral) {
-                model.edit = .neutral
-            }
-        }
-        .padding(.top, 14)
-    }
-
-    private func secondaryButton(_ title: String, disabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
+        Button {
+            model.edit = .neutral
+        } label: {
+            Text("Reset all")
                 .font(Theme.ui(11))
-                .foregroundStyle(disabled ? Theme.ink3 : Theme.ink2)
+                .foregroundStyle(model.edit.isNeutral ? Theme.ink3 : Theme.ink2)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 7)
                 .background(RoundedRectangle(cornerRadius: 7).stroke(Theme.hairline))
         }
         .buttonStyle(.plain)
-        .disabled(disabled)
+        .disabled(model.edit.isNeutral)
+        .padding(.top, 14)
     }
 
     private var scrubHint: some View {
-        Text("Tip: click a control's name, then drag left–right anywhere on the photo. Hold \\ to compare with the original.")
+        Text("Tip: click a control, then drag on the photo or the dial. Scroll over a control for fine moves. Hold \\ to compare with the original.")
             .font(Theme.ui(10))
             .foregroundStyle(Theme.ink3)
             .fixedSize(horizontal: false, vertical: true)

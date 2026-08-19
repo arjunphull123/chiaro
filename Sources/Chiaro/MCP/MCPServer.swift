@@ -12,7 +12,7 @@ final class MCPServer {
     static let preferredPort: UInt16 = 24242
 
     private var listener: NWListener?
-    private(set) var port: UInt16 = 0
+    private(set) nonisolated(unsafe) var port: UInt16 = 0
     @MainActor weak var library: Library?
 
     @MainActor

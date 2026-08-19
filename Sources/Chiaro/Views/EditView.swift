@@ -26,7 +26,19 @@ struct EditView: View {
             backButton.padding(.top, 12).padding(.leading, 86) // clear of traffic lights
         }
         .overlay(alignment: .topTrailing) {
-            exportButton.padding(14).padding(.trailing, Theme.railWidth)
+            HStack(spacing: 8) {
+                glassAction("Copy Edits", icon: "doc.on.doc", disabled: model.edit.isNeutral) {
+                    library.copiedEdit = model.edit
+                }
+                if library.copiedEdit != nil {
+                    glassAction("Paste Edits", icon: "doc.on.clipboard") {
+                        if let copied = library.copiedEdit { model.edit = copied }
+                    }
+                }
+                exportButton
+            }
+            .padding(14)
+            .padding(.trailing, Theme.railWidth)
         }
         .focusable()
         .focused($focused)
@@ -119,6 +131,21 @@ struct EditView: View {
 
     private var photoIndex: Int {
         library.photos.firstIndex(where: { $0.url == model.photo.url }) ?? 0
+    }
+
+    private func glassAction(_ title: String, icon: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: icon).font(.system(size: 10, weight: .semibold))
+                Text(title).font(Theme.ui(11, .medium))
+            }
+            .foregroundStyle(disabled ? Theme.ink3 : Theme.ink2)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .chiaroGlass(cornerRadius: 10)
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
     }
 
     private var exportButton: some View {

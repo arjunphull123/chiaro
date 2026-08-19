@@ -9,11 +9,7 @@ struct LibraryView: View {
     private let gap: CGFloat = 8
 
     private var targetRowHeight: CGFloat {
-        switch library.zoom {
-        case .days: 176
-        case .months: 118
-        case .years: 78
-        }
+        64 + CGFloat(library.zoomLevel) * 190
     }
 
     var body: some View {
@@ -66,16 +62,18 @@ struct LibraryView: View {
         }
     }
 
-    /// Pinned frosted header: clears the traffic lights, holds the real actions.
+    /// Pinned frosted header: title, zoom slider, and the real actions.
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
             Text(library.folderName)
                 .font(Theme.ui(19, .semibold))
                 .foregroundStyle(Theme.ink)
-            Text("\(library.photos.count) photos · \(library.photos.filter(\.isRAW).count) RAW · pinch to zoom timeline")
+            Text("\(library.photos.count) photos · \(library.photos.filter(\.isRAW).count) RAW")
                 .font(Theme.mono(10))
                 .foregroundStyle(Theme.ink3)
             Spacer()
+            zoomSlider
+            ConnectAgentButton()
             Button("Export…") { onExport() }
                 .buttonStyle(AmberButtonStyle())
                 .disabled(library.selection.isEmpty)
@@ -85,8 +83,7 @@ struct LibraryView: View {
                 .buttonStyle(AmberButtonStyle())
                 .help("⌘O")
         }
-        .padding(.leading, 86)
-        .padding(.trailing, 16)
+        .padding(.horizontal, 16)
         .padding(.vertical, 11)
         .background(
             Rectangle().fill(.ultraThinMaterial)
@@ -96,28 +93,45 @@ struct LibraryView: View {
         )
     }
 
-    // MARK: - Pinch to zoom timeline (days ↔ months ↔ years)
+    // MARK: - Zoom: one continuous value, slider + pinch (days ↔ months ↔ years)
 
-    @State private var magnifyBaseline: CGFloat = 1
+    @State private var pinchBase: Double?
+
+    private var zoomSlider: some View {
+        HStack(spacing: 7) {
+            Image(systemName: "square.grid.4x3.fill")
+                .font(.system(size: 9)).foregroundStyle(Theme.ink3)
+            Slider(value: zoomBinding, in: 0...1)
+                .frame(width: 130)
+                .tint(Theme.amber)
+                .controlSize(.mini)
+            Image(systemName: "square.fill")
+                .font(.system(size: 11)).foregroundStyle(Theme.ink3)
+        }
+        .help("Thumbnail size — small groups by year, medium by month, large by day")
+    }
+
+    private var zoomBinding: Binding<Double> {
+        Binding(
+            get: { library.zoomLevel },
+            set: { newValue in
+                let before = library.zoom
+                library.zoomLevel = newValue
+                if library.zoom != before {
+                    NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                }
+            }
+        )
+    }
 
     private var zoomGesture: some Gesture {
         MagnifyGesture()
             .onChanged { g in
-                let relative = g.magnification / magnifyBaseline
-                if relative > 1.3 { stepZoom(1); magnifyBaseline = g.magnification }
-                else if relative < 0.77 { stepZoom(-1); magnifyBaseline = g.magnification }
+                if pinchBase == nil { pinchBase = library.zoomLevel }
+                zoomBinding.wrappedValue = (pinchBase! + (g.magnification - 1) * 0.55)
+                    .clamped(to: 0...1)
             }
-            .onEnded { _ in magnifyBaseline = 1 }
-    }
-
-    /// Pinch out = more detail (years → months → days), like Photos on iOS.
-    private func stepZoom(_ delta: Int) {
-        let order: [Library.Zoom] = [.years, .months, .days]
-        guard let index = order.firstIndex(of: library.zoom) else { return }
-        let next = min(order.count - 1, max(0, index + delta))
-        guard next != index else { return }
-        withAnimation(.easeOut(duration: 0.18)) { library.zoom = order[next] }
-        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+            .onEnded { _ in pinchBase = nil }
     }
 
     // MARK: - Date sections
@@ -149,7 +163,8 @@ struct LibraryView: View {
         case .months: Self.monthFormatter
         case .years: Self.yearFormatter
         }
-        var result = byPeriod.keys.sorted().map { period in
+        // Most recent first.
+        var result = byPeriod.keys.sorted(by: >).map { period in
             DaySection(id: period, title: formatter.string(from: period), photos: byPeriod[period]!)
         }
         if !undated.isEmpty {

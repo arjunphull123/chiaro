@@ -11,6 +11,7 @@ struct CanvasView: View {
     @State private var pan: CGSize = .zero
     @State private var gesturePan: CGSize = .zero
     @State private var lastScrubX: CGFloat?
+    @State private var lastDialX: CGFloat?
 
     var body: some View {
         GeometryReader { geo in
@@ -86,40 +87,53 @@ struct CanvasView: View {
         gesturePan = .zero
     }
 
-    /// Floating glass readout for the armed parameter (ADR 0005).
+    /// The one slider in the app: a floating glass dial for the armed parameter
+    /// (ADR 0005). Drag it, drag the photo, or scroll — same EditState either way.
     @ViewBuilder private var readout: some View {
         if let armed = model.armed {
             let range = armed.range
             let t = (armed.value(in: model.edit) - range.lowerBound) / (range.upperBound - range.lowerBound)
-            VStack(spacing: 6) {
-                Text(armed.label.uppercased())
-                    .font(Theme.mono(9))
-                    .kerning(1.6)
-                    .foregroundStyle(Theme.ink2)
-                Text(armed.format(armed.value(in: model.edit)))
-                    .font(Theme.mono(22, .medium))
-                    .foregroundStyle(Theme.amber)
-                    .monospacedDigit()
+            VStack(spacing: 7) {
+                HStack(spacing: 10) {
+                    Text(armed.label.uppercased())
+                        .font(Theme.mono(9))
+                        .kerning(1.6)
+                        .foregroundStyle(Theme.ink2)
+                    Text(armed.format(armed.value(in: model.edit)))
+                        .font(Theme.mono(19, .medium))
+                        .foregroundStyle(Theme.amber)
+                        .monospacedDigit()
+                }
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.white.opacity(0.18)).frame(height: 2)
                     ForEach(armed.detents, id: \.self) { d in
                         let dt = (d - range.lowerBound) / (range.upperBound - range.lowerBound)
                         Rectangle().fill(Color.white.opacity(0.3))
-                            .frame(width: 2, height: 6)
-                            .offset(x: dt * 216)
+                            .frame(width: 2, height: 7)
+                            .offset(x: dt * 260)
                     }
-                    Capsule().fill(Theme.amber).frame(width: max(0, t * 216), height: 2)
+                    Capsule().fill(Theme.amber).frame(width: max(0, t * 260), height: 2)
                     RoundedRectangle(cornerRadius: 1.5)
                         .fill(Theme.amber)
-                        .frame(width: 3, height: 12)
+                        .frame(width: 3, height: 14)
                         .shadow(color: Theme.amber.opacity(0.6), radius: 4)
-                        .offset(x: t * 216 - 1.5)
+                        .offset(x: t * 260 - 1.5)
                 }
-                .frame(width: 216, height: 12)
+                .frame(width: 260, height: 14)
+                .contentShape(Rectangle().inset(by: -10))
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { g in
+                            let dx = g.location.x - (lastDialX ?? g.startLocation.x)
+                            lastDialX = g.location.x
+                            model.scrub(deltaX: dx * 1.6)
+                        }
+                        .onEnded { _ in lastDialX = nil }
+                )
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 13)
-            .chiaroGlass(cornerRadius: 16)
+            .padding(.horizontal, 22)
+            .padding(.vertical, 12)
+            .chiaroGlass(cornerRadius: 15)
             .transition(.opacity)
         }
     }

@@ -36,12 +36,17 @@ photo's colors).
 
 ## Controls
 
-- **Scrub-on-photo is primary** (ADR 0005): arming a parameter turns the canvas into
-  its control surface — horizontal drag or trackpad scroll adjusts it, with a floating
-  glass readout (name, value, scale). Tracking is strictly 1:1 with the gesture; haptic
-  detents at full stops and zero-crossings.
-- Sliders: thin track, amber fill from the neutral default point, scrubbable numeric
-  value at right; hover + scroll adjusts; double-click resets to default.
+- **One slider in the app** (v3 interaction, refines ADR 0005): rail rows show name +
+  value only. Clicking a row arms it — the canvas becomes its control surface and the
+  single floating glass dial appears bottom-center (draggable, with detent ticks).
+  Drag the photo, drag the dial, or scroll over the row: same EditState, strictly 1:1,
+  haptic detents at full stops and zero-crossings. Double-click a row resets it.
+- Top action cluster (glass, right of canvas): Copy Edits · Paste Edits (appears once
+  something is copied) · Export. Library button top-left, clear of traffic lights.
+- Library header (pinned frost): title + counts, continuous zoom slider (thumbnail
+  size and days/months/years grouping share one value; trackpad pinch drives it too,
+  haptic tick at each grouping change), Connect Agent, amber Export / Open Folder.
+  Sections newest-first.
 - Before/after: hold `\` (press-and-hold, like Lightroom).
 - Filmstrip thumbs: amber border = selected; small amber dot = has edits.
 - Ratings: 1–5 keys in Library and Edit.
