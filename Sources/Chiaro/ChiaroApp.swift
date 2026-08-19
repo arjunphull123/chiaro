@@ -122,6 +122,10 @@ struct ChiaroApp: App {
                     }
                     DispatchQueue.main.async {
                         let scene = DepthScene.build(grid: grid, focusDepth: focus, focusRange: range)
+                        scene.rootNode.childNode(withName: "rig", recursively: false)?
+                            .childNode(withName: "cloud", recursively: false)?
+                            .morpher?.setWeight(1, forTargetAt: 0)
+                        DepthScene.updatePlanes(in: scene, focusDepth: focus, focusRange: range)
                         scene.background.contents = NSColor(Theme.ground)
                         let cameraNode = scene.rootNode.childNode(withName: "camera", recursively: false)
                         cameraNode?.position = SCNVector3(0.99, 0.68, 1.99) // rest orbit pose

@@ -28,7 +28,9 @@ via Apple's RAW engine.
 - SwiftUI-first; drop to AppKit only where SwiftUI genuinely can't (and note why inline).
 - **Typography roles:** Fraunces = headers/wordmark (sentence case, never uppercase);
   Geist = all UI text; Geist Mono = data only (values, EXIF, counts, timestamps).
-- **UI copy:** sentence case, no trailing periods on labels/tips.
+- **UI copy:** sentence case, no trailing periods on labels/tips. Never
+  all-lowercase strings — status/hint text is sentence case in Geist; Geist Mono
+  is for data values only. Prefer no caption over an explanatory one.
 - **Buttons come from DesignSystem.swift** (Amber/Outline/Glass/GlassIcon styles, Chip);
   ad-hoc button chrome is a bug.
 

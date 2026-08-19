@@ -145,12 +145,12 @@ struct RailView: View {
     @ViewBuilder private var subjectContent: some View {
         switch model.hasPerson {
         case .none:
-            Text(model.edit.blurMode == .person ? "finding person…" : "finding subject…")
-                .font(Theme.mono(10)).foregroundStyle(Theme.ink3)
+            Text(model.edit.blurMode == .person ? "Finding person…" : "Finding subject…")
+                .font(Theme.ui(10.5)).foregroundStyle(Theme.ink3)
                 .frame(height: 24)
         case .some(false):
-            Text(model.edit.blurMode == .person ? "no person found in this photo" : "no subject found in this photo")
-                .font(Theme.mono(10)).foregroundStyle(Theme.ink3)
+            Text(model.edit.blurMode == .person ? "No person found in this photo" : "No subject found in this photo")
+                .font(Theme.ui(10.5)).foregroundStyle(Theme.ink3)
                 .frame(height: 24)
         case .some(true):
             ForEach([EditParameter.blurF, .relight, .maskReach]) { p in
@@ -179,8 +179,8 @@ struct RailView: View {
             }
             .frame(height: 24)
         case .preparing:
-            Text("preparing model…")
-                .font(Theme.mono(10)).foregroundStyle(Theme.ink3)
+            Text("Preparing the model…")
+                .font(Theme.ui(10.5)).foregroundStyle(Theme.ink3)
                 .frame(height: 24)
         case .failed(let message):
             VStack(alignment: .leading, spacing: 4) {

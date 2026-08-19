@@ -101,6 +101,9 @@ final class EditViewModel {
     /// (exit / view presets) — the scene lives behind an NSViewRepresentable.
     var depthSceneVisible = false
     var depthSceneCommand: DepthSceneCommand?
+    /// Orbit state, shared with the orientation cube.
+    var sceneYaw: CGFloat = DepthScene.restYaw
+    var scenePitch: CGFloat = DepthScene.restPitch
     private var renderGeneration = 0
     private var saveItem: DispatchWorkItem?
     private var saveActivity: NSObjectProtocol?
