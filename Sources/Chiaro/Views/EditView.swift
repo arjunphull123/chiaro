@@ -67,13 +67,13 @@ struct EditView: View {
         }
         // Arrows nudge the armed control; with nothing armed they step photos.
         .onKeyPress(.leftArrow) {
-            guard !textEditing else { return .ignored } nudgeOrStep(-1); return .handled }
-        .onKeyPress(.rightArrow) {
-            guard !textEditing else { return .ignored } nudgeOrStep(1); return .handled }
-        .onKeyPress(characters: .init(charactersIn: "012345")) { press in
             guard !textEditing else { return .ignored }
-            model.photo.rating = Int(press.characters) ?? 0
-            model.saveNow()
+            nudgeOrStep(-1)
+            return .handled
+        }
+        .onKeyPress(.rightArrow) {
+            guard !textEditing else { return .ignored }
+            nudgeOrStep(1)
             return .handled
         }
         .overlay(alignment: .bottom) {
