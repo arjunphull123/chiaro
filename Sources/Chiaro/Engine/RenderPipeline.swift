@@ -4,7 +4,7 @@ import CoreImage.CIFilterBuiltins
 /// Pure function (base image, edit, optional person mask) -> adjusted image.
 /// Order is fixed by SPEC.md; every node reads only EditState values.
 enum RenderPipeline {
-    static func render(base: CIImage, edit: EditState, personMask: CIImage?, depthMap: CIImage? = nil, skipCrop: Bool = false) -> CIImage {
+    static func render(base: CIImage, edit: EditState, personMask: CIImage?, depthMap: CIImage? = nil, skipCrop: Bool = false, focusPeaking: Bool = false) -> CIImage {
         var image = applyGeometry(base, edit: edit, skipCrop: skipCrop)
         // Masks are aligned to the un-transformed base, so they get the same
         // geometry before use.
@@ -82,6 +82,30 @@ enum RenderPipeline {
             f.intensity = Float(edit.vignette / 100 * 1.6)
             f.radius = Float(1.6)
             image = f.outputImage ?? image
+        }
+        // Focus peaking (preview only, never export): amber wash over the
+        // in-focus plane while the Focus control is armed.
+        if focusPeaking, edit.depthBlur, let depthMap {
+            let target = 1 - edit.focusDepth
+            let focusPlane = CIImage(color: CIColor(red: target, green: target, blue: target))
+                .cropped(to: image.extent)
+            let inFocus = depthMap.cropped(to: image.extent)
+                .applyingFilter("CIColorAbsoluteDifference", parameters: ["inputImage2": focusPlane])
+                .applyingFilter("CIColorMatrix", parameters: [
+                    "inputRVector": CIVector(x: -7, y: 0, z: 0, w: 0),
+                    "inputGVector": CIVector(x: -7, y: 0, z: 0, w: 0),
+                    "inputBVector": CIVector(x: -7, y: 0, z: 0, w: 0),
+                    "inputBiasVector": CIVector(x: 1, y: 1, z: 1, w: 0),
+                ])
+                .applyingFilter("CIColorClamp")
+            let amber = CIImage(color: CIColor(red: 0.91, green: 0.64, blue: 0.24, alpha: 0.45))
+                .cropped(to: image.extent)
+                .composited(over: image)
+            let blend = CIFilter.blendWithMask()
+            blend.inputImage = amber
+            blend.backgroundImage = image
+            blend.maskImage = inFocus
+            image = blend.outputImage ?? image
         }
         return image
     }

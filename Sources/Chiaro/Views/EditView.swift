@@ -45,6 +45,10 @@ struct EditView: View {
             model.showOriginal = press.phase == .down
             return .handled
         }
+        .onKeyPress(keys: [" "], phases: [.down, .up, .repeat]) { press in
+            model.spacePan = press.phase != .up
+            return .handled
+        }
         .onKeyPress(.leftArrow) { step(-1); return .handled }
         .onKeyPress(.rightArrow) { step(1); return .handled }
         .onKeyPress(characters: .init(charactersIn: "012345")) { press in

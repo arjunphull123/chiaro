@@ -50,16 +50,39 @@ struct CanvasView: View {
                 }
             }
             .contentShape(Rectangle())
-            .popoverTip(ScrubTip(), arrowEdge: .top)
             .gesture(dragGesture)
             .gesture(magnifyGesture)
             .onTapGesture(count: 2) { if !model.cropMode { toggleZoom() } }
+            .onTapGesture(count: 1, coordinateSpace: .local) { location in
+                guard model.edit.depthBlur, !model.cropMode, !model.spacePan,
+                      model.armed == nil || model.armed == .focusDepth,
+                      let cg = model.preview else { return }
+                let imageSize = CGSize(width: cg.width, height: cg.height)
+                let fitScale = min(
+                    (fitRegion.width - 48) / imageSize.width,
+                    (fitRegion.height - 48) / imageSize.height
+                )
+                let fitSize = CGSize(width: imageSize.width * fitScale, height: imageSize.height * fitScale)
+                let center = CGPoint(x: fitRegion.width / 2 + pan.width, y: fitRegion.height / 2 + pan.height)
+                let u = (location.x - center.x) / (fitSize.width * zoom) + 0.5
+                let v = (location.y - center.y) / (fitSize.height * zoom) + 0.5
+                model.focusAt(u: u, v: v)
+            }
             .overlay(alignment: .bottom) {
                 Group {
-                    if model.cropMode { cropPanel } else { readout.popoverTip(FineTuneTip(), arrowEdge: .bottom) }
+                    if model.cropMode { cropPanel } else { readout }
                 }
                 .padding(.bottom, 78)
                 .padding(.trailing, Theme.railWidth)
+            }
+            .overlay(alignment: .topLeading) {
+                VStack(alignment: .leading, spacing: 8) {
+                    TipView(ScrubTip())
+                    if model.armed != nil { TipView(FineTuneTip()) }
+                }
+                .frame(maxWidth: 340)
+                .padding(.top, 52)
+                .padding(.leading, 16)
             }
             .onChange(of: model.photo.url) { resetView() }
             .onChange(of: model.cropMode) { resetView() }
@@ -69,7 +92,9 @@ struct CanvasView: View {
     private var dragGesture: some Gesture {
         DragGesture(minimumDistance: 1)
             .onChanged { g in
-                if model.armed != nil {
+                if model.spacePan {
+                    gesturePan = g.translation
+                } else if model.armed != nil {
                     let dx = g.location.x - (lastScrubX ?? g.startLocation.x)
                     lastScrubX = g.location.x
                     model.scrub(deltaX: dx)
@@ -187,6 +212,17 @@ struct CanvasView: View {
                         .font(Theme.mono(19, .medium))
                         .foregroundStyle(Theme.amber)
                         .monospacedDigit()
+                    Button { model.armed = nil } label: {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Theme.ink)
+                            .frame(width: 22, height: 22)
+                            .background(Circle().fill(Color.white.opacity(0.1)))
+                            .overlay(Circle().stroke(Theme.hairline))
+                    }
+                    .buttonStyle(.plain)
+                    .clickCursor()
+                    .help("Done — back to pan and zoom (esc)")
                 }
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.white.opacity(0.18)).frame(height: 2)

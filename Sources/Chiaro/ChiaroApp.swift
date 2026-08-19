@@ -19,6 +19,7 @@ struct ChiaroApp: App {
     init() {
         _exporting = State(initialValue: CommandLine.arguments.contains("--show-export"))
         Theme.registerFonts()
+        FirstMouse.enableGlobally()
         if CommandLine.arguments.contains("--show-tips") { Tips.showAllTipsForTesting() }
         try? Tips.configure([.displayFrequency(.immediate), .datastoreLocation(.applicationDefault)])
         let lib = library
@@ -228,12 +229,8 @@ struct RootView: View {
 
 /// Behind-window blur that makes the whole window translucent.
 struct WindowBackdrop: NSViewRepresentable {
-    final class FirstMouseEffectView: NSVisualEffectView {
-        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-    }
-
     func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = FirstMouseEffectView()
+        let view = NSVisualEffectView()
         view.material = .hudWindow
         view.blendingMode = .behindWindow
         view.state = .active
@@ -247,7 +244,6 @@ struct WindowBackdrop: NSViewRepresentable {
             window.isOpaque = false
             window.backgroundColor = .clear
             window.titlebarAppearsTransparent = true
-            if let content = window.contentView { FirstMouse.enable(content) }
         }
     }
 }

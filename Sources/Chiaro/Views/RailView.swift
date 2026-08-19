@@ -114,7 +114,7 @@ struct RailView: View {
             sectionLabel("Portrait", help: "Background blur — by detected subject or by scene depth — and subject light")
             HStack(spacing: 6) {
                 Chip(title: "Subject", selected: !model.edit.depthBlur) { model.edit.depthBlur = false }
-                Chip(title: "Depth", selected: model.edit.depthBlur) { model.edit.depthBlur = true }
+                Chip(title: "Depth", selected: model.edit.depthBlur) { model.enableDepthBlur() }
             }
             .padding(.bottom, 4)
             if model.edit.depthBlur {
@@ -178,6 +178,11 @@ struct RailView: View {
             ForEach([EditParameter.blurF, .focusDepth, .relight]) { p in
                 AdjustmentRow(parameter: p, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
             }
+            Text("Click the photo to set focus — arm Focus to see the sharp zone")
+                .font(Theme.mono(9))
+                .foregroundStyle(Theme.ink3)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 2)
         }
     }
 

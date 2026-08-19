@@ -70,6 +70,31 @@ final class DepthEngine: @unchecked Sendable {
         return scaled(normalized, to: image.extent)
     }
 
+    /// Mean disparity inside the person mask → focusDepth (0 near … 1 far).
+    /// nil when there's no person to focus on.
+    static func subjectFocus(depth: CIImage, mask: CIImage?) -> Double? {
+        guard let mask = mask?.cropped(to: depth.extent) else { return nil }
+        let weighted = depth.applyingFilter("CIMultiplyCompositing", parameters: [
+            kCIInputBackgroundImageKey: mask,
+        ])
+        func average(_ image: CIImage) -> Double {
+            let area = image.applyingFilter("CIAreaAverage", parameters: [
+                kCIInputExtentKey: CIVector(cgRect: depth.extent),
+            ])
+            var px = [Float](repeating: 0, count: 4)
+            RawEngine.shared.context.render(
+                area, toBitmap: &px, rowBytes: 16,
+                bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
+                format: .RGBAf, colorSpace: nil
+            )
+            return Double(px[0])
+        }
+        let maskMean = average(mask)
+        guard maskMean > 0.01 else { return nil }
+        let disparity = average(weighted) / maskMean
+        return (1 - disparity).clamped(to: 0...1)
+    }
+
     private func scaled(_ map: CIImage, to extent: CGRect) -> CIImage {
         let sx = extent.width / map.extent.width
         let sy = extent.height / map.extent.height

@@ -13,9 +13,8 @@ struct AgentRailStatus: View {
     @State private var showing = false
 
     var body: some View {
-        if AgentTip.isEligible {
-            timeline.popoverTip(agentTip, arrowEdge: .trailing)
-        } else {
+        VStack(alignment: .leading, spacing: 6) {
+            if AgentTip.isEligible { TipView(agentTip) }
             timeline
         }
     }
