@@ -121,7 +121,7 @@ struct AgentConnectPopover: View {
     private var historyContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("\(AgentStatus.shared.displayName) in Chiaro")
-                .font(Theme.ui(14, .semibold))
+                .font(Theme.serif(17, .semibold))
                 .foregroundStyle(Theme.ink)
             ScrollView {
                 VStack(alignment: .leading, spacing: 7) {
@@ -153,7 +153,7 @@ struct AgentConnectPopover: View {
     private var connectContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Drive Chiaro with any agent")
-                .font(Theme.ui(14, .semibold))
+                .font(Theme.serif(17, .semibold))
                 .foregroundStyle(Theme.ink)
             Text("Paste this into any MCP-capable agent — Claude Code, Cursor, whatever you run — and it can see, edit, and export your photos, live in this window. It will confirm once connected.")
                 .font(Theme.ui(11.5))
