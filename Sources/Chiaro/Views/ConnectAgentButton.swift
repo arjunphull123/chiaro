@@ -24,19 +24,28 @@ struct ConnectAgentButton: View {
     }
 
     var body: some View {
-        Button {
-            showing.toggle()
-        } label: {
-            HStack(spacing: 6) {
-                Circle().fill(Theme.amber).frame(width: 6, height: 6)
-                Text("Connect Agent").font(Theme.ui(12, .medium))
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            let connected = AgentStatus.shared.isConnected(now: context.date)
+            Button {
+                showing.toggle()
+            } label: {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(connected ? Color(hex: 0x4FC463) : Theme.ink3)
+                        .frame(width: 6, height: 6)
+                    Text(connected ? (AgentStatus.shared.clientName ?? "Agent") + " connected" : "Connect Agent")
+                        .font(Theme.ui(12, .medium))
+                }
+                .foregroundStyle(connected ? Theme.ink : Theme.ink2)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(connected ? Color(hex: 0x4FC463).opacity(0.4) : Theme.hairline)
+                )
             }
-            .foregroundStyle(Theme.ink2)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(RoundedRectangle(cornerRadius: 8).stroke(Theme.hairline))
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
         .popover(isPresented: $showing, arrowEdge: .bottom) { popover }
     }
 

@@ -9,22 +9,26 @@ struct RailView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 12) {
-                photoHeader
-                HistogramView(data: model.histogram)
-                looks
-                section(
-                    "Light", [.exposure, .contrast, .highlights, .shadows, .whites, .blacks],
-                    help: "Brightness and tonal balance"
-                )
-                section(
-                    "Color", [.temp, .tint, .vibrance, .saturation],
-                    help: "White balance and color strength"
-                )
-                portraitSection
-                section("Effects", [.clarity, .vignette], help: "Punch and framing")
-                section("Detail", [.sharpness, .noiseReduction], help: "Fine texture and grain cleanup")
-                actions
-                scrubHint
+                if library.agentActive { agentBanner }
+                Group {
+                    photoHeader
+                    HistogramView(data: model.histogram)
+                    section(
+                        "Light", [.exposure, .contrast, .highlights, .shadows, .whites, .blacks],
+                        help: "Brightness and tonal balance"
+                    )
+                    section(
+                        "Color", [.temp, .tint, .vibrance, .saturation],
+                        help: "White balance and color strength"
+                    )
+                    portraitSection
+                    section("Effects", [.clarity, .vignette], help: "Punch and framing")
+                    section("Detail", [.sharpness, .noiseReduction], help: "Fine texture and grain cleanup")
+                    actions
+                    scrubHint
+                }
+                .opacity(library.agentActive ? 0.4 : 1)
+                .animation(.easeOut(duration: 0.2), value: library.agentActive)
             }
             .padding(16)
             .padding(.top, 40)
@@ -68,55 +72,34 @@ struct RailView: View {
         }
     }
 
-    /// Looks carousel: each card previews THIS photo with the preset applied.
-    private var looks: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            sectionLabel("Looks", help: "One-tap starting points — tweak anything after")
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 7) {
-                    ForEach(Preset.builtIn) { preset in
-                        lookCard(preset)
-                    }
-                }
+    /// Agent presence lives at the top of the rail (per user design): locked pill,
+    /// intent beneath, everything below dimmed while the agent drives.
+    private var agentBanner: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 8) {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(Theme.amber)
+                Text("AGENT IS EDITING…")
+                    .font(Theme.mono(9, .medium))
+                    .kerning(1.4)
+                    .foregroundStyle(Theme.ink)
+                Spacer()
+                Circle().fill(Theme.amber).frame(width: 6, height: 6)
             }
-            .scrollClipDisabled()
-        }
-    }
-
-    private func lookCard(_ preset: Preset) -> some View {
-        let isCurrent = model.edit == preset.applied(over: model.edit)
-        return Button {
-            model.edit = preset.applied(over: model.edit)
-        } label: {
-            ZStack(alignment: .bottomLeading) {
-                Group {
-                    if let cg = model.presetPreviews[preset.name] {
-                        Image(cg, scale: 1, label: Text(preset.name))
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } else {
-                        Color.white.opacity(0.06)
-                    }
-                }
-                .frame(width: 104, height: 66)
-                LinearGradient(
-                    colors: [.clear, .black.opacity(0.75)],
-                    startPoint: .center, endPoint: .bottom
-                )
-                Text(preset.name)
-                    .font(Theme.ui(9.5, .medium))
-                    .foregroundStyle(.white.opacity(0.92))
-                    .padding(.horizontal, 6)
-                    .padding(.bottom, 5)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(RoundedRectangle(cornerRadius: 9).fill(Theme.amber.opacity(0.13)))
+            .overlay(RoundedRectangle(cornerRadius: 9).stroke(Theme.amber.opacity(0.4)))
+            if let intent = library.agentIntent {
+                Text(intent)
+                    .font(Theme.ui(10.5))
+                    .foregroundStyle(Theme.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 2)
             }
-            .frame(width: 104, height: 66)
-            .clipShape(RoundedRectangle(cornerRadius: 7))
-            .overlay(
-                RoundedRectangle(cornerRadius: 7)
-                    .stroke(isCurrent ? Theme.amber : Theme.hairline, lineWidth: isCurrent ? 1.5 : 1)
-            )
         }
-        .buttonStyle(.plain)
+        .transition(.opacity)
     }
 
     private func section(_ title: String, _ params: [EditParameter], help: String) -> some View {

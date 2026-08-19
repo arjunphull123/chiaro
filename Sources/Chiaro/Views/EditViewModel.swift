@@ -48,7 +48,6 @@ final class EditViewModel {
     var histogram = HistogramData()
     var hasPerson: Bool?
     var isLoading = true
-    var presetPreviews: [String: CGImage] = [:]
 
     private var basePreview: CIImage?
     private var personMask: CIImage?
@@ -85,7 +84,6 @@ final class EditViewModel {
         basePreview = nil
         personMask = nil
         hasPerson = nil
-        presetPreviews = [:]
         isLoading = true
         load()
     }
@@ -105,22 +103,6 @@ final class EditViewModel {
             self.originalPreview = baseCG
             self.isLoading = false
             self.scheduleRender()
-
-            // Tiny per-preset renders for the Looks carousel.
-            let cards = await Offload.on(Offload.render) { () -> [String: CGImage] in
-                let scale = 300 / max(base.extent.width, base.extent.height)
-                let small = base.transformed(by: .init(scaleX: scale, y: scale))
-                var cards: [String: CGImage] = [:]
-                for preset in Preset.builtIn {
-                    let out = RenderPipeline.render(base: small, edit: preset.edit, personMask: nil)
-                    if let cg = RawEngine.shared.context.createCGImage(out, from: out.extent) {
-                        cards[preset.name] = cg
-                    }
-                }
-                return cards
-            }
-            guard self.photo.url == url else { return }
-            self.presetPreviews = cards
 
             let mask = await Offload.on(Offload.vision) { PortraitEngine.shared.mask(for: url, image: base) }
             guard self.photo.url == url else { return }

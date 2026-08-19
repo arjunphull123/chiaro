@@ -19,17 +19,16 @@ struct EditView: View {
             RailView(model: model, library: library)
                 .ignoresSafeArea()
                 .disabled(library.agentActive)
-                .blur(radius: library.agentActive ? 7 : 0)
-                .animation(.easeOut(duration: 0.25), value: library.agentActive)
-                .overlay(alignment: .trailing) { agentOverlay }
         }
         .overlay(alignment: .bottom) { navPill.padding(.bottom, 16).padding(.trailing, Theme.railWidth) }
         .overlay(alignment: .topLeading) {
-            backButton.padding(.top, 12).padding(.leading, 86) // clear of traffic lights
+            backButton.padding(.top, 40).padding(.leading, 14) // below the traffic lights
         }
         .overlay(alignment: .topTrailing) {
             HStack(spacing: 8) {
                 ConnectAgentButton()
+                glassIcon("arrow.uturn.backward", disabled: !model.canUndo, help: "Undo (⌘Z)") { model.undo() }
+                glassIcon("arrow.uturn.forward", disabled: !model.canRedo, help: "Redo (⇧⌘Z)") { model.redo() }
                 glassAction("Copy Edits", icon: "doc.on.doc", disabled: model.edit.isNeutral) {
                     library.copiedEdit = model.edit
                 }
@@ -89,30 +88,6 @@ struct EditView: View {
         }
     }
 
-    /// While an agent drives, the rail gaussian-blurs beneath this (content stays
-    /// visible through it) with the pill and the agent's stated intent on top.
-    @ViewBuilder private var agentOverlay: some View {
-        if library.agentActive {
-            ZStack {
-                Color.black.opacity(0.18)
-                VStack(spacing: 10) {
-                    AgentPill()
-                    if let intent = library.agentIntent {
-                        Text(intent)
-                            .font(Theme.ui(11))
-                            .foregroundStyle(Theme.ink)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 20)
-                            .shadow(color: .black.opacity(0.7), radius: 3)
-                    }
-                }
-            }
-            .frame(width: Theme.railWidth)
-            .ignoresSafeArea()
-            .transition(.opacity)
-        }
-    }
-
     private var navPill: some View {
         HStack(spacing: 12) {
             Button { step(-1) } label: { chevron("chevron.left") }.buttonStyle(.plain)
@@ -137,6 +112,19 @@ struct EditView: View {
 
     private var photoIndex: Int {
         library.photos.firstIndex(where: { $0.url == model.photo.url }) ?? 0
+    }
+
+    private func glassIcon(_ icon: String, disabled: Bool, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(disabled ? Theme.ink3 : Theme.ink2)
+                .frame(width: 30, height: 28)
+                .chiaroGlass(cornerRadius: 10)
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .help(help)
     }
 
     private func glassAction(_ title: String, icon: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
@@ -182,28 +170,6 @@ struct EditView: View {
             .chiaroGlass(cornerRadius: 10)
         }
         .buttonStyle(.plain)
-    }
-
-    private struct AgentPill: View {
-        @State private var pulsing = false
-
-        var body: some View {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(Theme.amber)
-                    .frame(width: 7, height: 7)
-                    .opacity(pulsing ? 0.35 : 1)
-                    .animation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true), value: pulsing)
-                Text("AGENT EDITING")
-                    .font(Theme.mono(9, .medium))
-                    .kerning(1.6)
-                    .foregroundStyle(Theme.ink)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .chiaroGlass(cornerRadius: 12)
-            .onAppear { pulsing = true }
-        }
     }
 
     private func close() {

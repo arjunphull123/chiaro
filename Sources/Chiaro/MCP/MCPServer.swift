@@ -105,6 +105,7 @@ final class MCPServer {
 
     private func handle(body: Data, reply: @escaping (Data?) -> Void) {
         KeepAwake.poke(20)
+        Task { @MainActor in AgentStatus.shared.lastSeen = Date() }
         guard let message = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
               let method = message["method"] as? String
         else { reply(rpcError(id: nil, code: -32700, message: "parse error")); return }
@@ -115,6 +116,8 @@ final class MCPServer {
         case "initialize":
             let params = message["params"] as? [String: Any]
             let version = params?["protocolVersion"] as? String ?? "2025-03-26"
+            let client = (params?["clientInfo"] as? [String: Any])?["name"] as? String
+            Task { @MainActor in AgentStatus.shared.clientName = client }
             reply(rpcResult(id: id, [
                 "protocolVersion": version,
                 "capabilities": ["tools": [:] as [String: Any]],
