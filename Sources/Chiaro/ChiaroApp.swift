@@ -31,6 +31,12 @@ struct ChiaroApp: App {
             NSApp.setActivationPolicy(.regular)
             if !quiet { NSApp.activate(ignoringOtherApps: true) }
         }
+        // Wake the on-demand model stores: anything already downloaded loads
+        // now (nothing downloads without the user asking).
+        DispatchQueue.main.async {
+            _ = DepthModelStore.shared
+            _ = CleanupModelStore.shared
+        }
         // Dock icon for unbundled dev runs; the .app bundle carries the .icns.
         DispatchQueue.main.async {
             if let url = Bundle.module.url(forResource: "AppIcon", withExtension: "png"),
@@ -144,6 +150,11 @@ struct ChiaroApp: App {
                 }
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) { attempt(20) }
+        }
+        if args.contains("--download-cleanup") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                CleanupModelStore.shared.downloadIfNeeded()
+            }
         }
         if args.contains("--download-depth") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {

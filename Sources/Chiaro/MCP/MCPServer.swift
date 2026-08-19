@@ -233,6 +233,10 @@ final class MCPServer {
             "type": "object",
             "description": "color mixer: per-band {h,s,l} each -100...100 — bands: \(HSLBand.names.joined(separator: ", ")). Partial objects fine, e.g. {\"orange\": {\"s\": -30}, \"blue\": {\"l\": 20}}",
         ]
+        props["cleanup"] = [
+            "type": "array",
+            "description": "Clean up strokes: [{points: [[x,y],...] normalized (y from top), radius: fraction of width}] — brushed regions are removed and inpainted on-device (needs the cleanup model downloaded in the app). Empty array clears",
+        ]
         props["curve"] = [
             "type": "array",
             "items": ["type": "array", "items": ["type": "number"]],
@@ -487,6 +491,28 @@ final class MCPServer {
                     }
                     continue
                 }
+                if key == "cleanup" {
+                    guard let raw = value as? [[String: Any]] else {
+                        if let empty = value as? [Any], empty.isEmpty { edit.cleanup = []; continue }
+                        throw ToolError("cleanup must be [{points: [[x,y],...], radius}]")
+                    }
+                    edit.cleanup = try raw.map { dict in
+                        guard let pts = dict["points"] as? [[Any]],
+                              let radius = (dict["radius"] as? Double) ?? (dict["radius"] as? Int).map(Double.init) else {
+                            throw ToolError("each stroke needs points and radius")
+                        }
+                        let points = pts.compactMap { pair -> CurvePoint? in
+                            guard pair.count == 2,
+                                  let x = (pair[0] as? Double) ?? (pair[0] as? Int).map(Double.init),
+                                  let y = (pair[1] as? Double) ?? (pair[1] as? Int).map(Double.init)
+                            else { return nil }
+                            return CurvePoint(x: x.clamped(to: 0...1), y: y.clamped(to: 0...1))
+                        }
+                        guard !points.isEmpty else { throw ToolError("stroke points must be [[x,y],...]") }
+                        return CleanupStroke(points: points, radius: radius.clamped(to: 0.002...0.12))
+                    }
+                    continue
+                }
                 if key == "curve" {
                     guard let raw = value as? [[Any]] else { throw ToolError("curve must be [[x,y],...]") }
                     let pts = raw.compactMap { pair -> CurvePoint? in
@@ -527,7 +553,10 @@ final class MCPServer {
             let maxDim = args["maxDimension"] as? Double ?? 768
             let url = p.url, edit = p.edit
             let jpeg = await Offload.on(Offload.render) { () -> Data? in
-                guard let base = RawEngine.shared.preview(for: url) else { return nil }
+                guard var base = RawEngine.shared.preview(for: url) else { return nil }
+                if !edit.cleanup.isEmpty {
+                    base = CleanupEngine.shared.applied(to: base, url: url, strokes: edit.cleanup)
+                }
                 var mask: CIImage?
                 if edit.blurF > 0 || edit.relight != 0 {
                     mask = PortraitEngine.shared.mask(

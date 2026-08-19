@@ -48,6 +48,20 @@ final class EditViewModel {
             scheduleRender()
         }
     }
+    /// Clean up: brush mode, radius (fraction of image width), and the
+    /// stroke being painted right now.
+    var cleanupMode = false {
+        didSet { if cleanupMode { armed = nil } }
+    }
+    var cleanupBrush: Double = 0.025
+    var activeStroke: CleanupStroke?
+
+    func commitActiveStroke() {
+        guard let stroke = activeStroke, !stroke.points.isEmpty else { activeStroke = nil; return }
+        edit.cleanup.append(stroke)
+        activeStroke = nil
+    }
+
     /// Held-space pan: drag moves the photo even while a parameter is armed.
     var spacePan = false {
         didSet {
@@ -226,9 +240,11 @@ final class EditViewModel {
         let peaking = (armed == .focusDepth || armed == .focusRange) && edit.blurMode == .depth
         Task { [weak self] in
             let result = await Offload.on(Offload.render) { () -> (CGImage, HistogramData)? in
+                let base = edit.cleanup.isEmpty ? basePreview
+                    : CleanupEngine.shared.applied(to: basePreview, url: url, strokes: edit.cleanup)
                 let depth = edit.blurMode == .depth && (edit.blurF > 0 || peaking)
-                    ? DepthEngine.shared.depthMap(for: url, image: basePreview) : nil
-                let output = RenderPipeline.render(base: basePreview, edit: edit, personMask: mask, depthMap: depth, skipCrop: skipCrop, focusPeaking: peaking)
+                    ? DepthEngine.shared.depthMap(for: url, image: base) : nil
+                let output = RenderPipeline.render(base: base, edit: edit, personMask: mask, depthMap: depth, skipCrop: skipCrop, focusPeaking: peaking)
                 guard let cg = RawEngine.shared.context.createCGImage(output, from: output.extent) else { return nil }
                 return (cg, HistogramSampler.sample(output))
             }

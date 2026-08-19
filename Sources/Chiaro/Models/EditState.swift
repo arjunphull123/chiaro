@@ -36,6 +36,16 @@ struct HSLBand: Codable, Equatable {
     static let centers: [Double] = [0, 30, 60, 120, 180, 240, 285, 330]
 }
 
+/// One Clean up brush stroke: normalized points (y from top) + brush radius
+/// as a fraction of image width.
+struct CleanupStroke: Codable, Equatable {
+    var points: [CurvePoint]
+    var radius: Double
+    var cacheKey: String {
+        "\(points.count),\(points.first?.x ?? 0),\(points.last?.y ?? 0),\(radius);"
+    }
+}
+
 /// The complete, serializable description of one photo's edit (ADR 0003).
 /// Every UI input path mutates this; the render pipeline is a pure function of it.
 struct EditState: Codable, Equatable {
@@ -64,6 +74,8 @@ struct EditState: Codable, Equatable {
     var blurMode: BlurMode = .subject
     var focusDepth: Double = 0.5  // 0 = nearest, 1 = farthest — the plane kept sharp
     var focusRange: Double = 0.25 // width of the sharp zone around the focus plane
+    // Clean up: brush strokes over removed objects (inpainted on-device)
+    var cleanup: [CleanupStroke] = []
     // Color mixer: 8 hue bands (see HSLBand.names)
     var hsl: [HSLBand] = Array(repeating: HSLBand(), count: 8)
     // Tone curve: control points, always including endpoints
@@ -117,6 +129,9 @@ struct EditState: Codable, Equatable {
         }
         if crop != .full {
             try c.encode(crop, forKey: CodingKeys(stringValue: "crop")!)
+        }
+        if !cleanup.isEmpty {
+            try c.encode(cleanup, forKey: CodingKeys(stringValue: "cleanup")!)
         }
         if hsl.contains(where: { !$0.isNeutral }) {
             try c.encode(hsl, forKey: CodingKeys(stringValue: "hsl")!)

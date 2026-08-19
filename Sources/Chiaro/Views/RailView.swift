@@ -44,15 +44,16 @@ struct RailView: View {
                         "Light", [.exposure, .contrast, .highlights, .shadows, .whites, .blacks],
                         help: "Brightness and tonal balance"
                     )
+                    portraitSection
                     curveSection
                     section(
                         "Color", [.temp, .tint, .vibrance, .saturation],
                         help: "White balance and color strength"
                     )
                     colorMixSection
-                    portraitSection
                     section("Effects", [.clarity, .vignette], help: "Punch and framing")
                     section("Detail", [.sharpness, .noiseReduction], help: "Fine texture and grain cleanup")
+                    cleanupSection
                     actions
                     scrubHint
                 }
@@ -129,11 +130,11 @@ struct RailView: View {
 
     private var portraitSection: some View {
         VStack(alignment: .leading, spacing: 3) {
-            sectionLabel("Portrait", help: "Background blur — by lifted subject or by scene depth — and subject light")
+            sectionLabel("Depth", help: "Background blur — by lifted subject or by scene depth — and subject light")
             HStack(spacing: 6) {
                 Chip(title: "Subject", selected: model.edit.blurMode == .subject) { model.setBlurMode(.subject) }
                 Chip(title: "Person", selected: model.edit.blurMode == .person) { model.setBlurMode(.person) }
-                Chip(title: "Depth ML", selected: model.edit.blurMode == .depth) { model.setBlurMode(.depth) }
+                Chip(title: "Scene ML", selected: model.edit.blurMode == .depth) { model.setBlurMode(.depth) }
             }
             .padding(.bottom, 4)
             if model.edit.blurMode == .depth {
@@ -238,7 +239,8 @@ struct RailView: View {
     private var colorMixSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             sectionLabel("Color mix", help: "Per-hue adjustments — pick a band, then shift its hue, saturation, and luminance")
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
                 ForEach(0..<8, id: \.self) { i in
                     let active = !model.edit.hsl[i].isNeutral
                     Button { selectedBand = i } label: {
@@ -256,7 +258,7 @@ struct RailView: View {
                     .clickCursor()
                     .help(HSLBand.names[i].prefix(1).uppercased() + HSLBand.names[i].dropFirst())
                 }
-                Spacer()
+                Spacer(minLength: 0)
             }
             .padding(.bottom, 2)
             bandRow("Hue", keyPath: \.h)
@@ -302,6 +304,72 @@ struct RailView: View {
         .clickCursor()
     }
 
+    private var cleanupSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionLabel("Clean up", help: "Brush over distractions to remove them — inpainted on-device, nothing generated elsewhere")
+            switch CleanupModelStore.shared.availability {
+            case .missing:
+                Button("Download cleanup model (40 MB)") {
+                    CleanupModelStore.shared.downloadIfNeeded()
+                }
+                .buttonStyle(OutlineButtonStyle())
+                .clickCursor()
+            case .downloading(let progress):
+                HStack(spacing: 7) {
+                    ProgressView(value: progress)
+                        .progressViewStyle(.linear)
+                        .tint(Theme.amber)
+                    Text("\(Int(progress * 100))%")
+                        .font(Theme.mono(9)).foregroundStyle(Theme.ink3).monospacedDigit()
+                }
+                .frame(height: 24)
+            case .preparing:
+                HStack(spacing: 7) {
+                    ProgressView().controlSize(.mini)
+                    Text("Preparing…")
+                        .font(Theme.ui(10.5)).foregroundStyle(Theme.ink3)
+                }
+                .frame(height: 24)
+            case .failed(let message):
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(message).font(Theme.ui(9.5)).foregroundStyle(Theme.ink3).lineLimit(2)
+                    Button("Try again") { CleanupModelStore.shared.downloadIfNeeded() }
+                        .buttonStyle(OutlineButtonStyle())
+                        .clickCursor()
+                }
+            case .ready:
+                Button {
+                    model.cleanupMode.toggle()
+                } label: {
+                    HStack(spacing: 7) {
+                        Image(systemName: "bandage")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(model.cleanupMode ? "Painting — brush over distractions" : "Remove distractions")
+                            .font(Theme.ui(11, .medium))
+                        if !model.edit.cleanup.isEmpty {
+                            Text("\(model.edit.cleanup.count)")
+                                .font(Theme.mono(9))
+                                .foregroundStyle(Theme.ink3)
+                        }
+                    }
+                    .foregroundStyle(model.cleanupMode ? Theme.amber : Theme.ink2)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 7)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(model.cleanupMode ? Theme.amber.opacity(0.12) : Color.white.opacity(0.04))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(model.cleanupMode ? Theme.amber.opacity(0.6) : Theme.hairline)
+                    )
+                }
+                .buttonStyle(.plain)
+                .clickCursor()
+            }
+        }
+    }
+
     @State private var savingPreset = false
     @State private var presetName = ""
 
@@ -320,11 +388,21 @@ struct RailView: View {
                     .disabled(model.edit.isNeutral)
             }
             .padding(.top, 10)
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 68), spacing: 5)], alignment: .leading, spacing: 5) {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 5), GridItem(.flexible(), spacing: 5)], spacing: 5) {
                 ForEach(PresetStore.shared.all) { preset in
-                    Chip(title: preset.name, selected: preset.matches(model.edit)) {
-                        model.edit = preset.applied(to: model.edit)
+                    let selected = preset.matches(model.edit)
+                    Button { model.edit = preset.applied(to: model.edit) } label: {
+                        Text(preset.name)
+                            .font(Theme.ui(10.5, selected ? .medium : .regular))
+                            .foregroundStyle(selected ? Theme.amber : Theme.ink2)
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(Color.white.opacity(selected ? 0.08 : 0.03)))
+                            .overlay(Capsule().stroke(selected ? Theme.amber.opacity(0.5) : Theme.hairline))
                     }
+                    .buttonStyle(.plain)
+                    .clickCursor()
                     .contextMenu {
                         if PresetStore.shared.user.contains(preset) {
                             Button("Delete preset") { PresetStore.shared.delete(preset) }

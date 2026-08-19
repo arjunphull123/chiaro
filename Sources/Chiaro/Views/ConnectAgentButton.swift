@@ -50,8 +50,6 @@ struct AgentRailStatus: View {
                             Image(systemName: "lock.fill")
                                 .font(.system(size: 9, weight: .semibold))
                                 .foregroundStyle(brand.color)
-                        } else if connected, let seen = AgentStatus.shared.lastSeenText(now: context.date) {
-                            Text(seen).font(Theme.mono(8.5)).foregroundStyle(Theme.ink3)
                         }
                     }
                     if editing, let intent = library.agentIntent {
