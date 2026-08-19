@@ -446,22 +446,6 @@ final class MCPServer {
             p.starred = starred
             Sidecar.write(for: p)
             return try text(["applied": true, "name": p.name, "starred": starred])
-        case "list_presets":
-            return try text(["presets": PresetStore.shared.all.map(\.name)])
-        case "apply_preset":
-            let p = try photo(args)
-            guard let presetName = args["preset"] as? String,
-                  let preset = PresetStore.shared.all.first(where: { $0.name == presetName }) else {
-                throw ToolError("unknown preset; valid: \(PresetStore.shared.all.map(\.name).joined(separator: ", "))")
-            }
-            if let editor = library.activeEditor, editor.photo.url == p.url {
-                library.noteAgentActivity(intent: "applying \(presetName)")
-                editor.edit = preset.applied(to: editor.edit)
-            } else {
-                p.edit = preset.applied(to: p.edit)
-                Sidecar.write(for: p)
-            }
-            return try text(["applied": presetName, "name": p.name])
         case "set_edit":
             let p = try photo(args)
             guard let params = args["edit"] as? [String: Any] else { throw ToolError("missing edit object") }
@@ -631,6 +615,7 @@ final class MCPServer {
         case "set_edit": text = (args["intent"] as? String).map { "\(name) — \($0)" } ?? "adjusted \(name)"
         case "set_starred": text = (args["starred"] as? Bool == true) ? "starred \(name)" : "unstarred \(name)"
         case "apply_preset": text = "applied \((args["preset"] as? String) ?? "a preset") to \(name)"
+        case "list_presets": text = "reviewed the presets"
         case "export": text = "exported \(name)"
         default: text = "\(tool) \(name)"
         }

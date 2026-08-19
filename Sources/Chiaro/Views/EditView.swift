@@ -145,15 +145,9 @@ struct EditView: View {
                 model.edit.straighten = (model.edit.straighten - Double(dx) / 8).clamped(to: -45...45)
                 return nil
             }
-            if model.armedHSL != nil {
-                model.scrub(deltaX: dx)
-                return nil
-            }
-            guard let parameter = model.armed else { return event }
-            let span = parameter.range.upperBound - parameter.range.lowerBound
-            let old = parameter.value(in: model.edit)
-            parameter.set(old + dx / 500 * span, in: &model.edit)
-            HapticDetents.tickIfCrossed(parameter: parameter, from: old, to: parameter.value(in: model.edit))
+            guard model.armed != nil || model.armedHSL != nil else { return event }
+            // Negated so the ruler's ticks travel with the fingers.
+            model.scrub(deltaX: -dx)
             return nil
         }
     }
@@ -210,7 +204,6 @@ struct EditView: View {
             }
             iconAction("Undo", icon: "arrow.uturn.backward", disabled: !model.canUndo) { model.undo() }
             iconAction("Redo", icon: "arrow.uturn.forward", disabled: !model.canRedo) { model.redo() }
-            iconAction("Revert", icon: "arrow.counterclockwise", disabled: model.edit.isNeutral) { reverting = true }
             iconAction("Original", icon: model.showOriginal ? "eye.fill" : "eye", active: model.showOriginal) {
                 model.showOriginal.toggle()
             }
@@ -223,6 +216,8 @@ struct EditView: View {
                 }
             }
             versionsMenu
+            iconAction("Revert", icon: "arrow.counterclockwise", disabled: model.edit.isNeutral,
+                       tint: Theme.danger) { reverting = true }
             exportButton
         }
         .alert("Revert to original", isPresented: $reverting) {
@@ -297,9 +292,9 @@ struct EditView: View {
     /// Icon-only glass button whose label slides in on hover.
     private func iconAction(
         _ title: String, icon: String, active: Bool = false, disabled: Bool = false,
-        action: @escaping () -> Void
+        tint: Color? = nil, action: @escaping () -> Void
     ) -> some View {
-        HoverLabelButton(title: title, icon: icon, active: active, disabled: disabled, action: action)
+        HoverLabelButton(title: title, icon: icon, active: active, disabled: disabled, tint: tint, action: action)
     }
 
     private func glassAction(_ title: String, icon: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
@@ -384,7 +379,7 @@ struct EditView: View {
             let span = armed.range.upperBound - armed.range.lowerBound
             armed.set(armed.value(in: model.edit) + Double(direction) * span / 200, in: &model.edit)
         } else if model.armedHSL != nil {
-            model.scrub(deltaX: CGFloat(direction) * 2.1)
+            model.scrub(deltaX: CGFloat(direction) * 2.1, snapping: false)
         } else {
             step(direction)
         }

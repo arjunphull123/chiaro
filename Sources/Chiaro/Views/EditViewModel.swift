@@ -400,24 +400,49 @@ final class EditViewModel {
     }
 
     /// Scrub input from the canvas (ADR 0005): 1:1, fixed per-parameter sensitivity.
-    func scrub(deltaX: CGFloat) {
+    /// The raw (unsnapped) position accumulates separately so detents have real
+    /// resistance: the value holds at the detent until the finger travels out of
+    /// the window, instead of re-capturing every tick and pinning slow scrubs.
+    private var scrubRaw: Double?
+    private var scrubAnchor: Double?
+
+    func scrub(deltaX: CGFloat, snapping: Bool = true) {
         if let armedHSL {
             let keyPath = armedHSL.component.keyPath
             let old = edit.hsl[armedHSL.band][keyPath: keyPath]
-            var new = (old + Double(deltaX) / 420 * 200).clamped(to: -100...100)
-            if abs(new) < 2 { new = 0 }
+            var new: Double
+            if snapping {
+                if scrubRaw == nil || scrubAnchor != old { scrubRaw = old }
+                let raw = (scrubRaw! + Double(deltaX) / 420 * 200).clamped(to: -100...100)
+                scrubRaw = raw
+                new = abs(raw) < 6 ? 0 : raw
+            } else {
+                new = (old + Double(deltaX) / 420 * 200).clamped(to: -100...100)
+                scrubRaw = nil
+            }
             edit.hsl[armedHSL.band][keyPath: keyPath] = new
+            scrubAnchor = new
             return
         }
         guard let armed else { return }
         let span = armed.range.upperBound - armed.range.lowerBound
         let old = armed.value(in: edit)
-        var new = old + Double(deltaX) / 420 * span
-        // Magnetic detents: land exactly on a nearby tick.
-        for detent in armed.detents where abs(new - detent) < span * 0.012 {
-            new = detent
+        var new: Double
+        if snapping {
+            if scrubRaw == nil || scrubAnchor != old { scrubRaw = old }
+            let raw = (scrubRaw! + Double(deltaX) / 420 * span).clamped(to: armed.range)
+            scrubRaw = raw
+            new = raw
+            let detents = armed.detents.isEmpty ? [armed.defaultValue] : armed.detents
+            for detent in detents where abs(raw - detent) < span * 0.03 {
+                new = detent
+            }
+        } else {
+            new = old + Double(deltaX) / 420 * span
+            scrubRaw = nil
         }
         armed.set(new, in: &edit)
+        scrubAnchor = armed.value(in: edit)
         HapticDetents.tickIfCrossed(parameter: armed, from: old, to: armed.value(in: edit))
     }
 }

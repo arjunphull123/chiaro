@@ -78,6 +78,7 @@ struct HoverLabelButton: View {
     let icon: String
     var active = false
     var disabled = false
+    var tint: Color?
     let action: () -> Void
     @State private var hovering = false
 
@@ -85,7 +86,7 @@ struct HoverLabelButton: View {
         Button(action: action) {
             Image(systemName: icon)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(active ? Theme.amber : Theme.ink2)
+                .foregroundStyle(active ? Theme.amber : tint ?? Theme.ink2)
                 .frame(width: 16, height: 14)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 7)

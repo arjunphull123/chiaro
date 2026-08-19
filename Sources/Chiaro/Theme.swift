@@ -8,6 +8,8 @@ enum Theme {
     static let amber = Color(hex: 0xE8A33D)
     /// Anthropic's terracotta — used only for Claude connection state.
     static let claude = Color(hex: 0xD97757)
+    /// Destructive actions only (Revert, delete).
+    static let danger = Color(hex: 0xE05A4E)
     static let ink = Color.white.opacity(0.87)
     static let ink2 = Color.white.opacity(0.52)
     static let ink3 = Color.white.opacity(0.34)

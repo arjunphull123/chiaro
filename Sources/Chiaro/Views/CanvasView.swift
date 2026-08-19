@@ -19,9 +19,6 @@ struct CanvasView: View {
     @State private var gesturePan: CGSize = .zero
     @State private var lastScrubX: CGFloat?
     @State private var lastDialX: CGFloat?
-    /// Dial card position — dragged by its header, independent of the ruler's own drag.
-    @State private var cardOffset: CGSize = .zero
-    @State private var cardDragStart: CGSize?
 
 
     var body: some View {
@@ -124,7 +121,6 @@ struct CanvasView: View {
             }
             .onChange(of: model.photo.url) { resetView() }
             .onChange(of: model.cropMode) { resetView() }
-            .onChange(of: dialActive) { if !dialActive { cardOffset = .zero } }
         }
     }
 
@@ -196,42 +192,33 @@ struct CanvasView: View {
         zoom = 1
         pan = .zero
         gesturePan = .zero
-        cardOffset = .zero
     }
 
     /// Whether a dial card (readout or depth focus) is on screen.
     private var dialActive: Bool { model.armed != nil || model.armedHSL != nil }
 
-    /// Crop mode controls: aspect presets, straighten, reset, done.
+    /// Crop mode controls: aspect dropdown, straighten arc, reset, done.
     private var cropPanel: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 5) {
-                aspectChip("Free", nil)
-                aspectChip("Original", originalAspect)
-                aspectChip("1:1", 1)
-                aspectChip("4:5", 0.8)
-                aspectChip("3:2", 1.5)
-                aspectChip("16:9", 16.0 / 9)
-            }
+        VStack(spacing: 9) {
             HStack(spacing: 10) {
-                Text("Straighten")
-                    .font(Theme.ui(10))
-                    .foregroundStyle(Theme.ink3)
+                aspectMenu
+                Spacer()
                 Button("Auto") { model.autoLevel() }
                     .buttonStyle(.plain)
-                    .font(Theme.ui(10, .medium))
+                    .font(Theme.ui(10.5, .medium))
                     .foregroundStyle(Theme.amber)
                     .clickCursor()
                     .help("Level the horizon automatically")
                 if model.edit.straighten != 0 {
-                    Button("Reset") { model.edit.straighten = 0 }
-                        .buttonStyle(.plain)
-                        .font(Theme.ui(10, .medium))
-                        .foregroundStyle(Theme.ink3)
-                        .clickCursor()
-                        .help("Clear straighten")
+                    Button { model.edit.straighten = 0 } label: {
+                        Image(systemName: "arrow.counterclockwise")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(Theme.ink3)
+                    }
+                    .buttonStyle(.plain)
+                    .clickCursor()
+                    .help("Clear straighten")
                 }
-                Spacer()
                 Text(EditParameter.straighten.format(model.edit.straighten))
                     .font(Theme.mono(10))
                     .foregroundStyle(model.edit.straighten == 0 ? Theme.ink3 : Theme.amber)
@@ -279,24 +266,47 @@ struct CanvasView: View {
         )
     }
 
-    private func aspectChip(_ title: String, _ aspect: Double?) -> some View {
-        let selected = model.cropAspectName == title
-        return Button {
-            model.applyCropAspect(aspect, name: title)
+    private var aspectOptions: [(name: String, ratio: Double?)] {
+        [("Free", nil), ("Original", originalAspect), ("1:1", 1), ("4:5", 0.8), ("3:2", 1.5), ("16:9", 16.0 / 9)]
+    }
+
+    private var aspectMenu: some View {
+        let currentName = model.cropAspectName ?? "Free"
+        let current = aspectOptions.first { $0.name == currentName }
+        return Menu {
+            ForEach(aspectOptions, id: \.name) { option in
+                Button {
+                    model.applyCropAspect(option.ratio, name: option.name)
+                } label: {
+                    if option.name == currentName {
+                        Label(option.name, systemImage: "checkmark")
+                    } else {
+                        Text(option.name)
+                    }
+                }
+            }
         } label: {
-            HStack(spacing: 5) {
-                aspectGlyph(aspect, selected: selected)
-                Text(title)
-                    .font(Theme.ui(10.5, selected ? .medium : .regular))
-                    .foregroundStyle(selected ? Theme.amber : Theme.ink2)
+            HStack(spacing: 6) {
+                aspectGlyph(current?.ratio ?? nil, selected: false)
+                Text(currentName)
+                    .font(Theme.ui(10.5, .medium))
+                    .foregroundStyle(Theme.ink)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 7, weight: .semibold))
+                    .foregroundStyle(Theme.ink3)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(Capsule().fill(Color.white.opacity(selected ? 0.08 : 0.03)))
-            .overlay(Capsule().stroke(selected ? Theme.amber.opacity(0.5) : Theme.hairline))
+            .background(Capsule().fill(Color.white.opacity(0.05)))
+            .overlay(Capsule().stroke(Theme.hairline))
+            .contentShape(Capsule())
         }
+        .menuStyle(.button)
         .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
         .clickCursor()
+        .help("Lock the crop to a ratio")
     }
 
     /// Mini frame preview inside an aspect chip — a dashed square stands
@@ -440,9 +450,6 @@ struct CanvasView: View {
                     .foregroundStyle(Theme.amber)
                     .monospacedDigit()
             }
-            .contentShape(Rectangle())
-            .gesture(cardDragGesture)
-            .onTapGesture(count: 2) { snapCardHome() }
             // The scale slides under a fixed center marker — the current
             // value is always at the middle, ticks move with the drag.
             ZStack {
@@ -504,27 +511,7 @@ struct CanvasView: View {
         .padding(.top, 12)
         .padding(.bottom, 10)
         .chiaroGlass(cornerRadius: 15)
-        .offset(cardOffset)
         .transition(.opacity)
-    }
-
-    private var cardDragGesture: some Gesture {
-        DragGesture(minimumDistance: 0)
-            .onChanged { g in
-                let start = cardDragStart ?? cardOffset
-                cardDragStart = start
-                cardOffset = CGSize(width: start.width + g.translation.width, height: start.height + g.translation.height)
-            }
-            .onEnded { _ in
-                cardDragStart = nil
-                if abs(cardOffset.width) < 60, abs(cardOffset.height) < 60 {
-                    snapCardHome()
-                }
-            }
-    }
-
-    private func snapCardHome() {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { cardOffset = .zero }
     }
 }
 

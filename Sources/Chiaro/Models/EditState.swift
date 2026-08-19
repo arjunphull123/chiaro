@@ -156,6 +156,11 @@ struct EditState: Codable, Equatable {
         if let rect = try c.decodeIfPresent(CropRect.self, forKey: CodingKeys(stringValue: "crop")!) {
             crop = rect
         }
+        locals = try c.decodeIfPresent([LocalAdjustment].self, forKey: CodingKeys(stringValue: "locals")!) ?? []
+        if let bands = try c.decodeIfPresent([HSLBand].self, forKey: CodingKeys(stringValue: "hsl")!) {
+            // The engine and rail index bands 0..<8 by position — normalize hard.
+            hsl = (0..<HSLBand.centers.count).map { $0 < bands.count ? bands[$0] : HSLBand() }
+        }
         if let degrees = try c.decodeIfPresent(Int.self, forKey: CodingKeys(stringValue: "rotation")!) {
             rotation = ((degrees % 360) + 360) % 360 / 90 * 90
         }
