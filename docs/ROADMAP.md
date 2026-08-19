@@ -2,11 +2,13 @@
 
 ## Ship list (v1.0, beyond features — owner's list, 2026-08-19)
 
-Feature phase declared complete 2026-08-19 (owner). Remaining:
-bug sweep → ADRs current → landing page
-(chiaro.arjunphull.dev) → repo polish → open-source decision + monetization
-framing → distribution (Sparkle/Homebrew/notarization) → LinkedIn launch post
-("agent-native" framing) → competitive positioning check.
+Feature phase declared complete 2026-08-19 (owner).
+Done: bug sweep (2026-08-19: 20 findings fixed, including sidecar hsl/locals
+decode data loss) · ADRs current through 0013.
+Remaining: open-source decision + monetization framing → repo polish →
+distribution (Sparkle/Homebrew/notarization; rebuild dist for the new icon) →
+landing page (chiaro.arjunphull.dev) → LinkedIn launch post ("agent-native"
+framing) → competitive positioning check.
 Culling flow: cut from the feature queue by owner decision.
 
 Decisions (2026-08-18): first build spans Tiers 1+2; AI features are designed-for but
@@ -32,7 +34,7 @@ deferred (ADR 0003); personal tool first — no signing/App Store constraints ye
 - [x] Scrub-on-photo editing with glass readout + haptic detents (ADR 0005)
 - [x] Tone curve + HSL color mixer (8-band Color mix)
 - [x] Presets: six built-ins + user-saved, MCP list/apply
-- [x] Star ratings (keys 0–5) — dedicated culling flow cut by owner decision
+- [x] Starred flag (replaced 0–5 ratings 2026-08-19; P key, library filters, MCP set_starred)
 - [x] Library views: gallery / grid / Finder-style list (sortable columns), search,
       filename toggle, folder recursion + chips, card import to Chiaro Library
 - [x] Onboarding tips (TipKit): scrub, fine-tune scroll, agent discovery
@@ -48,8 +50,8 @@ deferred (ADR 0003); personal tool first — no signing/App Store constraints ye
 - Albums: cut by owner decision (2026-08-19)
 - SAM-assisted focus selection: built, tested, cut — SAM 2.1 tiny masks weren't
   good enough (owner decision 2026-08-19)
-- [x] Clean up: on-device LaMa inpainting (40 MB on-demand), brush UI + MCP
-  strokes. Cloud provider layer deferred post-release. Positioning: AI-driven
-  editing, not generative content
+- Clean up (LaMa inpainting): built, tested, cut — fills weren't shippable
+  (owner decision 2026-08-19, ADR 0012). Cloud provider layer possible post-release.
+  Positioning stands: AI-driven editing, not generative content
 - Auto-culling: not an in-app feature — an agent workflow over MCP
-  (get_preview + a set_rating tool; agent picks the keepers)
+  (get_preview + set_starred; agent picks the keepers)
