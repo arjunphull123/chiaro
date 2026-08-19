@@ -100,6 +100,9 @@ struct ChiaroApp: App {
                     if panel.runModal() == .OK, let url = panel.url { library.open(url) }
                 }
                 .keyboardShortcut("o")
+                Button("Close Library") { library.close() }
+                    .keyboardShortcut("w")
+                    .disabled(library.folderURL == nil)
             }
             CommandGroup(replacing: .undoRedo) {
                 Button("Undo Edit") { library.activeEditor?.undo() }

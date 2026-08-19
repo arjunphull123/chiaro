@@ -82,7 +82,10 @@ struct ExportSheet: View {
                 }
             }
 
-            DisclosureGroup(isExpanded: $showAdvanced) {
+            DisclosureGroup(isExpanded: Binding(
+                get: { showAdvanced },
+                set: { value in withAnimation(.easeOut(duration: 0.18)) { showAdvanced = value } }
+            )) {
                 VStack(alignment: .leading, spacing: 10) {
                     if options.format == .tiff {
                         Toggle("16-bit color", isOn: $options.tiff16Bit)
@@ -120,9 +123,17 @@ struct ExportSheet: View {
                     Text(estimateText)
                         .font(Theme.mono(10))
                         .foregroundStyle(Theme.ink2)
-                    Text("→ \(destinationText)")
-                        .font(Theme.ui(10))
-                        .foregroundStyle(Theme.ink3)
+                    HStack(spacing: 6) {
+                        Text("→ \(destinationText)")
+                            .font(Theme.ui(10))
+                            .foregroundStyle(Theme.ink3)
+                            .lineLimit(1)
+                        Button("Change…") { chooseDestination() }
+                            .buttonStyle(.plain)
+                            .font(Theme.ui(10, .medium))
+                            .foregroundStyle(Theme.amber)
+                            .clickCursor()
+                    }
                 }
                 Spacer()
                 Toggle("Show in Finder", isOn: $revealInFinder)
@@ -158,6 +169,8 @@ struct ExportSheet: View {
         .padding(22)
         .frame(width: 400)
         .background(Theme.ground)
+        .animation(.easeOut(duration: 0.18), value: showAdvanced)
+        .animation(.easeOut(duration: 0.15), value: options.format)
         .onChange(of: sizeChoice) { syncMaxDimension() }
         .onChange(of: customEdge) { syncMaxDimension() }
     }
@@ -246,10 +259,22 @@ struct ExportSheet: View {
     }
 
     private var destinationText: String {
+        if let chosen = options.destination {
+            return chosen.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
+        }
         if let first = photos.first, Library.isRemovable(first.url) {
             return "Pictures/Chiaro Exports"
         }
         return "“Chiaro Exports”, beside your originals"
+    }
+
+    private func chooseDestination() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Export Here"
+        if panel.runModal() == .OK { options.destination = panel.url }
     }
 
     private func runExport() {
@@ -258,7 +283,7 @@ struct ExportSheet: View {
         syncMaxDimension()
         var options = options
         let targets = photos
-        if let first = targets.first, Library.isRemovable(first.url) {
+        if options.destination == nil, let first = targets.first, Library.isRemovable(first.url) {
             options.destination = FileManager.default
                 .urls(for: .picturesDirectory, in: .userDomainMask)[0]
                 .appendingPathComponent("Chiaro Exports")

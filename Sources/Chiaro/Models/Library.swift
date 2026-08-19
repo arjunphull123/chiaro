@@ -64,6 +64,16 @@ final class Library {
         }
     }
 
+    /// Back to the start screen.
+    func close() {
+        activeEditor?.saveNow()
+        activeEditor = nil
+        editing = nil
+        folderURL = nil
+        photos = []
+        selection = []
+    }
+
     func open(_ url: URL) {
         folderURL = url
         editing = nil

@@ -65,6 +65,18 @@ struct LibraryView: View {
     /// Pinned frosted header: title, zoom slider, and the real actions.
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
+            Button {
+                library.close()
+            } label: {
+                Image(systemName: "house")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.ink2)
+                    .frame(width: 26, height: 24)
+                    .background(RoundedRectangle(cornerRadius: 7).stroke(Theme.hairline))
+            }
+            .buttonStyle(.plain)
+            .clickCursor()
+            .help("Back to the start screen (⌘W)")
             Text(library.folderName)
                 .font(Theme.ui(19, .semibold))
                 .foregroundStyle(Theme.ink)
@@ -232,6 +244,35 @@ struct LibraryView: View {
         })
     }
 
+    private struct SourceItem: Identifiable {
+        let id: URL
+        let icon: String
+        let tint: Color
+        let title: String
+        let subtitle: String
+    }
+    @State private var sources: [SourceItem] = []
+
+    /// Card/recent discovery stats folders (slow over USB) — computed once, not per frame.
+    private func refreshSources() {
+        var items: [SourceItem] = Library.cameraCardFolders().map { folder in
+            SourceItem(
+                id: folder, icon: "camera.fill", tint: Theme.amber,
+                title: "\(folder.lastPathComponent) — camera card",
+                subtitle: cardSummary(folder)
+            )
+        }
+        items += Library.recentFolders().filter { recent in !items.contains { $0.id == recent } }.map { folder in
+            SourceItem(
+                id: folder, icon: "folder", tint: Theme.ink2,
+                title: folder.lastPathComponent,
+                subtitle: folder.deletingLastPathComponent().path
+                    .replacingOccurrences(of: NSHomeDirectory(), with: "~")
+            )
+        }
+        sources = items
+    }
+
     private var emptyState: some View {
         VStack(spacing: 0) {
             Spacer()
@@ -247,20 +288,10 @@ struct LibraryView: View {
                     .padding(.top, 14)
 
                 VStack(spacing: 6) {
-                    ForEach(Library.cameraCardFolders(), id: \.self) { folder in
+                    ForEach(sources) { source in
                         sourceRow(
-                            icon: "camera.fill", tint: Theme.amber,
-                            title: "\(folder.lastPathComponent) — camera card",
-                            subtitle: cardSummary(folder), url: folder
-                        )
-                    }
-                    ForEach(Library.recentFolders(), id: \.self) { folder in
-                        sourceRow(
-                            icon: "folder", tint: Theme.ink2,
-                            title: folder.lastPathComponent,
-                            subtitle: folder.deletingLastPathComponent().path
-                                .replacingOccurrences(of: NSHomeDirectory(), with: "~"),
-                            url: folder
+                            icon: source.icon, tint: source.tint,
+                            title: source.title, subtitle: source.subtitle, url: source.id
                         )
                     }
                 }
@@ -283,6 +314,7 @@ struct LibraryView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
+        .onAppear { refreshSources() }
         .dropDestination(for: URL.self) { urls, _ in
             guard let url = urls.first,
                   (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
