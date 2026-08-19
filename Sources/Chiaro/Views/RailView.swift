@@ -378,7 +378,9 @@ struct RailView: View {
                     }
                     guard let start = bandScrubStart else { return }
                     let delta = Double(g.location.x - start.x) / 1.6
-                    model.edit.hsl[selectedBand][keyPath: keyPath] = (start.value + delta).clamped(to: -100...100)
+                    var new = (start.value + delta).clamped(to: -100...100)
+                    if abs(new) < 2 { new = 0 }
+                    model.edit.hsl[selectedBand][keyPath: keyPath] = new
                 }
                 .onEnded { _ in bandScrubStart = nil }
         )
@@ -567,7 +569,9 @@ struct RailView: View {
                     guard let start = localScrubStart else { return }
                     let span = range.upperBound - range.lowerBound
                     let delta = Double(g.location.x - start.x) / 260 * span
-                    model.edit.locals[index][keyPath: keyPath] = (start.value + delta).clamped(to: range)
+                    var new = (start.value + delta).clamped(to: range)
+                    if abs(new) < 2 { new = 0 }
+                    model.edit.locals[index][keyPath: keyPath] = new
                 }
                 .onEnded { _ in localScrubStart = nil }
         )

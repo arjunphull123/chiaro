@@ -404,13 +404,20 @@ final class EditViewModel {
         if let armedHSL {
             let keyPath = armedHSL.component.keyPath
             let old = edit.hsl[armedHSL.band][keyPath: keyPath]
-            edit.hsl[armedHSL.band][keyPath: keyPath] = (old + Double(deltaX) / 420 * 200).clamped(to: -100...100)
+            var new = (old + Double(deltaX) / 420 * 200).clamped(to: -100...100)
+            if abs(new) < 2 { new = 0 }
+            edit.hsl[armedHSL.band][keyPath: keyPath] = new
             return
         }
         guard let armed else { return }
         let span = armed.range.upperBound - armed.range.lowerBound
         let old = armed.value(in: edit)
-        armed.set(old + Double(deltaX) / 420 * span, in: &edit)
+        var new = old + Double(deltaX) / 420 * span
+        // Magnetic detents: land exactly on a nearby tick.
+        for detent in armed.detents where abs(new - detent) < span * 0.012 {
+            new = detent
+        }
+        armed.set(new, in: &edit)
         HapticDetents.tickIfCrossed(parameter: armed, from: old, to: armed.value(in: edit))
     }
 }

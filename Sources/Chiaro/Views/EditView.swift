@@ -9,6 +9,7 @@ struct EditView: View {
     @State private var savingVersion = false
     @State private var versionName = ""
     @State private var versionsHovering = false
+    @State private var reverting = false
     @FocusState private var focused: Bool
 
     init(library: Library, photo: Photo, onExport: @escaping () -> Void) {
@@ -209,6 +210,7 @@ struct EditView: View {
             }
             iconAction("Undo", icon: "arrow.uturn.backward", disabled: !model.canUndo) { model.undo() }
             iconAction("Redo", icon: "arrow.uturn.forward", disabled: !model.canRedo) { model.redo() }
+            iconAction("Revert", icon: "arrow.counterclockwise", disabled: model.edit.isNeutral) { reverting = true }
             iconAction("Original", icon: model.showOriginal ? "eye.fill" : "eye", active: model.showOriginal) {
                 model.showOriginal.toggle()
             }
@@ -222,6 +224,12 @@ struct EditView: View {
             }
             versionsMenu
             exportButton
+        }
+        .alert("Revert to original", isPresented: $reverting) {
+            Button("Revert", role: .destructive) { model.edit = EditState() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Removes every edit on this photo — the original file is never touched")
         }
     }
 

@@ -8,10 +8,8 @@ struct LibraryView: View {
 
     @State private var searchText = ""
     @FocusState private var searchFocused: Bool
-    enum LibraryFilter: String, CaseIterable {
-        case all = "All", starred = "Starred", edited = "Edited"
-    }
-    @State private var filter: LibraryFilter = .all
+    @State private var filterStarred = false
+    @State private var filterEdited = false
 
     /// Top-level subfolder filter (nil = everything). Only meaningful when the
     /// opened folder actually nests photos.
@@ -36,11 +34,8 @@ struct LibraryView: View {
 
     private var visiblePhotos: [Photo] {
         var result = library.photos
-        switch filter {
-        case .all: break
-        case .starred: result = result.filter(\.starred)
-        case .edited: result = result.filter(\.hasEdits)
-        }
+        if filterStarred { result = result.filter(\.starred) }
+        if filterEdited { result = result.filter(\.hasEdits) }
         if let folderScope {
             result = result.filter { topFolder($0) == folderScope }
         }
@@ -235,34 +230,37 @@ struct LibraryView: View {
         }
     }
 
-    private func filterChip(_ option: LibraryFilter) -> some View {
-        let active = filter == option
-        return Button { filter = option } label: {
-            Group {
-                if option == .starred {
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(active ? Theme.amber : Theme.ink3)
-                } else if option == .edited {
-                    PinwheelMark()
-                        .fill(active ? Theme.amber : Theme.ink3)
-                        .frame(width: 11, height: 11)
-                } else {
-                    Text(option.rawValue)
-                        .font(Theme.ui(10, .medium))
-                        .foregroundStyle(active ? Theme.amber : Theme.ink3)
-                }
-            }
-            .padding(.horizontal, 8)
-            .frame(height: 22)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(active ? Color.white.opacity(0.08) : .clear)
-            )
+    private func allChip() -> some View {
+        let active = !filterStarred && !filterEdited
+        return Button { filterStarred = false; filterEdited = false } label: {
+            Text("All")
+                .font(Theme.ui(10, .medium))
+                .foregroundStyle(active ? Theme.amber : Theme.ink3)
+                .padding(.horizontal, 8)
+                .frame(height: 22)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(active ? Color.white.opacity(0.08) : .clear)
+                )
         }
         .buttonStyle(.plain)
         .clickCursor()
-        .help(option == .all ? "Every photo" : option == .starred ? "Starred only" : "Edited only")
+        .help("Every photo")
+    }
+
+    private func toggleChip(active: Bool, help: String, toggle: @escaping () -> Void, @ViewBuilder icon: () -> some View) -> some View {
+        Button(action: toggle) {
+            icon()
+                .padding(.horizontal, 8)
+                .frame(height: 22)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(active ? Color.white.opacity(0.08) : .clear)
+                )
+        }
+        .buttonStyle(.plain)
+        .clickCursor()
+        .help(help)
     }
 
     /// Pinned frosted header: title, zoom slider, and the real actions.
@@ -296,8 +294,16 @@ struct LibraryView: View {
                 .foregroundStyle(Theme.ink3)
             Spacer()
             HStack(spacing: 3) {
-                ForEach(LibraryFilter.allCases, id: \.self) { option in
-                    filterChip(option)
+                allChip()
+                toggleChip(active: filterStarred, help: "Starred only", toggle: { filterStarred.toggle() }) {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(filterStarred ? Theme.amber : Theme.ink3)
+                }
+                toggleChip(active: filterEdited, help: "Edited only", toggle: { filterEdited.toggle() }) {
+                    PinwheelMark()
+                        .fill(filterEdited ? Theme.amber : Theme.ink3)
+                        .frame(width: 11, height: 11)
                 }
             }
             .padding(3)

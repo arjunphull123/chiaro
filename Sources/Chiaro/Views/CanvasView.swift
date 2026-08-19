@@ -19,6 +19,9 @@ struct CanvasView: View {
     @State private var gesturePan: CGSize = .zero
     @State private var lastScrubX: CGFloat?
     @State private var lastDialX: CGFloat?
+    /// Dial card position — dragged by its header, independent of the ruler's own drag.
+    @State private var cardOffset: CGSize = .zero
+    @State private var cardDragStart: CGSize?
 
 
     var body: some View {
@@ -121,6 +124,7 @@ struct CanvasView: View {
             }
             .onChange(of: model.photo.url) { resetView() }
             .onChange(of: model.cropMode) { resetView() }
+            .onChange(of: dialActive) { if !dialActive { cardOffset = .zero } }
         }
     }
 
@@ -192,7 +196,11 @@ struct CanvasView: View {
         zoom = 1
         pan = .zero
         gesturePan = .zero
+        cardOffset = .zero
     }
+
+    /// Whether a dial card (readout or depth focus) is on screen.
+    private var dialActive: Bool { model.armed != nil || model.armedHSL != nil }
 
     /// Crop mode controls: aspect presets, straighten, reset, done.
     private var cropPanel: some View {
@@ -215,6 +223,14 @@ struct CanvasView: View {
                     .foregroundStyle(Theme.amber)
                     .clickCursor()
                     .help("Level the horizon automatically")
+                if model.edit.straighten != 0 {
+                    Button("Reset") { model.edit.straighten = 0 }
+                        .buttonStyle(.plain)
+                        .font(Theme.ui(10, .medium))
+                        .foregroundStyle(Theme.ink3)
+                        .clickCursor()
+                        .help("Clear straighten")
+                }
                 Spacer()
                 Text(EditParameter.straighten.format(model.edit.straighten))
                     .font(Theme.mono(10))
@@ -264,8 +280,37 @@ struct CanvasView: View {
     }
 
     private func aspectChip(_ title: String, _ aspect: Double?) -> some View {
-        Chip(title: title, selected: model.cropAspectName == title) {
+        let selected = model.cropAspectName == title
+        return Button {
             model.applyCropAspect(aspect, name: title)
+        } label: {
+            HStack(spacing: 5) {
+                aspectGlyph(aspect, selected: selected)
+                Text(title)
+                    .font(Theme.ui(10.5, selected ? .medium : .regular))
+                    .foregroundStyle(selected ? Theme.amber : Theme.ink2)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(Capsule().fill(Color.white.opacity(selected ? 0.08 : 0.03)))
+            .overlay(Capsule().stroke(selected ? Theme.amber.opacity(0.5) : Theme.hairline))
+        }
+        .buttonStyle(.plain)
+        .clickCursor()
+    }
+
+    /// Mini frame preview inside an aspect chip — a dashed square stands
+    /// in for "no fixed ratio" (Free, or Original when it's not yet known).
+    @ViewBuilder private func aspectGlyph(_ aspect: Double?, selected: Bool) -> some View {
+        let color = selected ? Theme.amber : Theme.ink2
+        if let aspect {
+            RoundedRectangle(cornerRadius: 1.5)
+                .stroke(color, lineWidth: 1)
+                .frame(width: min(16, 9 * aspect), height: 9)
+        } else {
+            Rectangle()
+                .stroke(color, style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
+                .frame(width: 9, height: 11)
         }
     }
 
@@ -395,6 +440,9 @@ struct CanvasView: View {
                     .foregroundStyle(Theme.amber)
                     .monospacedDigit()
             }
+            .contentShape(Rectangle())
+            .gesture(cardDragGesture)
+            .onTapGesture(count: 2) { snapCardHome() }
             // The scale slides under a fixed center marker — the current
             // value is always at the middle, ticks move with the drag.
             ZStack {
@@ -456,7 +504,27 @@ struct CanvasView: View {
         .padding(.top, 12)
         .padding(.bottom, 10)
         .chiaroGlass(cornerRadius: 15)
+        .offset(cardOffset)
         .transition(.opacity)
+    }
+
+    private var cardDragGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { g in
+                let start = cardDragStart ?? cardOffset
+                cardDragStart = start
+                cardOffset = CGSize(width: start.width + g.translation.width, height: start.height + g.translation.height)
+            }
+            .onEnded { _ in
+                cardDragStart = nil
+                if abs(cardOffset.width) < 60, abs(cardOffset.height) < 60 {
+                    snapCardHome()
+                }
+            }
+    }
+
+    private func snapCardHome() {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { cardOffset = .zero }
     }
 }
 
@@ -515,7 +583,9 @@ struct ArcRuler: View {
                     if startValue == nil { startValue = value }
                     guard let startValue else { return }
                     // The scale follows the finger.
-                    value = (startValue - Double(g.translation.width) / 6).clamped(to: -45...45)
+                    var new = (startValue - Double(g.translation.width) / 6).clamped(to: -45...45)
+                    if abs(new) < 0.4 { new = 0 }
+                    value = new
                 }
                 .onEnded { _ in startValue = nil }
         )
