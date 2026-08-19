@@ -65,6 +65,14 @@ struct LibraryView: View {
     /// Pinned frosted header: title, zoom slider, and the real actions.
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
+            HStack(spacing: 7) {
+                AppMark(size: 15)
+                Text("Chiaro")
+                    .font(Theme.serif(16, .semibold))
+                    .kerning(-0.4)
+                    .foregroundStyle(Theme.ink)
+            }
+            Rectangle().fill(Theme.hairline).frame(width: 1, height: 18)
             Button {
                 library.close()
             } label: {

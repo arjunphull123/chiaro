@@ -9,6 +9,13 @@ struct RailView: View {
     var body: some View {
         ScrollView(showsIndicators: true) {
             VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 7) {
+                    AppMark(size: 14)
+                    Text("Chiaro")
+                        .font(Theme.serif(15, .semibold))
+                        .kerning(-0.4)
+                        .foregroundStyle(Theme.ink2)
+                }
                 AgentRailStatus(library: library)
                 Group {
                     photoHeader

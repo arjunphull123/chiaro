@@ -92,22 +92,46 @@ struct Chip: View {
     }
 }
 
-/// Interim brand mark: a sphere lit from the upper right — chiaroscuro itself.
-/// Doubles as the app-icon motif until a real icon is designed.
+/// The mark: six curved aperture blades in pinwheel rotation, open at the core
+/// (concept C1). Drawn in a 96pt design space, scaled to fit.
+struct PinwheelMark: Shape {
+    func path(in rect: CGRect) -> Path {
+        let scale = min(rect.width, rect.height) / 96
+        let cx = rect.midX, cy = rect.midY
+        func pt(_ r: Double, _ angle: Double) -> CGPoint {
+            CGPoint(x: cx + r * cos(angle) * scale, y: cy + r * sin(angle) * scale)
+        }
+        var path = Path()
+        let rOut = 40.0, rIn = 13.0, sweep = 0.85, curve = 0.42, tip = 1.02
+        for k in 0..<6 {
+            let t0 = 2 * .pi * Double(k) / 6
+            let t1 = t0 + sweep
+            let o0 = pt(rOut, t0)
+            let o1 = pt(rOut, t1)
+            let mid = pt(rOut * tip, (t0 + t1) / 2)
+            let inner = pt(rIn, t1 + curve)
+            // Closing control sits at 0.7x the chord midpoint (relative to center),
+            // matching the SVG geometry the mark was designed in.
+            let closeControl = CGPoint(
+                x: cx + ((inner.x - cx) + (o0.x - cx)) / 2 * 0.7,
+                y: cy + ((inner.y - cy) + (o0.y - cy)) / 2 * 0.7
+            )
+            path.move(to: o0)
+            path.addQuadCurve(to: o1, control: mid)
+            path.addLine(to: inner)
+            path.addQuadCurve(to: o0, control: closeControl)
+            path.closeSubpath()
+        }
+        return path
+    }
+}
+
 struct AppMark: View {
     var size: CGFloat = 24
 
     var body: some View {
-        Circle()
-            .fill(
-                RadialGradient(
-                    colors: [Theme.amber, Color(hex: 0x8A5A2B), Color(hex: 0x17130E)],
-                    center: UnitPoint(x: 0.68, y: 0.3),
-                    startRadius: size * 0.05,
-                    endRadius: size * 0.95
-                )
-            )
-            .overlay(Circle().stroke(Color.white.opacity(0.12), lineWidth: 0.5))
+        PinwheelMark()
+            .fill(Theme.amber)
             .frame(width: size, height: size)
     }
 }
