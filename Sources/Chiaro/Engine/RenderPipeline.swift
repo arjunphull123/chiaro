@@ -230,7 +230,7 @@ enum RenderPipeline {
                 // Pre-clamp so edge pixels don't pull in transparent black.
                 blur.inputImage = result.clampedToExtent()
                 blur.mask = amountMask
-                blur.radius = Float(edit.blurF * 14 * scale)
+                blur.radius = Float(edit.blurF * 34 * scale)
                 result = blur.outputImage?.cropped(to: image.extent) ?? result
             }
         }

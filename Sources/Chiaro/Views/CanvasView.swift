@@ -13,7 +13,7 @@ struct CanvasView: View {
     @State private var gesturePan: CGSize = .zero
     @State private var lastScrubX: CGFloat?
     @State private var lastDialX: CGFloat?
-    @State private var samBox: CGRect?
+
 
     var body: some View {
         GeometryReader { geo in
@@ -91,19 +91,6 @@ struct CanvasView: View {
                 .padding(.top, 52)
                 .padding(.leading, 16)
             }
-            .overlay {
-                if let samBox {
-                    Rectangle()
-                        .stroke(Theme.amber, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
-                        .background(Rectangle().fill(Theme.amber.opacity(0.08)))
-                        .frame(width: samBox.width, height: samBox.height)
-                        .position(x: samBox.midX, y: samBox.midY)
-                        .allowsHitTesting(false)
-                }
-            }
-            .onContinuousHover { phase in
-                if model.samPicking, case .active = phase { NSCursor.crosshair.set() }
-            }
             .onChange(of: model.photo.url) { resetView() }
             .onChange(of: model.cropMode) { resetView() }
         }
@@ -121,33 +108,10 @@ struct CanvasView: View {
         return imageSize.height * fitScale / fitRegion.height
     }
 
-    /// Canvas point → normalized image coordinates (v top-down), accounting
-    /// for fit, zoom, and pan.
-    private func normalizedPoint(_ location: CGPoint, in fitRegion: CGSize) -> (Double, Double)? {
-        guard let cg = model.preview else { return nil }
-        let imageSize = CGSize(width: cg.width, height: cg.height)
-        let fitScale = min(
-            (fitRegion.width - 48) / imageSize.width,
-            (fitRegion.height - 48) / imageSize.height
-        )
-        let fitSize = CGSize(width: imageSize.width * fitScale, height: imageSize.height * fitScale)
-        let center = CGPoint(x: fitRegion.width / 2 + pan.width, y: fitRegion.height / 2 + pan.height)
-        let u = (location.x - center.x) / (fitSize.width * zoom) + 0.5
-        let v = (location.y - center.y) / (fitSize.height * zoom) + 0.5
-        return (Double(u.clamped(to: 0...1)), Double(v.clamped(to: 0...1)))
-    }
-
     private func dragGesture(_ fitRegion: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { g in
-                if model.samPicking {
-                    samBox = CGRect(
-                        x: min(g.startLocation.x, g.location.x),
-                        y: min(g.startLocation.y, g.location.y),
-                        width: abs(g.translation.width),
-                        height: abs(g.translation.height)
-                    )
-                } else if model.spacePan {
+                if model.spacePan {
                     gesturePan = g.translation
                 } else if model.armed != nil {
                     let dx = g.location.x - (lastScrubX ?? g.startLocation.x)
@@ -158,16 +122,6 @@ struct CanvasView: View {
                 }
             }
             .onEnded { _ in
-                if model.samPicking {
-                    defer { samBox = nil; model.samPicking = false }
-                    if let box = samBox, box.width > 8, box.height > 8,
-                       let a = normalizedPoint(CGPoint(x: box.minX, y: box.minY), in: fitRegion),
-                       let b = normalizedPoint(CGPoint(x: box.maxX, y: box.maxY), in: fitRegion) {
-                        model.focusOnObject(box: CGRect(
-                            x: a.0, y: a.1, width: b.0 - a.0, height: b.1 - a.1))
-                    }
-                    return
-                }
                 lastScrubX = nil
                 pan = CGSize(width: pan.width + gesturePan.width, height: pan.height + gesturePan.height)
                 gesturePan = .zero

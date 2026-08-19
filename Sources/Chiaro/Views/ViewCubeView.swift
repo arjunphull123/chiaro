@@ -32,7 +32,7 @@ struct ViewCubeView: NSViewRepresentable {
         context.coordinator.model = model
         guard let cube = view.scene?.rootNode.childNode(withName: "cube", recursively: false) else { return }
         SCNTransaction.begin()
-        SCNTransaction.animationDuration = 0.18
+        SCNTransaction.disableActions = true
         cube.eulerAngles = SCNVector3(pitch, -yaw, 0)
         SCNTransaction.commit()
     }

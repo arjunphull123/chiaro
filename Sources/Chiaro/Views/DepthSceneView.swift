@@ -249,7 +249,7 @@ struct DepthSceneView: NSViewRepresentable {
         }
         if let scene = view.scene, !coordinator.isAnimating {
             DepthScene.updatePlanes(in: scene, focusDepth: focusDepth, focusRange: focusRange)
-            coordinator.applyOrbit()
+            if !coordinator.dragOwnsCamera { coordinator.applyOrbit() }
         }
         if let command = model.depthSceneCommand {
             DispatchQueue.main.async { [weak model] in
@@ -298,6 +298,8 @@ struct DepthSceneView: NSViewRepresentable {
         private var headOnDistance: CGFloat {
             1 / (2 * tan(30 * .pi / 180) * max(0.2, fitFraction))
         }
+
+        var dragOwnsCamera = false
 
         func applyOrbit() {
             guard !isAnimating else { return }
@@ -444,6 +446,7 @@ struct DepthSceneView: NSViewRepresentable {
             let translation = gesture.translation(in: view)
             switch gesture.state {
             case .began:
+                dragOwnsCamera = true
                 startFocus = model.edit.focusDepth
                 startRange = model.edit.focusRange
                 startYaw = model.sceneYaw
@@ -472,6 +475,7 @@ struct DepthSceneView: NSViewRepresentable {
                 }
             default:
                 dragTarget = nil
+                dragOwnsCamera = false
             }
         }
 

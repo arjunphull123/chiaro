@@ -145,54 +145,6 @@ struct ChiaroApp: App {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) { attempt(20) }
         }
-        // --sam-test <photo> <x> <y> <w> <h> (normalized box): verify the SAM
-        // pipeline headless — prints model IO names on failure.
-        if let i = args.firstIndex(of: "--sam-test"), i + 5 < args.count {
-            let name = args[i + 1]
-            let box = CGRect(
-                x: Double(args[i + 2]) ?? 0.3, y: Double(args[i + 3]) ?? 0.3,
-                width: Double(args[i + 4]) ?? 0.4, height: Double(args[i + 5]) ?? 0.4)
-            let lib = library
-            func attempt(_ triesLeft: Int) {
-                if case .missing = SamModelStore.shared.availability {
-                    SamModelStore.shared.downloadIfNeeded()
-                }
-                _ = DepthModelStore.shared
-                guard SamEngine.shared.isReady, DepthEngine.shared.isReady,
-                      let photo = lib.photos.first(where: { $0.name == name }) else {
-                    if triesLeft > 0 {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { attempt(triesLeft - 1) }
-                    } else {
-                        fputs("SAM TEST: not ready\n", stderr)
-                        NSApp.terminate(nil)
-                    }
-                    return
-                }
-                let url = photo.url
-                DispatchQueue.global(qos: .userInitiated).async {
-                    guard let base = RawEngine.shared.preview(for: url) else {
-                        fputs("SAM TEST: no preview\n", stderr)
-                        DispatchQueue.main.async { NSApp.terminate(nil) }
-                        return
-                    }
-                    if let mask = SamEngine.shared.mask(for: url, image: base, box: box),
-                       let grid = DepthEngine.shared.pointGrid(for: url, image: base),
-                       let interval = SamEngine.disparityInterval(mask: mask, grid: grid) {
-                        fputs("SAM TEST: interval \(interval)\n", stderr)
-                        if let cg = RawEngine.shared.context.createCGImage(mask, from: mask.extent) {
-                            let rep = NSBitmapImageRep(cgImage: cg)
-                            try? rep.representation(using: .png, properties: [:])?
-                                .write(to: URL(fileURLWithPath: "/tmp/chiaro_sam_mask.png"))
-                        }
-                    } else {
-                        fputs("SAM TEST: FAILED\n", stderr)
-                        SamEngine.shared.debugDescribe()
-                    }
-                    DispatchQueue.main.async { NSApp.terminate(nil) }
-                }
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { attempt(30) }
-        }
         if args.contains("--download-depth") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                 DepthModelStore.shared.downloadIfNeeded()
