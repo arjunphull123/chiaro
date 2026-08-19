@@ -91,8 +91,13 @@ struct AdjustmentRow: View {
 
     private func commitTyped() {
         defer { typing = false }
-        guard let typed = Double(typedText.replacingOccurrences(of: "ƒ", with: "")
-            .replacingOccurrences(of: "°", with: "").trimmingCharacters(in: .whitespaces)) else { return }
+        let cleaned = typedText.replacingOccurrences(of: "ƒ", with: "")
+            .replacingOccurrences(of: "°", with: "").trimmingCharacters(in: .whitespaces)
+        if cleaned.isEmpty {
+            parameter.set(parameter.defaultValue, in: &edit)
+            return
+        }
+        guard let typed = Double(cleaned) else { return }
         let newValue = parameter == .blurF
             ? (typed >= 15.9 ? 0 : (log(16 / typed.clamped(to: 1.4...16)) / log(16 / 1.4)))
             : typed

@@ -39,6 +39,19 @@ struct RailView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Group {
                     HistogramView(data: model.histogram)
+                    HStack {
+                        Spacer()
+                        Button(collapsedRaw.isEmpty ? "Collapse all" : "Expand all") {
+                            collapsedRaw = collapsedRaw.isEmpty
+                                ? RailView.allSections.joined(separator: ",") : ""
+                        }
+                        .buttonStyle(.plain)
+                        .font(Theme.ui(9.5))
+                        .foregroundStyle(Theme.ink3)
+                        .clickCursor()
+                    }
+                    .padding(.top, 2)
+                    .padding(.bottom, -6)
                     presetsSection
                     colorMixSection
                     section(
@@ -46,6 +59,7 @@ struct RailView: View {
                         help: "Brightness and tonal balance"
                     )
                     portraitSection
+                    backdropSection
                     curveSection
                     section(
                         "Color", [.temp, .tint, .vibrance, .saturation],
@@ -229,12 +243,10 @@ struct RailView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 7)
                 .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(model.depthSceneVisible ? Theme.amber.opacity(0.12) : Color.white.opacity(0.04))
+                    Capsule().fill(model.depthSceneVisible ? Theme.amber.opacity(0.12) : Color.white.opacity(0.04))
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(model.depthSceneVisible ? Theme.amber.opacity(0.6) : Theme.hairline)
+                    Capsule().stroke(model.depthSceneVisible ? Theme.amber.opacity(0.6) : Theme.hairline)
                 )
             }
             .buttonStyle(.plain)
@@ -460,6 +472,50 @@ struct RailView: View {
         .help("Masked corrections — a radial or linear region, or the detected subject")
     }
 
+    private var backdropSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionLabel("Backdrop", help: "Replace the background behind the lifted subject with a studio gradient")
+            if !isCollapsed("Backdrop") {
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 5), GridItem(.flexible(), spacing: 5), GridItem(.flexible(), spacing: 5)], spacing: 5) {
+                    backdropPill("None", "none")
+                    backdropPill("Studio", "studio")
+                    backdropPill("Charcoal", "charcoal")
+                    backdropPill("Cream", "cream")
+                    backdropPill("Navy", "navy")
+                    backdropPill("White", "white")
+                }
+                if model.hasPerson == false {
+                    Text("No subject found in this photo")
+                        .font(Theme.ui(10.5)).foregroundStyle(Theme.ink3)
+                }
+            }
+        }
+    }
+
+    private func backdropPill(_ title: String, _ style: String) -> some View {
+        let selected = model.edit.backdrop == style
+        return Button { model.edit.backdrop = style } label: {
+            HStack(spacing: 5) {
+                if let colors = RenderPipeline.backdropStyles[style] {
+                    Circle()
+                        .fill(Color(red: colors.top.red, green: colors.top.green, blue: colors.top.blue))
+                        .frame(width: 9, height: 9)
+                        .overlay(Circle().stroke(Theme.hairline))
+                }
+                Text(title)
+                    .font(Theme.ui(10.5, selected ? .medium : .regular))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(selected ? Theme.amber : Theme.ink2)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(Color.white.opacity(selected ? 0.08 : 0.03)))
+            .overlay(Capsule().stroke(selected ? Theme.amber.opacity(0.5) : Theme.hairline))
+        }
+        .buttonStyle(.plain)
+        .clickCursor()
+    }
+
     private func modePill(_ title: String, _ mode: BlurMode) -> some View {
         let selected = model.edit.blurMode == mode
         return Button { model.setBlurMode(mode) } label: {
@@ -614,7 +670,8 @@ struct RailView: View {
         }
     }
 
-    @AppStorage("collapsedSections") private var collapsedRaw = ""
+    static let allSections = ["Presets", "Color mix", "Light", "Background blur", "Backdrop", "Curve", "Color", "Masking", "Effects", "Detail"]
+    @AppStorage("collapsedSections") private var collapsedRaw = RailView.allSections.joined(separator: ",")
 
     private func isCollapsed(_ title: String) -> Bool {
         collapsedRaw.split(separator: ",").map(String.init).contains(title)
@@ -626,19 +683,23 @@ struct RailView: View {
         collapsedRaw = set.sorted().joined(separator: ",")
     }
 
+    @State private var hoveredSection: String?
+
     private func sectionLabel(_ title: String, help: String) -> some View {
-        HStack(spacing: 5) {
+        let hovered = hoveredSection == title
+        return HStack(spacing: 5) {
             Text(title)
                 .font(Theme.ui(12, .medium))
-                .foregroundStyle(Theme.ink2)
-            Rectangle().fill(Theme.hairline).frame(height: 1)
+                .foregroundStyle(hovered ? Theme.ink : Theme.ink2)
+            Rectangle().fill(hovered ? Color.white.opacity(0.16) : Theme.hairline).frame(height: 1)
             Image(systemName: "chevron.down")
                 .font(.system(size: 8, weight: .semibold))
-                .foregroundStyle(Theme.ink3)
+                .foregroundStyle(hovered ? Theme.ink2 : Theme.ink3)
                 .rotationEffect(.degrees(isCollapsed(title) ? -90 : 0))
         }
         .contentShape(Rectangle())
         .onTapGesture { toggleCollapsed(title) }
+        .onHover { hoveredSection = $0 ? title : (hoveredSection == title ? nil : hoveredSection) }
         .clickCursor()
         .padding(.top, 10)
         .padding(.bottom, 6)

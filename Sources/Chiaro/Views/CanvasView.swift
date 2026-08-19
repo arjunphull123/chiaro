@@ -355,51 +355,73 @@ struct CanvasView: View {
         label: String, value: String, t: Double, detents: [Double], doneHelp: String,
         onDrag: @escaping (CGFloat) -> Void, onReset: @escaping () -> Void, onDone: @escaping () -> Void
     ) -> some View {
-        VStack(spacing: 7) {
+        VStack(spacing: 8) {
             HStack(spacing: 10) {
                 Text(label)
-                    .font(Theme.ui(11, .medium))
-                    .foregroundStyle(Theme.ink2)
+                    .font(Theme.ui(13, .medium))
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(1)
                 Text(value)
                     .font(Theme.mono(19, .medium))
                     .foregroundStyle(Theme.amber)
                     .monospacedDigit()
             }
-            ZStack(alignment: .leading) {
-                Capsule().fill(Color.white.opacity(0.18)).frame(height: 2)
-                ForEach(detents, id: \.self) { dt in
-                    Rectangle().fill(Color.white.opacity(0.3))
-                        .frame(width: 2, height: 7)
-                        .offset(x: dt * 260)
+            // The scale slides under a fixed center marker — the current
+            // value is always at the middle, ticks move with the drag.
+            ZStack {
+                Canvas { context, size in
+                    let width = size.width
+                    let offset = (0.5 - t) * width
+                    for i in 0...48 {
+                        let x = CGFloat(i) / 48 * width + offset
+                        guard x >= 0, x <= width else { continue }
+                        let major = i % 6 == 0
+                        let height: CGFloat = major ? 13 : 9
+                        context.fill(
+                            Path(CGRect(x: x - 0.5, y: (size.height - height) / 2, width: 1, height: height)),
+                            with: .color(.white.opacity(major ? 0.42 : 0.2))
+                        )
+                    }
+                    for dt in detents {
+                        let x = dt * width + offset
+                        guard x >= 0, x <= width else { continue }
+                        context.fill(
+                            Path(CGRect(x: x - 0.75, y: (size.height - 13) / 2, width: 1.5, height: 13)),
+                            with: .color(.white.opacity(0.6))
+                        )
+                    }
+                    // Fixed center marker: the value.
+                    context.fill(
+                        Path(roundedRect: CGRect(x: width / 2 - 1.25, y: 1, width: 2.5, height: size.height - 2), cornerRadius: 1.25),
+                        with: .color(Theme.amber)
+                    )
                 }
-                Capsule().fill(Theme.amber).frame(width: max(0, t * 260), height: 2)
-                RoundedRectangle(cornerRadius: 1.5)
-                    .fill(Theme.amber)
-                    .frame(width: 3, height: 14)
-                    .shadow(color: Theme.amber.opacity(0.6), radius: 4)
-                    .offset(x: t * 260 - 1.5)
+                .frame(width: 260, height: 20)
+                .shadow(color: Theme.amber.opacity(0.25), radius: 3)
             }
-            .frame(width: 260, height: 14)
             .contentShape(Rectangle().inset(by: -10))
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { g in
                         let dx = g.location.x - (lastDialX ?? g.startLocation.x)
                         lastDialX = g.location.x
-                        onDrag(dx)
+                        onDrag(-dx) // the scale follows the finger
                     }
                     .onEnded { _ in lastDialX = nil }
             )
-            HStack(spacing: 8) {
+            HStack(spacing: 14) {
                 Button("Reset", action: onReset)
-                    .buttonStyle(OutlineButtonStyle())
+                    .buttonStyle(.plain)
+                    .font(Theme.ui(10.5, .medium))
+                    .foregroundStyle(Theme.ink3)
                     .clickCursor()
                 Button("Done", action: onDone)
-                    .buttonStyle(AmberButtonStyle())
+                    .buttonStyle(.plain)
+                    .font(Theme.ui(10.5, .medium))
+                    .foregroundStyle(Theme.amber)
                     .clickCursor()
                     .help(doneHelp)
             }
-            .padding(.top, 2)
         }
         .padding(.horizontal, 22)
         .padding(.top, 12)

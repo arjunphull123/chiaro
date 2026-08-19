@@ -40,7 +40,7 @@ final class PortraitEngine {
             }
         case .person:
             let request = VNGeneratePersonSegmentationRequest()
-            request.qualityLevel = .balanced
+            request.qualityLevel = .accurate
             request.outputPixelFormat = kCVPixelFormatType_OneComponent8
             try? handler.perform([request])
             buffer = request.results?.first?.pixelBuffer

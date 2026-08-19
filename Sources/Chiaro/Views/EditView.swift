@@ -54,8 +54,9 @@ struct EditView: View {
             model.spacePan = press.phase != .up
             return .handled
         }
-        .onKeyPress(.leftArrow) { step(-1); return .handled }
-        .onKeyPress(.rightArrow) { step(1); return .handled }
+        // Arrows nudge the armed control; with nothing armed they step photos.
+        .onKeyPress(.leftArrow) { nudgeOrStep(-1); return .handled }
+        .onKeyPress(.rightArrow) { nudgeOrStep(1); return .handled }
         .onKeyPress(characters: .init(charactersIn: "012345")) { press in
             model.photo.rating = Int(press.characters) ?? 0
             model.saveNow()
@@ -72,12 +73,7 @@ struct EditView: View {
                 .padding(.leading, 14) // just below the traffic lights
         }
         .overlay(alignment: .topTrailing) {
-            // Wide windows show every transform labeled; narrow ones fold
-            // them into a Transform menu.
-            ViewThatFits(in: .horizontal) {
-                toolbar(expandedTransforms: true)
-                toolbar(expandedTransforms: false)
-            }
+            toolbar
             .padding(14)
             .padding(.trailing, Theme.railWidth)
         }
@@ -144,78 +140,43 @@ struct EditView: View {
         library.photos.firstIndex(where: { $0.url == model.photo.url }) ?? 0
     }
 
-    private func toolbar(expandedTransforms: Bool) -> some View {
-        HStack(spacing: 8) {
-            Button {
-                model.cropMode.toggle()
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "crop").font(.system(size: 10, weight: .semibold))
-                    Text("Crop")
-                }
+    private var toolbar: some View {
+        HStack(spacing: 7) {
+            iconAction("Crop", icon: "crop", active: model.cropMode) { model.cropMode.toggle() }
+            iconAction("Level", icon: "level") { model.autoLevel() }
+            iconAction("Headshot", icon: "person.crop.square") { model.autoHeadshotCrop() }
+            iconAction("Rotate", icon: "rotate.right") {
+                model.edit.rotation = (model.edit.rotation + 90) % 360
             }
-            .buttonStyle(GlassButtonStyle(tint: model.cropMode ? Theme.amber : Theme.ink2))
-            .clickCursor()
-            .help("Crop & straighten (C)")
-            if expandedTransforms {
-                glassAction("Level", icon: "level") { model.autoLevel() }
-                glassAction("Headshot", icon: "person.crop.square") { model.autoHeadshotCrop() }
-                glassAction("Rotate", icon: "rotate.right") {
-                    model.edit.rotation = (model.edit.rotation + 90) % 360
-                }
-                glassAction("Flip H", icon: "arrow.left.and.right.righttriangle.left.righttriangle.right") {
-                    model.edit.flipH.toggle()
-                }
-                glassAction("Flip V", icon: "arrow.up.and.down.righttriangle.up.righttriangle.down") {
-                    model.edit.flipV.toggle()
-                }
-            } else {
-                Menu {
-                    Button("Level") { model.autoLevel() }
-                    Button("Headshot crop") { model.autoHeadshotCrop() }
-                    Button("Rotate 90°") { model.edit.rotation = (model.edit.rotation + 90) % 360 }
-                    Button("Flip horizontal") { model.edit.flipH.toggle() }
-                    Button("Flip vertical") { model.edit.flipV.toggle() }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "rotate.right").font(.system(size: 10, weight: .semibold))
-                        Text("Transform")
-                        Image(systemName: "chevron.down").font(.system(size: 7, weight: .bold))
-                    }
-                }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
-                .font(Theme.ui(11, .medium))
-                .foregroundStyle(Theme.ink2)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .chiaroGlass(cornerRadius: 10)
-                .clickCursor()
+            iconAction("Flip H", icon: "arrow.left.and.right.righttriangle.left.righttriangle.right") {
+                model.edit.flipH.toggle()
             }
-            glassAction("Undo", icon: "arrow.uturn.backward", disabled: !model.canUndo) { model.undo() }
-            glassAction("Redo", icon: "arrow.uturn.forward", disabled: !model.canRedo) { model.redo() }
-            Button {
+            iconAction("Flip V", icon: "arrow.up.and.down.righttriangle.up.righttriangle.down") {
+                model.edit.flipV.toggle()
+            }
+            iconAction("Undo", icon: "arrow.uturn.backward", disabled: !model.canUndo) { model.undo() }
+            iconAction("Redo", icon: "arrow.uturn.forward", disabled: !model.canRedo) { model.redo() }
+            iconAction("Original", icon: model.showOriginal ? "eye.fill" : "eye", active: model.showOriginal) {
                 model.showOriginal.toggle()
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: model.showOriginal ? "eye.fill" : "eye")
-                        .font(.system(size: 10, weight: .semibold))
-                    Text("View original")
-                }
             }
-            .buttonStyle(GlassButtonStyle(tint: model.showOriginal ? Theme.amber : Theme.ink2))
-            .clickCursor()
-            .help("Compare with the unedited photo — or hold \\")
-            glassAction("Copy edits", icon: "doc.on.doc", disabled: model.edit.isNeutral) {
+            iconAction("Copy edits", icon: "doc.on.doc", disabled: model.edit.isNeutral) {
                 library.copiedEdit = model.edit
             }
             if library.copiedEdit != nil {
-                glassAction("Paste edits", icon: "doc.on.clipboard") {
+                iconAction("Paste edits", icon: "doc.on.clipboard") {
                     if let copied = library.copiedEdit { model.edit = copied }
                 }
             }
             exportButton
         }
+    }
+
+    /// Icon-only glass button whose label slides in on hover.
+    private func iconAction(
+        _ title: String, icon: String, active: Bool = false, disabled: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        HoverLabelButton(title: title, icon: icon, active: active, disabled: disabled, action: action)
     }
 
     private func glassAction(_ title: String, icon: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
@@ -252,6 +213,17 @@ struct EditView: View {
         }
         .buttonStyle(GlassButtonStyle())
         .clickCursor()
+    }
+
+    private func nudgeOrStep(_ direction: Int) {
+        if let armed = model.armed {
+            let span = armed.range.upperBound - armed.range.lowerBound
+            armed.set(armed.value(in: model.edit) + Double(direction) * span / 200, in: &model.edit)
+        } else if model.armedHSL != nil {
+            model.scrub(deltaX: CGFloat(direction) * 2.1)
+        } else {
+            step(direction)
+        }
     }
 
     private func close() {

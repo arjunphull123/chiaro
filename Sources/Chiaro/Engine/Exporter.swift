@@ -82,7 +82,7 @@ enum Exporter {
         }
         let edit = photo.edit
         var mask: CIImage?
-        if edit.blurF > 0 || edit.relight != 0 {
+        if edit.blurF > 0 || edit.relight != 0 || edit.backdrop != "none" {
             mask = PortraitEngine.shared.mask(
                 for: photo.url, image: full,
                 kind: edit.blurMode == .person ? .person : .subject)

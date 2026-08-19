@@ -71,6 +71,45 @@ struct GlassIconButtonStyle: ButtonStyle {
     }
 }
 
+/// Icon glass button that reveals its label on hover — toolbars stay a tight
+/// row of icons until the pointer asks for words.
+struct HoverLabelButton: View {
+    let title: String
+    let icon: String
+    var active = false
+    var disabled = false
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .semibold))
+                if hovering {
+                    Text(title)
+                        .font(Theme.ui(11, .medium))
+                        .fixedSize()
+                        .transition(.opacity.combined(with: .move(edge: .leading)))
+                }
+            }
+            .foregroundStyle(active ? Theme.amber : Theme.ink2)
+            .frame(height: 14)
+            .padding(.horizontal, hovering ? 12 : 9)
+            .padding(.vertical, 7)
+            .chiaroGlass(cornerRadius: 10)
+        }
+        .buttonStyle(.plain)
+        .clickCursor()
+        .disabled(disabled)
+        .opacity(disabled ? 0.4 : 1)
+        .onHover { inside in
+            withAnimation(.easeOut(duration: 0.14)) { hovering = inside }
+        }
+        .help(title)
+    }
+}
+
 /// Selectable pill chip (aspect ratios, export formats, sizes, color spaces).
 struct Chip: View {
     let title: String
