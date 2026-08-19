@@ -25,7 +25,7 @@ struct AgentRailStatus: View {
                             brand.icon.frame(width: 13, height: 13)
                         } else {
                             Spacer(minLength: 0)
-                            Image(systemName: "handshake")
+                            Image(systemName: "sparkles")
                                 .font(.system(size: 11))
                                 .foregroundStyle(Theme.ink3)
                         }
@@ -85,7 +85,7 @@ struct ConnectAgentButton: View {
                     if connected {
                         brand.icon.frame(width: 12, height: 12)
                     } else {
-                        Image(systemName: "handshake")
+                        Image(systemName: "sparkles")
                             .font(.system(size: 10))
                             .foregroundStyle(Theme.ink3)
                     }
@@ -114,7 +114,7 @@ struct AgentConnectPopover: View {
         }
         // One fixed size for every state: animated popover resizes crash NSPopover.
         .frame(width: 380, height: 370)
-        .background(Theme.ground)
+        .presentationBackground(.ultraThinMaterial)
     }
 
     /// Once an agent has done things, the popover becomes its activity log.

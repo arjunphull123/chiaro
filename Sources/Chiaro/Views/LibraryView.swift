@@ -334,9 +334,12 @@ struct LibraryView: View {
                         .font(Theme.serif(26, .semibold))
                         .kerning(-0.8)
                         .foregroundStyle(Theme.ink)
+                    Spacer()
+                    ConnectAgentButton()
                 }
                 Text(greeting)
                     .font(Theme.serif(34))
+                    .kerning(-1.1)
                     .foregroundStyle(Theme.ink)
                     .padding(.top, 14)
                     .padding(.bottom, 4)
@@ -393,9 +396,6 @@ struct LibraryView: View {
         }
         .padding(.horizontal, 28)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .overlay(alignment: .topTrailing) {
-            ConnectAgentButton().padding(14)
-        }
         .contentShape(Rectangle())
         .onAppear {
             refreshSources()
