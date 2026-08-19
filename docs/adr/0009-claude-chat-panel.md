@@ -1,6 +1,7 @@
 # ADR 0009: Native Claude chat panel via Agent SDK sidecar
 
-**Status:** Accepted direction · 2026-08-18 · Amends ADR 0008 (embedded agent now planned)
+**Status:** Deferred · 2026-08-18 · MCP automation remains the path for now; this
+records the verified facts for whenever the panel is picked up.
 
 ## Context
 

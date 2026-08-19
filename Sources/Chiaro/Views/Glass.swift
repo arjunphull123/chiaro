@@ -20,4 +20,11 @@ extension View {
     func chiaroGlass(cornerRadius: CGFloat = 16) -> some View {
         modifier(ChiaroGlass(cornerRadius: cornerRadius))
     }
+
+    /// Pointing-hand cursor on hover — every clickable control should read as one.
+    func clickCursor() -> some View {
+        onHover { inside in
+            if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
+    }
 }

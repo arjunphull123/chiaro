@@ -9,19 +9,8 @@ final class AgentStatus {
     var clientName: String?
     var lastSeen: Date?
 
-    /// Friendly names for known MCP clients ("claude-code" reads as "Claude").
-    var displayName: String {
-        guard let clientName else { return "Agent" }
-        let lower = clientName.lowercased()
-        if lower.contains("claude") { return "Claude" }
-        if lower.contains("cursor") { return "Cursor" }
-        if lower.contains("codex") { return "Codex" }
-        if lower.contains("gemini") { return "Gemini" }
-        if lower.contains("copilot") { return "Copilot" }
-        return clientName
-    }
-
-    var isClaude: Bool { displayName == "Claude" }
+    var brand: AgentBrand { AgentBrand.match(clientName) }
+    var displayName: String { brand.name == "Agent" ? (clientName ?? "Agent") : brand.name }
 
     /// HTTP transport is stateless — "connected" means requests arrived recently.
     /// Window is generous because agents legitimately go quiet while thinking.

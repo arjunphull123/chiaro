@@ -66,16 +66,22 @@ final class MCPServer {
 
     // MARK: - Minimal HTTP
 
+    private struct HTTPRequest {
+        var method: String
+        var path: String
+        var origin: String?
+        var body: Data
+    }
+
     private func receive(on connection: NWConnection, buffer: Data) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 1 << 20) { [weak self] data, _, done, error in
             guard let self, error == nil else { connection.cancel(); return }
             var buffer = buffer
             if let data { buffer.append(data) }
             if let request = Self.parseRequest(buffer) {
-                self.handle(body: request) { response in
-                    let payload = response ?? Data()
-                    let status = response == nil ? "202 Accepted" : "200 OK"
+                self.route(request) { status, payload in
                     var head = "HTTP/1.1 \(status)\r\nContent-Type: application/json\r\n"
+                    if status.hasPrefix("405") { head += "Allow: POST\r\n" }
                     head += "Content-Length: \(payload.count)\r\nConnection: close\r\n\r\n"
                     connection.send(
                         content: Data(head.utf8) + payload,
@@ -90,15 +96,46 @@ final class MCPServer {
         }
     }
 
-    /// Returns the body once the full request (headers + Content-Length bytes) has arrived.
-    private static func parseRequest(_ data: Data) -> Data? {
+    /// MCP streamable-HTTP requirements: validate Origin (DNS-rebinding defense),
+    /// POST-only (no SSE stream offered), single /mcp endpoint.
+    private func route(_ request: HTTPRequest, reply: @escaping (String, Data) -> Void) {
+        if let origin = request.origin,
+           !(origin.contains("127.0.0.1") || origin.contains("localhost")) {
+            reply("403 Forbidden", Data("{\"error\":\"origin not allowed\"}".utf8))
+            return
+        }
+        guard request.path == "/mcp" || request.path == "/mcp/" else {
+            reply("404 Not Found", Data("{\"error\":\"unknown path\"}".utf8))
+            return
+        }
+        guard request.method == "POST" else {
+            reply("405 Method Not Allowed", Data("{\"error\":\"POST only; SSE stream not offered\"}".utf8))
+            return
+        }
+        handle(body: request.body) { response in
+            if let response { reply("200 OK", response) } else { reply("202 Accepted", Data()) }
+        }
+    }
+
+    /// Returns the request once headers + Content-Length bytes have fully arrived.
+    private static func parseRequest(_ data: Data) -> HTTPRequest? {
         guard let headerEnd = data.range(of: Data("\r\n\r\n".utf8)) else { return nil }
         let head = String(decoding: data[..<headerEnd.lowerBound], as: UTF8.self)
-        let length = head.split(separator: "\r\n")
-            .first { $0.lowercased().hasPrefix("content-length:") }
-            .flatMap { Int($0.split(separator: ":")[1].trimmingCharacters(in: .whitespaces)) } ?? 0
+        let lines = head.split(separator: "\r\n")
+        let requestParts = lines.first?.split(separator: " ") ?? []
+        let method = requestParts.count > 0 ? String(requestParts[0]) : "POST"
+        let path = requestParts.count > 1 ? String(requestParts[1]) : "/mcp"
+        func header(_ name: String) -> String? {
+            lines.first { $0.lowercased().hasPrefix("\(name):") }
+                .map { $0.dropFirst(name.count + 1).trimmingCharacters(in: .whitespaces) }
+        }
+        let length = header("content-length").flatMap(Int.init) ?? 0
         let body = data[headerEnd.upperBound...]
-        return body.count >= length ? Data(body.prefix(length)) : nil
+        guard body.count >= length else { return nil }
+        return HTTPRequest(
+            method: method, path: path,
+            origin: header("origin"), body: Data(body.prefix(length))
+        )
     }
 
     // MARK: - JSON-RPC
@@ -115,7 +152,11 @@ final class MCPServer {
         switch method {
         case "initialize":
             let params = message["params"] as? [String: Any]
-            let version = params?["protocolVersion"] as? String ?? "2025-03-26"
+            // Version negotiation per spec: echo the client's version if we support
+            // it, otherwise answer with the latest we do.
+            let supported = ["2024-11-05", "2025-03-26", "2025-06-18"]
+            let requested = params?["protocolVersion"] as? String ?? "2025-03-26"
+            let version = supported.contains(requested) ? requested : "2025-06-18"
             let client = (params?["clientInfo"] as? [String: Any])?["name"] as? String
             Task { @MainActor in AgentStatus.shared.clientName = client }
             reply(rpcResult(id: id, [

@@ -90,11 +90,13 @@ struct EditView: View {
     private var navPill: some View {
         HStack(spacing: 12) {
             Button { step(-1) } label: { chevron("chevron.left") }.buttonStyle(.plain)
+        .clickCursor()
             Text("\(photoIndex + 1) / \(library.photos.count)")
                 .font(Theme.mono(10))
                 .foregroundStyle(Theme.ink2)
                 .monospacedDigit()
             Button { step(1) } label: { chevron("chevron.right") }.buttonStyle(.plain)
+        .clickCursor()
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
@@ -122,6 +124,7 @@ struct EditView: View {
                 .chiaroGlass(cornerRadius: 10)
         }
         .buttonStyle(.plain)
+        .clickCursor()
         .disabled(disabled)
         .help(help)
     }
@@ -138,6 +141,7 @@ struct EditView: View {
             .chiaroGlass(cornerRadius: 10)
         }
         .buttonStyle(.plain)
+        .clickCursor()
         .disabled(disabled)
     }
 
@@ -153,6 +157,7 @@ struct EditView: View {
             .chiaroGlass(cornerRadius: 10)
         }
         .buttonStyle(.plain)
+        .clickCursor()
         .keyboardShortcut("e")
         .help("Full-resolution JPEG, HEIF, or 16-bit TIFF (⌘E)")
     }
@@ -169,6 +174,7 @@ struct EditView: View {
             .chiaroGlass(cornerRadius: 10)
         }
         .buttonStyle(.plain)
+        .clickCursor()
     }
 
     private func close() {

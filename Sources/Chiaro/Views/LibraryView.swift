@@ -76,11 +76,13 @@ struct LibraryView: View {
             ConnectAgentButton()
             Button("Export…") { onExport() }
                 .buttonStyle(AmberButtonStyle())
+                .clickCursor()
                 .disabled(library.selection.isEmpty)
                 .opacity(library.selection.isEmpty ? 0.4 : 1)
                 .help("Export selected photos (⌘E)")
             Button("Open Folder…") { openFolder() }
                 .buttonStyle(AmberButtonStyle())
+                .clickCursor()
                 .help("⌘O")
         }
         .padding(.horizontal, 16)
@@ -217,6 +219,7 @@ struct LibraryView: View {
             .shadow(color: .black.opacity(0.6), radius: 2)
         }
         .contentShape(Rectangle())
+        .clickCursor()
         .gesture(TapGesture(count: 2).onEnded {
             library.edit(photo)
         })
@@ -246,6 +249,7 @@ struct LibraryView: View {
                     .background(Capsule().fill(Theme.amber))
             }
             .buttonStyle(.plain)
+        .clickCursor()
             .keyboardShortcut("o")
         }
     }

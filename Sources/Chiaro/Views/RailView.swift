@@ -32,7 +32,7 @@ struct RailView: View {
                 .animation(.easeOut(duration: 0.2), value: library.agentActive)
             }
             .padding(16)
-            .padding(.top, 40)
+            .padding(.top, 26) // pill top aligns with the canvas action cluster
         }
         .overlay(alignment: .bottom) {
             // Hints that the rail continues below the fold.
@@ -90,17 +90,15 @@ struct RailView: View {
                 if model.edit.curve != CurvePoint.identity {
                     Button("Reset") { model.edit.curve = CurvePoint.identity }
                         .buttonStyle(.plain)
+        .clickCursor()
                         .font(Theme.ui(9.5))
                         .foregroundStyle(Theme.ink3)
                 }
             }
             .padding(.top, 10)
             CurveEditorView(edit: $model.edit, histogram: model.histogram)
-            Text("click adds a point · drag shapes it · double-click removes")
-                .font(Theme.mono(8))
-                .foregroundStyle(Theme.ink3)
         }
-        .help("Tone curve: precise control over the brightness response")
+        .help("Tone curve — click adds a point, drag shapes it, double-click removes")
     }
 
     private func section(_ title: String, _ params: [EditParameter], help: String) -> some View {
@@ -157,6 +155,7 @@ struct RailView: View {
                 .background(RoundedRectangle(cornerRadius: 7).stroke(Theme.hairline))
         }
         .buttonStyle(.plain)
+        .clickCursor()
         .disabled(model.edit.isNeutral)
         .padding(.top, 14)
     }

@@ -1,38 +1,5 @@
 import SwiftUI
 
-/// Stylized starburst for Claude connection state (drawn, not an asset).
-struct ClaudeSpark: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let cx = Double(rect.midX), cy = Double(rect.midY)
-        let radius = Double(min(rect.width, rect.height)) / 2
-        let rays = 10
-        for i in 0..<rays {
-            let angle = Double(i) / Double(rays) * 2 * .pi
-            let spread = 0.34
-            let base = radius * 0.16
-            path.move(to: CGPoint(x: cx + Foundation.cos(angle - spread) * base, y: cy + Foundation.sin(angle - spread) * base))
-            path.addLine(to: CGPoint(x: cx + Foundation.cos(angle) * radius, y: cy + Foundation.sin(angle) * radius))
-            path.addLine(to: CGPoint(x: cx + Foundation.cos(angle + spread) * base, y: cy + Foundation.sin(angle + spread) * base))
-            path.closeSubpath()
-        }
-        return path
-    }
-}
-
-struct AgentDot: View {
-    let connected: Bool
-
-    var body: some View {
-        if connected && AgentStatus.shared.isClaude {
-            ClaudeSpark().fill(Theme.claude).frame(width: 11, height: 11)
-        } else {
-            Circle()
-                .fill(connected ? Theme.claude : Theme.ink3)
-                .frame(width: 6, height: 6)
-        }
-    }
-}
 
 /// "Connect Agent": copyable orientation prompt pointing any coding agent at the
 /// local MCP server (ADR 0008). The server self-describes via tools/list schemas;
@@ -45,60 +12,61 @@ struct AgentRailStatus: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
-            if library.agentActive {
-                VStack(alignment: .leading, spacing: 7) {
+            let editing = library.agentActive
+            let connected = AgentStatus.shared.isConnected(now: context.date)
+            let brand = AgentStatus.shared.brand
+            let active = editing || connected
+            Button {
+                showing.toggle()
+            } label: {
+                VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 8) {
-                        Image(systemName: "lock.fill")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(Theme.amber)
-                        Text("\(AgentStatus.shared.displayName.uppercased()) IS EDITING…")
-                            .font(Theme.mono(9, .medium))
-                            .kerning(1.4)
-                            .foregroundStyle(Theme.ink)
+                        if active {
+                            brand.icon.frame(width: 13, height: 13)
+                        } else {
+                            Image(systemName: "handshake")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Theme.ink3)
+                        }
+                        Text(editing
+                            ? "\(AgentStatus.shared.displayName) is editing…"
+                            : connected ? "\(AgentStatus.shared.displayName) is connected" : "Connect Agent")
+                            .font(Theme.ui(11.5, .medium))
+                            .foregroundStyle(active ? Theme.ink : Theme.ink2)
                             .lineLimit(1)
                         Spacer()
-                        AgentDot(connected: true)
+                        if editing {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(brand.color)
+                        } else if connected, let seen = AgentStatus.shared.lastSeenText(now: context.date) {
+                            Text(seen).font(Theme.mono(8.5)).foregroundStyle(Theme.ink3)
+                        }
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(RoundedRectangle(cornerRadius: 9).fill(Theme.amber.opacity(0.13)))
-                    .overlay(RoundedRectangle(cornerRadius: 9).stroke(Theme.amber.opacity(0.4)))
-                    if let intent = library.agentIntent {
+                    if editing, let intent = library.agentIntent {
                         Text(intent)
                             .font(Theme.ui(10.5))
                             .foregroundStyle(Theme.ink2)
                             .fixedSize(horizontal: false, vertical: true)
-                            .padding(.horizontal, 2)
                     }
                 }
-                .transition(.opacity)
-            } else {
-                let connected = AgentStatus.shared.isConnected(now: context.date)
-                Button {
-                    showing.toggle()
-                } label: {
-                    HStack(spacing: 8) {
-                        AgentDot(connected: connected)
-                        Text(connected ? "\(AgentStatus.shared.displayName) connected" : "Connect Agent")
-                            .font(Theme.ui(11, .medium))
-                            .foregroundStyle(connected ? Theme.ink : Theme.ink2)
-                            .lineLimit(1)
-                        Spacer()
-                        if connected, let seen = AgentStatus.shared.lastSeenText(now: context.date) {
-                            Text(seen).font(Theme.mono(8.5)).foregroundStyle(Theme.ink3)
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 9)
-                            .stroke(connected ? Theme.claude.opacity(0.4) : Theme.hairline)
-                    )
-                }
-                .buttonStyle(.plain)
-                .popover(isPresented: $showing, arrowEdge: .bottom) { AgentConnectPopover() }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 9)
+                        .fill(editing ? brand.color.opacity(0.12) : Color.clear)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 9)
+                        .stroke(active ? brand.color.opacity(0.45) : Theme.hairline)
+                )
             }
+            .buttonStyle(.plain)
+            .clickCursor()
+            .animation(.easeOut(duration: 0.2), value: editing)
         }
+        .popover(isPresented: $showing, arrowEdge: .bottom) { AgentConnectPopover() }
     }
 }
 
@@ -108,12 +76,19 @@ struct ConnectAgentButton: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             let connected = AgentStatus.shared.isConnected(now: context.date)
+            let brand = AgentStatus.shared.brand
             Button {
                 showing.toggle()
             } label: {
-                HStack(spacing: 6) {
-                    AgentDot(connected: connected)
-                    Text(connected ? AgentStatus.shared.displayName + " connected" : "Connect Agent")
+                HStack(spacing: 7) {
+                    if connected {
+                        brand.icon.frame(width: 12, height: 12)
+                    } else {
+                        Image(systemName: "handshake")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Theme.ink3)
+                    }
+                    Text(connected ? AgentStatus.shared.displayName + " is connected" : "Connect Agent")
                         .font(Theme.ui(12, .medium))
                 }
                 .foregroundStyle(connected ? Theme.ink : Theme.ink2)
@@ -121,10 +96,11 @@ struct ConnectAgentButton: View {
                 .padding(.vertical, 7)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(connected ? Theme.claude.opacity(0.4) : Theme.hairline)
+                        .stroke(connected ? brand.color.opacity(0.45) : Theme.hairline)
                 )
             }
             .buttonStyle(.plain)
+            .clickCursor()
         }
         .popover(isPresented: $showing, arrowEdge: .bottom) { AgentConnectPopover() }
     }
