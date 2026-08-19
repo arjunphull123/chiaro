@@ -123,7 +123,7 @@ struct RailView: View {
         VStack(alignment: .leading, spacing: 3) {
             sectionLabel(title, help: help)
             ForEach(params) { p in
-                AdjustmentRow(parameter: p, edit: $model.edit, armed: $model.armed)
+                AdjustmentRow(parameter: p, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
             }
         }
     }
@@ -142,7 +142,7 @@ struct RailView: View {
                     .frame(height: 24)
             case .some(true):
                 ForEach([EditParameter.blurF, .relight, .maskReach]) { p in
-                    AdjustmentRow(parameter: p, edit: $model.edit, armed: $model.armed)
+                    AdjustmentRow(parameter: p, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
                 }
             }
         }

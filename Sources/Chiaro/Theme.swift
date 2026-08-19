@@ -40,6 +40,19 @@ enum Theme {
     }
 }
 
+/// Primary action: filled amber, near-black text.
+struct AmberButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(Theme.ui(12, .semibold))
+            .foregroundStyle(Color(hex: 0x131315))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Theme.amber))
+            .opacity(configuration.isPressed ? 0.75 : 1)
+    }
+}
+
 extension Color {
     init(hex: UInt32) {
         self.init(

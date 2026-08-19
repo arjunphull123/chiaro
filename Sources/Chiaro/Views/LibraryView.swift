@@ -28,11 +28,17 @@ struct LibraryView: View {
     }
 
     private var gallery: some View {
+        VStack(spacing: 0) {
+            header
+            galleryScroll
+        }
+    }
+
+    private var galleryScroll: some View {
         GeometryReader { geo in
             let width = geo.size.width - 32
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
-                    header
                     ForEach(sections) { section in
                         VStack(alignment: .leading, spacing: gap) {
                             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -55,37 +61,63 @@ struct LibraryView: View {
                     }
                 }
                 .padding(16)
-                .padding(.top, 28)
             }
+            .simultaneousGesture(zoomGesture)
         }
     }
 
+    /// Pinned frosted header: clears the traffic lights, holds the real actions.
     private var header: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
+        HStack(alignment: .center, spacing: 12) {
             Text(library.folderName)
-                .font(Theme.ui(22, .semibold))
+                .font(Theme.ui(19, .semibold))
                 .foregroundStyle(Theme.ink)
-            Text("\(library.photos.count) photos · \(library.photos.filter(\.isRAW).count) RAW")
-                .font(Theme.mono(11))
+            Text("\(library.photos.count) photos · \(library.photos.filter(\.isRAW).count) RAW · pinch to zoom timeline")
+                .font(Theme.mono(10))
                 .foregroundStyle(Theme.ink3)
             Spacer()
-            Picker("", selection: $library.zoom) {
-                ForEach(Library.Zoom.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(width: 210)
-            if !library.selection.isEmpty {
-                Button("Export…") { onExport() }
-                    .font(Theme.ui(12, .medium))
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Theme.amber)
-            }
+            Button("Export…") { onExport() }
+                .buttonStyle(AmberButtonStyle())
+                .disabled(library.selection.isEmpty)
+                .opacity(library.selection.isEmpty ? 0.4 : 1)
+                .help("Export selected photos (⌘E)")
             Button("Open Folder…") { openFolder() }
-                .font(Theme.ui(12))
-                .buttonStyle(.plain)
-                .foregroundStyle(Theme.ink2)
+                .buttonStyle(AmberButtonStyle())
+                .help("⌘O")
         }
+        .padding(.leading, 86)
+        .padding(.trailing, 16)
+        .padding(.vertical, 11)
+        .background(
+            Rectangle().fill(.ultraThinMaterial)
+                .overlay(Theme.panel.opacity(0.72))
+                .overlay(alignment: .bottom) { Theme.hairline.frame(height: 1) }
+                .ignoresSafeArea()
+        )
+    }
+
+    // MARK: - Pinch to zoom timeline (days ↔ months ↔ years)
+
+    @State private var magnifyBaseline: CGFloat = 1
+
+    private var zoomGesture: some Gesture {
+        MagnifyGesture()
+            .onChanged { g in
+                let relative = g.magnification / magnifyBaseline
+                if relative > 1.3 { stepZoom(1); magnifyBaseline = g.magnification }
+                else if relative < 0.77 { stepZoom(-1); magnifyBaseline = g.magnification }
+            }
+            .onEnded { _ in magnifyBaseline = 1 }
+    }
+
+    /// Pinch out = more detail (years → months → days), like Photos on iOS.
+    private func stepZoom(_ delta: Int) {
+        let order: [Library.Zoom] = [.years, .months, .days]
+        guard let index = order.firstIndex(of: library.zoom) else { return }
+        let next = min(order.count - 1, max(0, index + delta))
+        guard next != index else { return }
+        withAnimation(.easeOut(duration: 0.18)) { library.zoom = order[next] }
+        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
     }
 
     // MARK: - Date sections

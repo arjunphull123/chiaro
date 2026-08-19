@@ -6,6 +6,7 @@ struct AdjustmentRow: View {
     let parameter: EditParameter
     @Binding var edit: EditState
     @Binding var armed: EditParameter?
+    @Binding var hovered: EditParameter?
     var disabled = false
 
     @State private var dragStartValue: Double?
@@ -32,6 +33,10 @@ struct AdjustmentRow: View {
         .opacity(disabled ? 0.35 : 1)
         .allowsHitTesting(!disabled)
         .onTapGesture { armed = isArmed ? nil : parameter }
+        .onHover { inside in
+            if inside { hovered = parameter }
+            else if hovered == parameter { hovered = nil }
+        }
     }
 
     private var track: some View {

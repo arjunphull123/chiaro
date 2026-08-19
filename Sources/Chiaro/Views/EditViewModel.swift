@@ -41,6 +41,7 @@ final class EditViewModel {
         isRestoringEdit = false
     }
     var armed: EditParameter?
+    var hovered: EditParameter?
     var showOriginal = false
     var preview: CGImage?
     var originalPreview: CGImage?

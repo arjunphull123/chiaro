@@ -4,6 +4,7 @@ struct EditView: View {
     let library: Library
     let onExport: () -> Void
     @State private var model: EditViewModel
+    @State private var scrollMonitor: Any?
     @FocusState private var focused: Bool
 
     init(library: Library, photo: Photo, onExport: @escaping () -> Void) {
@@ -21,7 +22,9 @@ struct EditView: View {
                 .overlay(alignment: .trailing) { agentOverlay }
         }
         .overlay(alignment: .bottom) { navPill.padding(.bottom, 16).padding(.trailing, Theme.railWidth) }
-        .overlay(alignment: .topLeading) { backButton.padding(14) }
+        .overlay(alignment: .topLeading) {
+            backButton.padding(.top, 12).padding(.leading, 86) // clear of traffic lights
+        }
         .overlay(alignment: .topTrailing) {
             exportButton.padding(14).padding(.trailing, Theme.railWidth)
         }
@@ -31,6 +34,7 @@ struct EditView: View {
         .onAppear {
             focused = true
             library.activeEditor = model
+            installScrollMonitor()
         }
         .onKeyPress(.escape) {
             if model.armed != nil { model.armed = nil } else { close() }
@@ -47,7 +51,26 @@ struct EditView: View {
             model.saveNow()
             return .handled
         }
-        .onDisappear { model.saveNow() }
+        .onDisappear {
+            model.saveNow()
+            if let scrollMonitor { NSEvent.removeMonitor(scrollMonitor) }
+            scrollMonitor = nil
+        }
+    }
+
+    /// Trackpad scroll over a slider adjusts it, with haptic detents (ADR 0005).
+    private func installScrollMonitor() {
+        guard scrollMonitor == nil else { return }
+        scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
+            guard !library.agentActive, let parameter = model.hovered else { return event }
+            let delta = event.scrollingDeltaX - event.scrollingDeltaY
+            guard delta != 0 else { return event }
+            let span = parameter.range.upperBound - parameter.range.lowerBound
+            let old = parameter.value(in: model.edit)
+            parameter.set(old + delta / 600 * span, in: &model.edit)
+            HapticDetents.tickIfCrossed(parameter: parameter, from: old, to: parameter.value(in: model.edit))
+            return nil // swallow so the rail doesn't scroll underneath
+        }
     }
 
     /// Frosts the entire rail while an agent drives, with the agent's stated intent.
