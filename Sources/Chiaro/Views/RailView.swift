@@ -257,8 +257,8 @@ struct RailView: View {
 }
 
 
-/// Lightroom-style focal range: the scene's depth distribution as bars, with
-/// a draggable window — body moves Focus, edges resize Range.
+/// Focal range: the scene's depth distribution as bars, with a draggable
+/// window — body moves Focus, edges resize Range.
 private struct FocalRangeStrip: View {
     @Bindable var model: EditViewModel
     @State private var dragZone: Zone?

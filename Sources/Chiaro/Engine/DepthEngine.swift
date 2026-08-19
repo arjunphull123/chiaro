@@ -113,30 +113,18 @@ final class DepthEngine: @unchecked Sendable {
             format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)
         )
 
+        // render(toBitmap:) writes top-down — already top-left row-major.
         var disparity = [Float](repeating: 0, count: width * height)
         var histogram = [Float](repeating: 0, count: bins)
-        // Core Image renders bottom-up; flip to top-left row-major.
-        for row in 0..<height {
-            let sourceRow = height - 1 - row
-            for col in 0..<width {
-                let d = depth[(sourceRow * width + col) * 4]
-                disparity[row * width + col] = d
-                let bin = min(bins - 1, max(0, Int(d * Float(bins))))
-                histogram[bin] += 1
-            }
+        for i in 0..<(width * height) {
+            let d = depth[i * 4]
+            disparity[i] = d
+            histogram[min(bins - 1, max(0, Int(d * Float(bins))))] += 1
         }
         let peak = histogram.max() ?? 1
         if peak > 0 { for i in 0..<bins { histogram[i] /= peak } }
-
-        var flippedColors = [UInt8](repeating: 0, count: width * height * 4)
-        for row in 0..<height {
-            let sourceRow = height - 1 - row
-            let src = (sourceRow * width) * 4
-            let dst = (row * width) * 4
-            flippedColors.replaceSubrange(dst..<(dst + width * 4), with: colors[src..<(src + width * 4)])
-        }
         return PointGrid(width: width, height: height, aspect: aspect,
-                         disparity: disparity, colors: flippedColors, histogram: histogram)
+                         disparity: disparity, colors: colors, histogram: histogram)
     }
 
     /// Mean disparity inside the person mask → focusDepth (0 near … 1 far).

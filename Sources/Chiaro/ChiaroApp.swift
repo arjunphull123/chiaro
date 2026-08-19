@@ -1,5 +1,6 @@
 import SwiftUI
 import TipKit
+import SceneKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
@@ -91,6 +92,52 @@ struct ChiaroApp: App {
                 }
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 4) { attemptClick(40) }
+        }
+        // --render-depth-scene <photo> <png>: snapshot the 3D focus scene.
+        if let i = args.firstIndex(of: "--render-depth-scene"), i + 2 < args.count {
+            let name = args[i + 1]
+            let path = args[i + 2]
+            let lib = library
+            func attempt(_ triesLeft: Int) {
+                _ = DepthModelStore.shared // kick the lazy load of the compiled model
+                guard DepthEngine.shared.isReady,
+                      let photo = lib.photos.first(where: { $0.name == name }) else {
+                    if triesLeft > 0 {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { attempt(triesLeft - 1) }
+                    } else {
+                        fputs("DEPTH SCENE: not ready\n", stderr)
+                        NSApp.terminate(nil)
+                    }
+                    return
+                }
+                let url = photo.url
+                let focus = photo.edit.focusDepth
+                let range = photo.edit.focusRange
+                DispatchQueue.global(qos: .userInitiated).async {
+                    guard let base = RawEngine.shared.preview(for: url),
+                          let grid = DepthEngine.shared.pointGrid(for: url, image: base) else {
+                        fputs("DEPTH SCENE: no grid\n", stderr)
+                        DispatchQueue.main.async { NSApp.terminate(nil) }
+                        return
+                    }
+                    DispatchQueue.main.async {
+                        let scene = DepthScene.build(grid: grid, focusDepth: focus, focusRange: range)
+                        scene.background.contents = NSColor(Theme.ground)
+                        let renderer = SCNRenderer(device: nil, options: nil)
+                        renderer.scene = scene
+                        renderer.pointOfView = scene.rootNode.childNode(withName: "camera", recursively: false)
+                        let image = renderer.snapshot(
+                            atTime: 0, with: CGSize(width: 1280, height: 860), antialiasingMode: .multisampling4X)
+                        if let tiff = image.tiffRepresentation,
+                           let rep = NSBitmapImageRep(data: tiff) {
+                            try? rep.representation(using: .png, properties: [:])?
+                                .write(to: URL(fileURLWithPath: path))
+                        }
+                        NSApp.terminate(nil)
+                    }
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { attempt(20) }
         }
         if args.contains("--download-depth") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {

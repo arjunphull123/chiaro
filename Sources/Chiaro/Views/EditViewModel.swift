@@ -97,7 +97,7 @@ final class EditViewModel {
     private var basePreview: CIImage?
     private var personMask: CIImage?
     private var maskKind: PortraitEngine.MaskKind = .subject
-    /// Focos-style 3D depth scene visibility.
+    /// 3D depth scene visibility.
     var depthSceneVisible = false
     /// Depth histogram for the focal-range strip (48 bins, 0 near … 1 far).
     var depthHistogram: [Float]?

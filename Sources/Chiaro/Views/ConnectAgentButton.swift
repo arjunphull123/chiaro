@@ -41,7 +41,7 @@ struct AgentRailStatus: View {
                         }
                         Text(editing
                             ? "\(AgentStatus.shared.displayName) is editing…"
-                            : connected ? "\(AgentStatus.shared.displayName) is connected" : "Connect your agent via MCP")
+                            : connected ? "\(AgentStatus.shared.displayName) is connected" : "Connect your agent")
                             .font(Theme.ui(11.5, .medium))
                             .foregroundStyle(active ? Theme.ink : Theme.ink2)
                             .lineLimit(1)
@@ -99,7 +99,7 @@ struct ConnectAgentButton: View {
                             .font(.system(size: 10))
                             .foregroundStyle(Theme.ink3)
                     }
-                    Text(connected ? AgentStatus.shared.displayName + " is connected" : "Connect your agent via MCP")
+                    Text(connected ? AgentStatus.shared.displayName + " is connected" : "Connect your agent")
                 }
             }
             .buttonStyle(OutlineButtonStyle())
