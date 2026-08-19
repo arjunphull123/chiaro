@@ -177,19 +177,6 @@ struct CanvasView: View {
     /// Crop mode controls: aspect presets, straighten, reset, done.
     private var cropPanel: some View {
         VStack(spacing: 10) {
-            HStack(spacing: 6) {
-                transformButton("Level", icon: "level") { model.autoLevel() }
-                transformButton("Headshot", icon: "person.crop.square") { model.autoHeadshotCrop() }
-                transformButton("Rotate", icon: "rotate.right") {
-                    model.edit.rotation = (model.edit.rotation + 90) % 360
-                }
-                transformButton("Flip H", icon: "arrow.left.and.right.righttriangle.left.righttriangle.right") {
-                    model.edit.flipH.toggle()
-                }
-                transformButton("Flip V", icon: "arrow.up.and.down.righttriangle.up.righttriangle.down") {
-                    model.edit.flipV.toggle()
-                }
-            }
             HStack(spacing: 5) {
                 aspectChip("Free", nil)
                 aspectChip("Original", originalAspect)
@@ -245,17 +232,6 @@ struct CanvasView: View {
                 HapticDetents.tickIfCrossed(parameter: .straighten, from: old, to: newValue)
             }
         )
-    }
-
-    private func transformButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                Image(systemName: icon).font(.system(size: 9, weight: .semibold))
-                Text(title)
-            }
-        }
-        .buttonStyle(OutlineButtonStyle())
-        .clickCursor()
     }
 
     private func aspectChip(_ title: String, _ aspect: Double?) -> some View {
@@ -338,6 +314,9 @@ struct CanvasView: View {
                 detents: [0.5],
                 doneHelp: "Done — back to pan and zoom (esc)",
                 onDrag: { dx in model.scrub(deltaX: dx * 1.6) },
+                onReset: {
+                    if let a = model.armedHSL { model.edit.hsl[a.band][keyPath: a.component.keyPath] = 0 }
+                },
                 onDone: { model.armedHSL = nil }
             )
         } else if let armed = model.armed {
@@ -349,6 +328,7 @@ struct CanvasView: View {
                 detents: armed.detents.map { ($0 - range.lowerBound) / (range.upperBound - range.lowerBound) },
                 doneHelp: "Done — back to pan and zoom (esc)",
                 onDrag: { dx in model.scrub(deltaX: dx * 1.6) },
+                onReset: { armed.set(armed.defaultValue, in: &model.edit) },
                 onDone: { model.armed = nil }
             )
         }
@@ -366,13 +346,14 @@ struct CanvasView: View {
             onDrag: { dx in
                 model.edit.focusRange = (model.edit.focusRange + Double(dx) / 260).clamped(to: 0...1)
             },
+            onReset: { model.edit.focusRange = EditParameter.focusRange.defaultValue },
             onDone: { model.depthSceneCommand = .exit }
         )
     }
 
     private func dialCard(
         label: String, value: String, t: Double, detents: [Double], doneHelp: String,
-        onDrag: @escaping (CGFloat) -> Void, onDone: @escaping () -> Void
+        onDrag: @escaping (CGFloat) -> Void, onReset: @escaping () -> Void, onDone: @escaping () -> Void
     ) -> some View {
         VStack(spacing: 7) {
             HStack(spacing: 10) {
@@ -409,24 +390,21 @@ struct CanvasView: View {
                     }
                     .onEnded { _ in lastDialX = nil }
             )
+            HStack(spacing: 8) {
+                Button("Reset", action: onReset)
+                    .buttonStyle(OutlineButtonStyle())
+                    .clickCursor()
+                Button("Done", action: onDone)
+                    .buttonStyle(AmberButtonStyle())
+                    .clickCursor()
+                    .help(doneHelp)
+            }
+            .padding(.top, 2)
         }
         .padding(.horizontal, 22)
-        .padding(.vertical, 12)
+        .padding(.top, 12)
+        .padding(.bottom, 10)
         .chiaroGlass(cornerRadius: 15)
-        .overlay(alignment: .topTrailing) {
-            Button(action: onDone) {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(Theme.ink)
-                    .frame(width: 20, height: 20)
-                    .background(Circle().fill(Color.white.opacity(0.12)))
-                    .overlay(Circle().stroke(Theme.hairline))
-            }
-            .buttonStyle(.plain)
-            .clickCursor()
-            .padding(5)
-            .help(doneHelp)
-        }
         .transition(.opacity)
     }
 }

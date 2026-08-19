@@ -24,7 +24,7 @@ final class PortraitEngine {
         if misses.contains(key) { lock.unlock(); return nil }
         if let cached = cache[key] {
             lock.unlock()
-            return scaled(cached, to: image.extent)
+            return scaled(cached, to: image.extent, guide: image)
         }
         lock.unlock()
 
@@ -70,10 +70,18 @@ final class PortraitEngine {
         cache[key] = mask
         if cache.count > 12 { cache.removeValue(forKey: cache.keys.first!) }
         lock.unlock()
-        return scaled(mask, to: image.extent)
+        return scaled(mask, to: image.extent, guide: image)
     }
 
-    private func scaled(_ mask: CIImage, to extent: CGRect) -> CIImage {
+    /// Edge-preserving upsample guided by the photo — the mask hugs hair
+    /// strands instead of blurring across them.
+    private func scaled(_ mask: CIImage, to extent: CGRect, guide: CIImage) -> CIImage {
+        let upsampled = guide.applyingFilter("CIEdgePreserveUpsampleFilter", parameters: [
+            "inputSmallImage": mask,
+        ])
+        if upsampled.extent.width >= extent.width - 1 {
+            return upsampled.clampedToExtent().cropped(to: extent)
+        }
         let sx = extent.width / mask.extent.width
         let sy = extent.height / mask.extent.height
         return mask

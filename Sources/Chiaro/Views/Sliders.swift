@@ -10,6 +10,9 @@ struct AdjustmentRow: View {
     @Binding var armed: EditParameter?
     @Binding var hovered: EditParameter?
     var disabled = false
+    @State private var typing = false
+    @State private var typedText = ""
+    @FocusState private var typingFocused: Bool
 
     private var value: Double { parameter.value(in: edit) }
     private var isArmed: Bool { armed == parameter }
@@ -23,14 +26,28 @@ struct AdjustmentRow: View {
                 .font(Theme.ui(11.5, isArmed ? .medium : .regular))
                 .foregroundStyle(isArmed ? Theme.ink : Theme.ink2)
             Spacer()
-            Text(parameter.format(value))
-                .font(Theme.mono(10))
-                .foregroundStyle(isActive ? Theme.amber : Theme.ink2)
-                .monospacedDigit()
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(Capsule().fill(Color.white.opacity(isArmed ? 0.10 : 0.05)))
-                .overlay(Capsule().stroke(isArmed ? Theme.amber.opacity(0.6) : Theme.hairline))
+            if typing {
+                TextField("", text: $typedText)
+                    .textFieldStyle(.plain)
+                    .font(Theme.mono(10))
+                    .foregroundStyle(Theme.amber)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 52)
+                    .focused($typingFocused)
+                    .onSubmit { commitTyped() }
+                    .onExitCommand { typing = false }
+                    .onChange(of: typingFocused) { if !typingFocused { typing = false } }
+            } else {
+                Text(parameter.format(value))
+                    .font(Theme.mono(10))
+                    .foregroundStyle(isActive ? Theme.amber : Theme.ink2)
+                    .monospacedDigit()
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Color.white.opacity(isArmed ? 0.10 : 0.05)))
+                    .overlay(Capsule().stroke(isArmed ? Theme.amber.opacity(0.6) : Theme.hairline))
+                    .onTapGesture { beginTyping() }
+            }
         }
         .padding(.leading, 10)
         .padding(.trailing, 6)
@@ -59,7 +76,27 @@ struct AdjustmentRow: View {
                 NSCursor.pop()
             }
         }
-        .help("Click to adjust — then drag the photo or the dial, or scroll sideways. Double-click resets.")
+        .help("Click to adjust — drag the photo or the dial, scroll sideways, or click the value to type. Double-click resets.")
+    }
+
+    /// Typed values arrive in display units — ƒ-stops for blur, EV, degrees.
+    private func beginTyping() {
+        let raw = parameter == .blurF
+            ? (value <= 0.001 ? 16 : 16 * pow(1.4 / 16, value))
+            : value
+        typedText = value == parameter.defaultValue ? "" : String(format: "%.4g", raw)
+        typing = true
+        typingFocused = true
+    }
+
+    private func commitTyped() {
+        defer { typing = false }
+        guard let typed = Double(typedText.replacingOccurrences(of: "ƒ", with: "")
+            .replacingOccurrences(of: "°", with: "").trimmingCharacters(in: .whitespaces)) else { return }
+        let newValue = parameter == .blurF
+            ? (typed >= 15.9 ? 0 : (log(16 / typed.clamped(to: 1.4...16)) / log(16 / 1.4)))
+            : typed
+        parameter.set(newValue, in: &edit)
     }
 }
 

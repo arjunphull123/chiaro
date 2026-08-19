@@ -72,41 +72,11 @@ struct EditView: View {
                 .padding(.leading, 14) // just below the traffic lights
         }
         .overlay(alignment: .topTrailing) {
-            HStack(spacing: 8) {
-                Button {
-                    model.cropMode.toggle()
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "crop").font(.system(size: 10, weight: .semibold))
-                        Text("Crop")
-                    }
-                }
-                .buttonStyle(GlassButtonStyle(tint: model.cropMode ? Theme.amber : Theme.ink2))
-                .clickCursor()
-                .help("Crop, straighten, rotate, and flip (C)")
-                glassAction("Undo", icon: "arrow.uturn.backward", disabled: !model.canUndo) { model.undo() }
-                glassAction("Redo", icon: "arrow.uturn.forward", disabled: !model.canRedo) { model.redo() }
-                Button {
-                    model.showOriginal.toggle()
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: model.showOriginal ? "eye.fill" : "eye")
-                            .font(.system(size: 10, weight: .semibold))
-                        Text("View original")
-                    }
-                }
-                .buttonStyle(GlassButtonStyle(tint: model.showOriginal ? Theme.amber : Theme.ink2))
-                .clickCursor()
-                .help("Compare with the unedited photo — or hold \\")
-                glassAction("Copy edits", icon: "doc.on.doc", disabled: model.edit.isNeutral) {
-                    library.copiedEdit = model.edit
-                }
-                if library.copiedEdit != nil {
-                    glassAction("Paste edits", icon: "doc.on.clipboard") {
-                        if let copied = library.copiedEdit { model.edit = copied }
-                    }
-                }
-                exportButton
+            // Wide windows show every transform labeled; narrow ones fold
+            // them into a Transform menu.
+            ViewThatFits(in: .horizontal) {
+                toolbar(expandedTransforms: true)
+                toolbar(expandedTransforms: false)
             }
             .padding(14)
             .padding(.trailing, Theme.railWidth)
@@ -172,6 +142,80 @@ struct EditView: View {
 
     private var photoIndex: Int {
         library.photos.firstIndex(where: { $0.url == model.photo.url }) ?? 0
+    }
+
+    private func toolbar(expandedTransforms: Bool) -> some View {
+        HStack(spacing: 8) {
+            Button {
+                model.cropMode.toggle()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "crop").font(.system(size: 10, weight: .semibold))
+                    Text("Crop")
+                }
+            }
+            .buttonStyle(GlassButtonStyle(tint: model.cropMode ? Theme.amber : Theme.ink2))
+            .clickCursor()
+            .help("Crop & straighten (C)")
+            if expandedTransforms {
+                glassAction("Level", icon: "level") { model.autoLevel() }
+                glassAction("Headshot", icon: "person.crop.square") { model.autoHeadshotCrop() }
+                glassAction("Rotate", icon: "rotate.right") {
+                    model.edit.rotation = (model.edit.rotation + 90) % 360
+                }
+                glassAction("Flip H", icon: "arrow.left.and.right.righttriangle.left.righttriangle.right") {
+                    model.edit.flipH.toggle()
+                }
+                glassAction("Flip V", icon: "arrow.up.and.down.righttriangle.up.righttriangle.down") {
+                    model.edit.flipV.toggle()
+                }
+            } else {
+                Menu {
+                    Button("Level") { model.autoLevel() }
+                    Button("Headshot crop") { model.autoHeadshotCrop() }
+                    Button("Rotate 90°") { model.edit.rotation = (model.edit.rotation + 90) % 360 }
+                    Button("Flip horizontal") { model.edit.flipH.toggle() }
+                    Button("Flip vertical") { model.edit.flipV.toggle() }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "rotate.right").font(.system(size: 10, weight: .semibold))
+                        Text("Transform")
+                        Image(systemName: "chevron.down").font(.system(size: 7, weight: .bold))
+                    }
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .font(Theme.ui(11, .medium))
+                .foregroundStyle(Theme.ink2)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .chiaroGlass(cornerRadius: 10)
+                .clickCursor()
+            }
+            glassAction("Undo", icon: "arrow.uturn.backward", disabled: !model.canUndo) { model.undo() }
+            glassAction("Redo", icon: "arrow.uturn.forward", disabled: !model.canRedo) { model.redo() }
+            Button {
+                model.showOriginal.toggle()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: model.showOriginal ? "eye.fill" : "eye")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text("View original")
+                }
+            }
+            .buttonStyle(GlassButtonStyle(tint: model.showOriginal ? Theme.amber : Theme.ink2))
+            .clickCursor()
+            .help("Compare with the unedited photo — or hold \\")
+            glassAction("Copy edits", icon: "doc.on.doc", disabled: model.edit.isNeutral) {
+                library.copiedEdit = model.edit
+            }
+            if library.copiedEdit != nil {
+                glassAction("Paste edits", icon: "doc.on.clipboard") {
+                    if let copied = library.copiedEdit { model.edit = copied }
+                }
+            }
+            exportButton
+        }
     }
 
     private func glassAction(_ title: String, icon: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {

@@ -158,6 +158,7 @@ struct RailView: View {
         }
     }
 
+
     @ViewBuilder private var subjectContent: some View {
         switch model.hasPerson {
         case .none:
@@ -258,7 +259,10 @@ struct RailView: View {
                 Spacer(minLength: 0)
                 ForEach(0..<8, id: \.self) { i in
                     let active = !model.edit.hsl[i].isNeutral
-                    Button { selectedBand = i } label: {
+                    Button {
+                        selectedBand = i
+                        if let armed = model.armedHSL { model.armedHSL = (i, armed.component) }
+                    } label: {
                         Circle()
                             .fill(Color(hue: HSLBand.centers[i] / 360, saturation: 0.75, brightness: 0.85))
                             .frame(width: 16, height: 16)
@@ -486,18 +490,40 @@ struct RailView: View {
     private func localRow(_ label: String, index: Int, keyPath: WritableKeyPath<LocalAdjustment, Double>, range: ClosedRange<Double>) -> some View {
         let value = model.edit.locals[index][keyPath: keyPath]
         let isEV = range.upperBound <= 3
+        let fieldID = "local-\(index)-\(label)"
         return HStack {
             Text(label)
                 .font(Theme.ui(11.5))
                 .foregroundStyle(Theme.ink2)
             Spacer()
-            Text(isEV ? String(format: "%+.2f", value) : (value == 0 ? "0" : String(format: "%+.0f", value)))
-                .font(Theme.mono(10, .medium))
-                .foregroundStyle(value == 0 ? Theme.ink3 : Theme.amber)
-                .monospacedDigit()
-                .padding(.horizontal, 7)
-                .padding(.vertical, 3)
-                .background(Capsule().fill(Color.white.opacity(0.05)))
+            if typingField == fieldID {
+                TextField("", text: $typingValue)
+                    .textFieldStyle(.plain)
+                    .font(Theme.mono(10, .medium))
+                    .foregroundStyle(Theme.amber)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 48)
+                    .focused($typingField, equals: fieldID)
+                    .onSubmit {
+                        if let typed = Double(typingValue) {
+                            model.edit.locals[index][keyPath: keyPath] = typed.clamped(to: range)
+                        }
+                        typingField = nil
+                    }
+                    .onExitCommand { typingField = nil }
+            } else {
+                Text(isEV ? String(format: "%+.2f", value) : (value == 0 ? "0" : String(format: "%+.0f", value)))
+                    .font(Theme.mono(10, .medium))
+                    .foregroundStyle(value == 0 ? Theme.ink3 : Theme.amber)
+                    .monospacedDigit()
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Color.white.opacity(0.05)))
+                    .onTapGesture {
+                        typingValue = value == 0 ? "" : String(format: isEV ? "%.2f" : "%.0f", value)
+                        typingField = fieldID
+                    }
+            }
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 5)

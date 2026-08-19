@@ -4,7 +4,7 @@ import Foundation
 /// Color-mixer LUT: the 8 hue bands baked into a CIColorCube, cached per
 /// band configuration (LUT generation walks 64³ entries on the CPU).
 enum HSLCube {
-    static let dimension = 64
+    static let dimension = 32
     private static let cache = NSCache<NSString, NSData>()
 
     static func apply(_ image: CIImage, bands: [HSLBand]) -> CIImage {
@@ -16,7 +16,8 @@ enum HSLCube {
     }
 
     private static func data(for bands: [HSLBand]) -> Data {
-        let key = bands.map { "\($0.h),\($0.s),\($0.l)" }.joined(separator: "|") as NSString
+        // Integer-rounded keys so scrubbing hits the cache between ticks.
+        let key = bands.map { "\(Int($0.h)),\(Int($0.s)),\(Int($0.l))" }.joined(separator: "|") as NSString
         if let cached = cache.object(forKey: key) { return cached as Data }
 
         let n = dimension
