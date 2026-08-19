@@ -35,7 +35,7 @@ struct RailView: View {
             // Heavy frost: strong blur sampled from whatever is behind the window,
             // under a graphite scrim opaque enough to read as material, not photo.
             Rectangle().fill(.ultraThinMaterial)
-                .overlay(Theme.panel.opacity(0.72))
+                .overlay(Theme.panel.opacity(0.52))
                 .overlay(alignment: .leading) { Theme.hairline.frame(width: 1) }
                 .ignoresSafeArea()
         }
@@ -177,7 +177,7 @@ struct RailView: View {
     }
 
     private var scrubHint: some View {
-        Text("Tip: click a control, then drag on the photo or the dial. Scroll over a control for fine moves. Hold \\ to compare with the original.")
+        Text("Tip: click a control, then drag on the photo or the dial — or scroll sideways for fine moves. Hold \\ to compare with the original.")
             .font(Theme.ui(10))
             .foregroundStyle(Theme.ink3)
             .fixedSize(horizontal: false, vertical: true)

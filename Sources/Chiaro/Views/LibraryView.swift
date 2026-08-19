@@ -87,7 +87,7 @@ struct LibraryView: View {
         .padding(.vertical, 11)
         .background(
             Rectangle().fill(.ultraThinMaterial)
-                .overlay(Theme.panel.opacity(0.72))
+                .overlay(Theme.panel.opacity(0.55))
                 .overlay(alignment: .bottom) { Theme.hairline.frame(height: 1) }
                 .ignoresSafeArea()
         )

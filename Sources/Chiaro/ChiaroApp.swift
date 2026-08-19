@@ -131,7 +131,7 @@ struct RootView: View {
             // The window itself is translucent: desktop light bleeds through the
             // graphite ground, and the rail's frost samples it (ADR 0006).
             WindowBackdrop().ignoresSafeArea()
-            Theme.ground.opacity(0.82).ignoresSafeArea()
+            Theme.ground.opacity(0.6).ignoresSafeArea()
             if let editing = library.editing {
                 EditView(library: library, photo: editing, onExport: { exporting = true })
             } else {

@@ -15,25 +15,33 @@ struct AdjustmentRow: View {
     private var isArmed: Bool { armed == parameter }
     private var isActive: Bool { value != parameter.defaultValue }
 
+    private var isHovered: Bool { hovered == parameter }
+
     var body: some View {
         HStack(spacing: 8) {
-            Circle()
-                .fill(isArmed ? Theme.amber : .clear)
-                .frame(width: 4, height: 4)
             Text(parameter.label)
                 .font(Theme.ui(11.5, isArmed ? .medium : .regular))
                 .foregroundStyle(isArmed ? Theme.ink : Theme.ink2)
             Spacer()
             Text(parameter.format(value))
-                .font(Theme.mono(10.5))
-                .foregroundStyle(isActive ? Theme.amber : Theme.ink3)
+                .font(Theme.mono(10))
+                .foregroundStyle(isActive ? Theme.amber : Theme.ink2)
                 .monospacedDigit()
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(Color.white.opacity(isArmed ? 0.10 : 0.05)))
+                .overlay(Capsule().stroke(isArmed ? Theme.amber.opacity(0.6) : Theme.hairline))
         }
-        .padding(.horizontal, 8)
-        .frame(height: 26)
+        .padding(.leading, 10)
+        .padding(.trailing, 6)
+        .frame(height: 28)
         .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(isArmed ? Color.white.opacity(0.07) : (hovered == parameter ? Color.white.opacity(0.04) : .clear))
+            RoundedRectangle(cornerRadius: 7)
+                .fill(Color.white.opacity(isArmed ? 0.08 : (isHovered ? 0.06 : 0.03)))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 7)
+                .stroke(isArmed ? Theme.amber.opacity(0.4) : (isHovered ? Color.white.opacity(0.12) : .clear))
         )
         .contentShape(Rectangle())
         .opacity(disabled ? 0.35 : 1)
@@ -43,9 +51,15 @@ struct AdjustmentRow: View {
             parameter.set(parameter.defaultValue, in: &edit)
         })
         .onHover { inside in
-            if inside { hovered = parameter }
-            else if hovered == parameter { hovered = nil }
+            if inside {
+                hovered = parameter
+                NSCursor.pointingHand.push()
+            } else if hovered == parameter {
+                hovered = nil
+                NSCursor.pop()
+            }
         }
+        .help("Click to adjust — then drag the photo or the dial, or scroll sideways. Double-click resets.")
     }
 }
 

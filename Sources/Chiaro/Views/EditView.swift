@@ -19,6 +19,8 @@ struct EditView: View {
             RailView(model: model, library: library)
                 .ignoresSafeArea()
                 .disabled(library.agentActive)
+                .blur(radius: library.agentActive ? 7 : 0)
+                .animation(.easeOut(duration: 0.25), value: library.agentActive)
                 .overlay(alignment: .trailing) { agentOverlay }
         }
         .overlay(alignment: .bottom) { navPill.padding(.bottom, 16).padding(.trailing, Theme.railWidth) }
@@ -27,6 +29,7 @@ struct EditView: View {
         }
         .overlay(alignment: .topTrailing) {
             HStack(spacing: 8) {
+                ConnectAgentButton()
                 glassAction("Copy Edits", icon: "doc.on.doc", disabled: model.edit.isNeutral) {
                     library.copiedEdit = model.edit
                 }
@@ -70,34 +73,37 @@ struct EditView: View {
         }
     }
 
-    /// Trackpad scroll over a slider adjusts it, with haptic detents (ADR 0005).
+    /// Horizontal trackpad scroll adjusts the ARMED parameter (the dial), with
+    /// haptic detents. Vertical scroll always scrolls lists — rows never hijack it.
     private func installScrollMonitor() {
         guard scrollMonitor == nil else { return }
         scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
-            guard !library.agentActive, let parameter = model.hovered else { return event }
-            let delta = event.scrollingDeltaX - event.scrollingDeltaY
-            guard delta != 0 else { return event }
+            guard !library.agentActive, let parameter = model.armed else { return event }
+            let dx = event.scrollingDeltaX
+            guard abs(dx) > abs(event.scrollingDeltaY), dx != 0 else { return event }
             let span = parameter.range.upperBound - parameter.range.lowerBound
             let old = parameter.value(in: model.edit)
-            parameter.set(old + delta / 600 * span, in: &model.edit)
+            parameter.set(old + dx / 500 * span, in: &model.edit)
             HapticDetents.tickIfCrossed(parameter: parameter, from: old, to: parameter.value(in: model.edit))
-            return nil // swallow so the rail doesn't scroll underneath
+            return nil
         }
     }
 
-    /// Frosts the entire rail while an agent drives, with the agent's stated intent.
+    /// While an agent drives, the rail gaussian-blurs beneath this (content stays
+    /// visible through it) with the pill and the agent's stated intent on top.
     @ViewBuilder private var agentOverlay: some View {
         if library.agentActive {
             ZStack {
-                Rectangle().fill(.ultraThinMaterial)
+                Color.black.opacity(0.18)
                 VStack(spacing: 10) {
                     AgentPill()
                     if let intent = library.agentIntent {
                         Text(intent)
                             .font(Theme.ui(11))
-                            .foregroundStyle(Theme.ink2)
+                            .foregroundStyle(Theme.ink)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 20)
+                            .shadow(color: .black.opacity(0.7), radius: 3)
                     }
                 }
             }
