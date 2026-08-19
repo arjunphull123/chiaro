@@ -4,7 +4,7 @@ import CoreImage.CIFilterBuiltins
 /// Pure function (base image, edit, optional person mask) -> adjusted image.
 /// Order is fixed by SPEC.md; every node reads only EditState values.
 enum RenderPipeline {
-    static func render(base: CIImage, edit: EditState, personMask: CIImage?, depthMap: CIImage? = nil, skipCrop: Bool = false, focusPeaking: Bool = false) -> CIImage {
+    static func render(base: CIImage, edit: EditState, personMask: CIImage?, depthMap: CIImage? = nil, skipCrop: Bool = false, focusPeaking: Bool = false, clippingWarnings: Bool = false) -> CIImage {
         var image = applyGeometry(base, edit: edit, skipCrop: skipCrop)
         // Masks are aligned to the un-transformed base, so they get the same
         // geometry before use.
@@ -111,6 +111,40 @@ enum RenderPipeline {
             blend.backgroundImage = image
             blend.maskImage = inFocus
             image = blend.outputImage ?? image
+        }
+        // Blinkies (preview only): red where any channel blows past ~250,
+        // blue where all channels crush under ~5 — the Lightroom convention.
+        if clippingWarnings {
+            let maxComponent = image.applyingFilter("CIMaximumComponent")
+            let highlight = maxComponent.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 60, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: 60, y: 0, z: 0, w: 0),
+                "inputBVector": CIVector(x: 60, y: 0, z: 0, w: 0),
+                "inputBiasVector": CIVector(x: -58.8, y: -58.8, z: -58.8, w: 0), // 0.98 * 60
+            ]).applyingFilter("CIColorClamp")
+            let minComponent = image
+                .applyingFilter("CIColorInvert")
+                .applyingFilter("CIMaximumComponent")
+                .applyingFilter("CIColorInvert")
+            let shadow = minComponent.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: -60, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: -60, y: 0, z: 0, w: 0),
+                "inputBVector": CIVector(x: -60, y: 0, z: 0, w: 0),
+                "inputBiasVector": CIVector(x: 1.2, y: 1.2, z: 1.2, w: 0), // 0.02 * 60
+            ]).applyingFilter("CIColorClamp")
+            let red = CIImage(color: CIColor(red: 1, green: 0.1, blue: 0.1)).cropped(to: image.extent)
+            let blue = CIImage(color: CIColor(red: 0.15, green: 0.3, blue: 1)).cropped(to: image.extent)
+            var warned = CIFilter(name: "CIBlendWithMask", parameters: [
+                kCIInputImageKey: red,
+                kCIInputBackgroundImageKey: image,
+                kCIInputMaskImageKey: highlight.cropped(to: image.extent),
+            ])?.outputImage ?? image
+            warned = CIFilter(name: "CIBlendWithMask", parameters: [
+                kCIInputImageKey: blue,
+                kCIInputBackgroundImageKey: warned,
+                kCIInputMaskImageKey: shadow.cropped(to: image.extent),
+            ])?.outputImage ?? warned
+            image = warned.cropped(to: image.extent)
         }
         return image
     }

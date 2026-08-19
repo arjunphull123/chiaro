@@ -7,9 +7,15 @@ import TipKit
 struct CanvasView: View {
     @Bindable var model: EditViewModel
 
-    @State private var zoom: CGFloat = 1
+    private var zoom: CGFloat {
+        get { model.canvasZoom }
+        nonmutating set { model.canvasZoom = newValue }
+    }
+    private var pan: CGSize {
+        get { model.canvasPan }
+        nonmutating set { model.canvasPan = newValue }
+    }
     @State private var gestureZoom: CGFloat = 1
-    @State private var pan: CGSize = .zero
     @State private var gesturePan: CGSize = .zero
     @State private var lastScrubX: CGFloat?
     @State private var lastDialX: CGFloat?
@@ -98,6 +104,20 @@ struct CanvasView: View {
                 .frame(maxWidth: 340)
                 .padding(.top, 52)
                 .padding(.leading, 16)
+            }
+            .onChange(of: model.pixelZoomRequested) {
+                guard model.pixelZoomRequested else { return }
+                model.pixelZoomRequested = false
+                guard let cg = model.preview else { return }
+                let fitScale = min(
+                    (fitRegion.width - 48) / CGFloat(cg.width),
+                    (fitRegion.height - 48) / CGFloat(cg.height)
+                )
+                // zoom 1 shows fitScale× pixels; 1/fitScale shows them 1:1.
+                withAnimation(.easeOut(duration: 0.2)) {
+                    model.canvasZoom = fitScale >= 1 ? 1 : 1 / fitScale
+                    model.canvasPan = .zero
+                }
             }
             .onChange(of: model.photo.url) { resetView() }
             .onChange(of: model.cropMode) { resetView() }
@@ -405,7 +425,7 @@ struct CanvasView: View {
                     .onChanged { g in
                         let dx = g.location.x - (lastDialX ?? g.startLocation.x)
                         lastDialX = g.location.x
-                        onDrag(dx)
+                        onDrag(-dx) // the scale follows the finger
                     }
                     .onEnded { _ in lastDialX = nil }
             )

@@ -8,7 +8,8 @@ final class Photo: Identifiable {
     var thumbnail: CGImage?
     var aspect: CGFloat = 1.5
     var edit: EditState
-    var rating: Int
+    var starred: Bool
+    var snapshots: [Sidecar.Snapshot] = []
     var captureDate: Date?
     var exifSummary: String?
     var pixelSize: CGSize?
@@ -22,7 +23,8 @@ final class Photo: Identifiable {
         self.isRAW = Photo.rawExtensions.contains(url.pathExtension.lowercased())
         let sidecar = Sidecar.read(for: url)
         self.edit = sidecar?.edit ?? .neutral
-        self.rating = sidecar?.rating ?? 0
+        self.starred = sidecar?.starred ?? false
+        self.snapshots = sidecar?.versions ?? []
     }
 
     static let rawExtensions: Set<String> = ["arw", "dng", "nef", "cr2", "cr3", "raf", "orf", "rw2", "srw", "pef"]

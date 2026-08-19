@@ -6,6 +6,8 @@ struct EditView: View {
     let onExport: () -> Void
     @State private var model: EditViewModel
     @State private var scrollMonitor: Any?
+    @State private var savingVersion = false
+    @State private var versionName = ""
     @FocusState private var focused: Bool
 
     init(library: Library, photo: Photo, onExport: @escaping () -> Void) {
@@ -50,6 +52,27 @@ struct EditView: View {
             model.cropMode = false
             return .handled
         }
+        .onKeyPress(keys: ["p"], phases: [.down]) { _ in
+            guard !textEditing else { return .ignored }
+            model.photo.starred.toggle()
+            model.saveNow()
+            return .handled
+        }
+        .onKeyPress(keys: ["j"], phases: [.down]) { _ in
+            guard !textEditing else { return .ignored }
+            model.showClipping.toggle()
+            return .handled
+        }
+        .onKeyPress(keys: ["z"], phases: [.down]) { _ in
+            guard !textEditing else { return .ignored }
+            if model.canvasZoom > 1 {
+                model.canvasZoom = 1
+                model.canvasPan = .zero
+            } else {
+                model.pixelZoomRequested = true
+            }
+            return .handled
+        }
         .onKeyPress(keys: ["c"], phases: [.down]) { _ in
             guard !textEditing else { return .ignored }
             model.cropMode.toggle()
@@ -82,9 +105,12 @@ struct EditView: View {
             }
         }
         .overlay(alignment: .topLeading) {
-            backButton
-                .padding(.top, 10)
-                .padding(.leading, 14) // just below the traffic lights
+            HStack(spacing: 8) {
+                backButton
+                zoomControls
+            }
+            .padding(.top, 10)
+            .padding(.leading, 14) // just below the traffic lights
         }
         .overlay(alignment: .topTrailing) {
             toolbar
@@ -156,6 +182,13 @@ struct EditView: View {
 
     private var toolbar: some View {
         HStack(spacing: 7) {
+            iconAction("Auto", icon: "wand.and.stars") { model.autoEnhance() }
+            iconAction(model.photo.starred ? "Starred" : "Star",
+                       icon: model.photo.starred ? "star.fill" : "star",
+                       active: model.photo.starred) {
+                model.photo.starred.toggle()
+                model.saveNow()
+            }
             iconAction("Crop", icon: "crop", active: model.cropMode) { model.cropMode.toggle() }
             iconAction("Level", icon: "level") { model.autoLevel() }
             iconAction("Headshot", icon: "person.crop.square") { model.autoHeadshotCrop() }
@@ -181,7 +214,51 @@ struct EditView: View {
                     if let copied = library.copiedEdit { model.edit = copied }
                 }
             }
+            versionsMenu
             exportButton
+        }
+    }
+
+    /// Named saved states of this photo's edit (sidecar-persisted).
+    private var versionsMenu: some View {
+        Menu {
+            Button("Save version…") {
+                versionName = Date().formatted(date: .abbreviated, time: .shortened)
+                savingVersion = true
+            }
+            if !model.photo.snapshots.isEmpty {
+                Divider()
+                ForEach(model.photo.snapshots) { snapshot in
+                    Menu(snapshot.name) {
+                        Button("Apply") { model.applyVersion(snapshot) }
+                        Button("Delete", role: .destructive) { model.deleteVersion(snapshot) }
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "square.stack")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(model.photo.snapshots.isEmpty ? Theme.ink2 : Theme.amber)
+                .frame(width: 16, height: 14)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 7)
+                .chiaroGlass(cornerRadius: 10)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .clickCursor()
+        .help("Versions — save and switch between edit states")
+        .alert("Save version", isPresented: $savingVersion) {
+            TextField("Name", text: $versionName)
+            Button("Save") {
+                let trimmed = versionName.trimmingCharacters(in: .whitespaces)
+                guard !trimmed.isEmpty else { return }
+                model.saveVersion(named: trimmed)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Keeps the current edit as a named state you can return to")
         }
     }
 
@@ -216,6 +293,40 @@ struct EditView: View {
         .clickCursor()
         .keyboardShortcut("e")
         .help("Full-resolution JPEG, HEIF, or 16-bit TIFF (⌘E)")
+    }
+
+    /// Fit / 1:1 / zoom multiplier — pixel-checking without the trackpad.
+    private var zoomControls: some View {
+        HStack(spacing: 10) {
+            Button {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    model.canvasZoom = 1
+                    model.canvasPan = .zero
+                }
+            } label: {
+                Text("Fit").font(Theme.ui(10.5, .medium))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(model.canvasZoom == 1 ? Theme.amber : Theme.ink2)
+            .clickCursor()
+            .help("Fit the photo in the window (Z toggles)")
+            Button {
+                model.pixelZoomRequested = true
+            } label: {
+                Text("1:1").font(Theme.ui(10.5, .medium))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(model.canvasZoom > 1 ? Theme.amber : Theme.ink2)
+            .clickCursor()
+            .help("Actual pixels — check sharpness (Z toggles)")
+            Text(String(format: "×%.1f", model.canvasZoom))
+                .font(Theme.mono(9))
+                .foregroundStyle(Theme.ink3)
+                .monospacedDigit()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .chiaroGlass(cornerRadius: 10)
     }
 
     private var backButton: some View {

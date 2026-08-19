@@ -300,12 +300,12 @@ final class MCPServer {
     static let toolDefinitions: [[String: Any]] = [
         [
             "name": "list_photos",
-            "description": "List the photos in Chiaro's open library: name, rating, whether edited, and which one is open in the editor.",
+            "description": "List the photos in Chiaro's open library: name, starred, whether edited, and which one is open in the editor.",
             "inputSchema": ["type": "object", "properties": [:] as [String: Any]],
         ],
         [
             "name": "get_edit",
-            "description": "Read a photo's full EditState (all adjustment values) and rating.",
+            "description": "Read a photo's full EditState (all adjustment values) and starred flag.",
             "inputSchema": [
                 "type": "object",
                 "properties": ["name": ["type": "string", "description": "photo name, e.g. DSC04091"]],
@@ -330,15 +330,15 @@ final class MCPServer {
             ],
         ],
         [
-            "name": "set_rating",
-            "description": "Star-rate a photo (0-5). Ratings persist in the sidecar and show in the library — the culling workflow: review previews, rate the keepers.",
+            "name": "set_starred",
+            "description": "Star or unstar a photo. The star persists in the sidecar and the library can filter by it — the culling workflow: review previews, star the keepers.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
                     "name": ["type": "string"],
-                    "rating": ["type": "integer", "minimum": 0, "maximum": 5],
+                    "starred": ["type": "boolean"],
                 ],
-                "required": ["name", "rating"],
+                "required": ["name", "starred"],
             ],
         ],
         [
@@ -415,13 +415,13 @@ final class MCPServer {
                 "folder": library.folderURL?.path ?? "none",
                 "editing": library.editing?.name ?? NSNull() as Any,
                 "photos": library.photos.map {
-                    ["name": $0.name, "rating": $0.rating, "hasEdits": $0.hasEdits, "isRAW": $0.isRAW]
+                    ["name": $0.name, "starred": $0.starred, "hasEdits": $0.hasEdits, "isRAW": $0.isRAW]
                 },
             ])
         case "get_edit":
             let p = try photo(args)
             let edit = try JSONSerialization.jsonObject(with: JSONEncoder().encode(p.edit))
-            return try text(["name": p.name, "rating": p.rating, "edit": edit])
+            return try text(["name": p.name, "starred": p.starred, "edit": edit])
         case "list_presets":
             return try text(["presets": PresetStore.shared.all.map(\.name)])
         case "apply_preset":
@@ -438,14 +438,14 @@ final class MCPServer {
                 Sidecar.write(for: p)
             }
             return try text(["applied": presetName, "name": p.name])
-        case "set_rating":
+        case "set_starred":
             let p = try photo(args)
-            guard let rating = args["rating"] as? Int, (0...5).contains(rating) else {
-                throw ToolError("rating must be an integer 0-5")
+            guard let starred = args["starred"] as? Bool else {
+                throw ToolError("starred must be a boolean")
             }
-            p.rating = rating
+            p.starred = starred
             Sidecar.write(for: p)
-            return try text(["applied": true, "name": p.name, "rating": rating])
+            return try text(["applied": true, "name": p.name, "starred": starred])
         case "list_presets":
             return try text(["presets": PresetStore.shared.all.map(\.name)])
         case "apply_preset":
@@ -462,14 +462,6 @@ final class MCPServer {
                 Sidecar.write(for: p)
             }
             return try text(["applied": presetName, "name": p.name])
-        case "set_rating":
-            let p = try photo(args)
-            guard let rating = args["rating"] as? Int, (0...5).contains(rating) else {
-                throw ToolError("rating must be an integer 0-5")
-            }
-            p.rating = rating
-            Sidecar.write(for: p)
-            return try text(["applied": true, "name": p.name, "rating": rating])
         case "set_edit":
             let p = try photo(args)
             guard let params = args["edit"] as? [String: Any] else { throw ToolError("missing edit object") }
@@ -637,7 +629,7 @@ final class MCPServer {
         case "get_preview": text = "looked at \(name)"
         case "open_photo": text = "opened \(name)"
         case "set_edit": text = (args["intent"] as? String).map { "\(name) — \($0)" } ?? "adjusted \(name)"
-        case "set_rating": text = "rated \(name)"
+        case "set_starred": text = (args["starred"] as? Bool == true) ? "starred \(name)" : "unstarred \(name)"
         case "apply_preset": text = "applied \((args["preset"] as? String) ?? "a preset") to \(name)"
         case "export": text = "exported \(name)"
         default: text = "\(tool) \(name)"

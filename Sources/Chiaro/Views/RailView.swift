@@ -39,6 +39,8 @@ struct RailView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Group {
                     HistogramView(data: model.histogram)
+                        .overlay(alignment: .topLeading) { clippingTriangle }
+                        .overlay(alignment: .topTrailing) { clippingTriangle }
                     HStack {
                         Spacer()
                         Button(collapsedRaw.isEmpty ? "Collapse all" : "Expand all") {
@@ -90,6 +92,17 @@ struct RailView: View {
                 Text(model.photo.name)
                     .font(Theme.ui(14, .semibold))
                     .foregroundStyle(Theme.ink)
+                Button {
+                    model.photo.starred.toggle()
+                    model.saveNow()
+                } label: {
+                    Image(systemName: model.photo.starred ? "star.fill" : "star")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(model.photo.starred ? Theme.amber : Theme.ink3)
+                }
+                .buttonStyle(.plain)
+                .clickCursor()
+                .help("Star this photo (P)")
                 if model.photo.isRAW {
                     Text("RAW")
                         .font(Theme.mono(8, .medium)).kerning(1)
@@ -642,6 +655,19 @@ struct RailView: View {
         var set = Set(collapsedRaw.split(separator: ",").map(String.init))
         if !set.insert(title).inserted { set.remove(title) }
         collapsedRaw = set.sorted().joined(separator: ",")
+    }
+
+    /// Lightroom-style histogram corner toggles for the clipping overlay.
+    private var clippingTriangle: some View {
+        Button { model.showClipping.toggle() } label: {
+            Image(systemName: "triangle.fill")
+                .font(.system(size: 6))
+                .foregroundStyle(model.showClipping ? Theme.amber : Theme.ink3)
+                .padding(5)
+        }
+        .buttonStyle(.plain)
+        .clickCursor()
+        .help("Clipping warnings — red blown highlights, blue crushed blacks (J)")
     }
 
     @State private var hoveredSection: String?

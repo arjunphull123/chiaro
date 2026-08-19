@@ -68,6 +68,17 @@ final class EditViewModel {
     /// The local adjustment being edited (gizmo shows on the canvas).
     var selectedLocalID: UUID?
 
+    /// Clipping warnings — red blown highlights, blue crushed blacks (J).
+    var showClipping = false {
+        didSet { scheduleRender() }
+    }
+
+    /// Canvas zoom/pan, lifted here so the toolbar can drive them.
+    var canvasZoom: CGFloat = 1
+    var canvasPan: CGSize = .zero
+    /// One-shot request: zoom so preview pixels map 1:1 to screen points.
+    var pixelZoomRequested = false
+
     /// Held-space pan: drag moves the photo even while a parameter is armed.
     var spacePan = false {
         didSet {
@@ -254,6 +265,35 @@ final class EditViewModel {
         }
     }
 
+    func saveVersion(named name: String) {
+        photo.snapshots.append(Sidecar.Snapshot(name: name, date: Date(), edit: edit))
+        Sidecar.write(for: photo)
+    }
+
+    func applyVersion(_ snapshot: Sidecar.Snapshot) {
+        edit = snapshot.edit
+    }
+
+    func deleteVersion(_ snapshot: Sidecar.Snapshot) {
+        photo.snapshots.removeAll { $0.id == snapshot.id }
+        Sidecar.write(for: photo)
+    }
+
+    /// The wand: conservative histogram heuristics, subject-weighted when a
+    /// person is in frame. Every output is an ordinary EditState value.
+    func autoEnhance() {
+        guard let basePreview else { return }
+        let mask = personMask
+        let current = edit
+        Task { [weak self] in
+            let enhanced = await Offload.on(Offload.render) {
+                AutoEnhance.compute(base: basePreview, subjectMask: mask, onto: current)
+            }
+            guard let self, let enhanced else { return }
+            self.edit = enhanced
+        }
+    }
+
     func setBlurMode(_ mode: BlurMode) {
         if mode == .depth {
             enableDepthBlur()
@@ -298,11 +338,12 @@ final class EditViewModel {
         let skipCrop = cropMode
         let url = photo.url
         let peaking = (armed == .focusDepth || armed == .focusRange) && edit.blurMode == .depth
+        let clipping = showClipping
         Task { [weak self] in
             let result = await Offload.on(Offload.render) { () -> (CGImage, HistogramData)? in
                 let depth = edit.blurMode == .depth && (edit.blurF > 0 || peaking)
                     ? DepthEngine.shared.depthMap(for: url, image: basePreview) : nil
-                let output = RenderPipeline.render(base: basePreview, edit: edit, personMask: mask, depthMap: depth, skipCrop: skipCrop, focusPeaking: peaking)
+                let output = RenderPipeline.render(base: basePreview, edit: edit, personMask: mask, depthMap: depth, skipCrop: skipCrop, focusPeaking: peaking, clippingWarnings: clipping)
                 guard let cg = RawEngine.shared.context.createCGImage(output, from: output.extent) else { return nil }
                 return (cg, HistogramSampler.sample(output))
             }

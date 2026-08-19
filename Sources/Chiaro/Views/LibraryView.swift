@@ -8,12 +8,16 @@ struct LibraryView: View {
 
     @State private var searchText = ""
     @FocusState private var searchFocused: Bool
+    enum LibraryFilter: String, CaseIterable {
+        case all = "All", starred = "Starred", edited = "Edited"
+    }
+    @State private var filter: LibraryFilter = .all
 
     /// Top-level subfolder filter (nil = everything). Only meaningful when the
     /// opened folder actually nests photos.
     @State private var folderScope: String?
 
-    enum ListSortKey: String { case name, rating, time, folder }
+    enum ListSortKey: String { case name, starred, time, folder }
     @AppStorage("listSortKey") private var listSortRaw = ListSortKey.name.rawValue
     @AppStorage("listSortAscending") private var listSortAscending = true
     private var listSort: ListSortKey { ListSortKey(rawValue: listSortRaw) ?? .name }
@@ -21,7 +25,7 @@ struct LibraryView: View {
     private func sortedForList(_ photos: [Photo]) -> [Photo] {
         let sorted: [Photo] = switch listSort {
         case .name: photos.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-        case .rating: photos.sorted { $0.rating < $1.rating }
+        case .starred: photos.sorted { !$0.starred && $1.starred }
         case .time: photos.sorted { ($0.captureDate ?? .distantPast) < ($1.captureDate ?? .distantPast) }
         case .folder: photos.sorted { relativeFolder($0).localizedStandardCompare(relativeFolder($1)) == .orderedAscending }
         }
@@ -32,6 +36,11 @@ struct LibraryView: View {
 
     private var visiblePhotos: [Photo] {
         var result = library.photos
+        switch filter {
+        case .all: break
+        case .starred: result = result.filter(\.starred)
+        case .edited: result = result.filter(\.hasEdits)
+        }
         if let folderScope {
             result = result.filter { topFolder($0) == folderScope }
         }
@@ -126,7 +135,7 @@ struct LibraryView: View {
             Color.clear.frame(width: 30, height: 1)
             columnTitle("Name", key: .name, width: nil, alignment: .leading)
             Spacer(minLength: 12)
-            columnTitle("★", key: .rating, width: nil, alignment: .trailing)
+            columnTitle("★", key: .starred, width: nil, alignment: .trailing)
             if hasSubfolders && folderScope == nil {
                 columnTitle("Folder", key: .folder, width: 120, alignment: .trailing)
             }
@@ -168,7 +177,7 @@ struct LibraryView: View {
         }
         .buttonStyle(.plain)
         .clickCursor()
-        .help("Sort by \(title == "★" ? "rating" : title.lowercased())")
+        .help("Sort by \(title == "★" ? "starred" : title.lowercased())")
     }
 
     private var galleryScroll: some View {
@@ -256,6 +265,31 @@ struct LibraryView: View {
                 .font(Theme.mono(10))
                 .foregroundStyle(Theme.ink3)
             Spacer()
+            HStack(spacing: 3) {
+                ForEach(LibraryFilter.allCases, id: \.self) { option in
+                    Button { filter = option } label: {
+                        Group {
+                            if option == .starred {
+                                Image(systemName: "star.fill").font(.system(size: 9, weight: .medium))
+                            } else {
+                                Text(option.rawValue).font(Theme.ui(10, .medium))
+                            }
+                        }
+                        .foregroundStyle(filter == option ? Theme.amber : Theme.ink3)
+                        .padding(.horizontal, 8)
+                        .frame(height: 22)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(filter == option ? Color.white.opacity(0.08) : .clear)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .clickCursor()
+                    .help(option == .all ? "Every photo" : option == .starred ? "Starred only" : "Edited only")
+                }
+            }
+            .padding(3)
+            .background(RoundedRectangle(cornerRadius: 8).stroke(Theme.hairline))
             HStack(spacing: 3) {
                 ForEach(Library.ViewMode.allCases, id: \.self) { mode in
                     Button { library.viewMode = mode } label: {
@@ -535,8 +569,8 @@ struct LibraryView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             }
             HStack(spacing: 4) {
-                if photo.rating > 0 {
-                    Text(String(repeating: "★", count: photo.rating))
+                if photo.starred {
+                    Image(systemName: "star.fill")
                         .font(.system(size: 8))
                         .foregroundStyle(Theme.amber)
                 }
@@ -869,8 +903,8 @@ struct LibraryView: View {
                 Circle().fill(Theme.amber).frame(width: 5, height: 5)
             }
             Spacer(minLength: 12)
-            if photo.rating > 0 {
-                Text(String(repeating: "★", count: photo.rating))
+            if photo.starred {
+                Image(systemName: "star.fill")
                     .font(.system(size: 8))
                     .foregroundStyle(Theme.amber)
             }

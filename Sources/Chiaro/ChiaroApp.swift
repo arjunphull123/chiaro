@@ -150,6 +150,37 @@ struct ChiaroApp: App {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) { attempt(20) }
         }
+        // --auto-test <photo>: print the wand's computed values headless.
+        if let i = args.firstIndex(of: "--auto-test"), i + 1 < args.count {
+            let name = args[i + 1]
+            let lib = library
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                guard let photo = lib.photos.first(where: { $0.name == name }) else {
+                    fputs("AUTO: photo not found\n", stderr); NSApp.terminate(nil); return
+                }
+                let url = photo.url
+                DispatchQueue.global(qos: .userInitiated).async {
+                    guard let base = RawEngine.shared.preview(for: url) else {
+                        fputs("AUTO: no preview\n", stderr)
+                        DispatchQueue.main.async { NSApp.terminate(nil) }
+                        return
+                    }
+                    let mask = PortraitEngine.shared.mask(for: url, image: base)
+                    if let edit = AutoEnhance.compute(base: base, subjectMask: mask, onto: EditState()) {
+                        fputs(String(format: "AUTO: exp %.2f contrast %.0f hi %.0f sh %.0f wh %.0f bl %.0f temp %.0f tint %.0f vib %.0f\n",
+                                     edit.exposure, edit.contrast, edit.highlights, edit.shadows,
+                                     edit.whites, edit.blacks, edit.temp, edit.tint, edit.vibrance), stderr)
+                        DispatchQueue.main.async {
+                            photo.edit = edit
+                            Sidecar.write(for: photo)
+                        }
+                    } else {
+                        fputs("AUTO: failed\n", stderr)
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) { NSApp.terminate(nil) }
+                }
+            }
+        }
         if args.contains("--download-depth") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                 DepthModelStore.shared.downloadIfNeeded()
@@ -240,6 +271,17 @@ struct ChiaroApp: App {
                 Button("Redo edit") { library.activeEditor?.redo() }
                     .keyboardShortcut("z", modifiers: [.command, .shift])
                     .disabled(!(library.activeEditor?.canRedo ?? false))
+            }
+            CommandGroup(after: .sidebar) {
+                Button("Fit to window") {
+                    library.activeEditor?.canvasZoom = 1
+                    library.activeEditor?.canvasPan = .zero
+                }
+                .keyboardShortcut("0")
+                .disabled(library.activeEditor == nil)
+                Button("Actual pixels") { library.activeEditor?.pixelZoomRequested = true }
+                    .keyboardShortcut("1")
+                    .disabled(library.activeEditor == nil)
             }
             CommandGroup(after: .pasteboard) {
                 Button("Copy edits") { library.copyEdit() }

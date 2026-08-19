@@ -262,7 +262,8 @@ final class Library {
         }
         let local = Photo(url: target)
         local.edit = photo.edit
-        local.rating = photo.rating
+        local.starred = photo.starred
+        local.snapshots = photo.snapshots
         local.thumbnail = photo.thumbnail
         local.aspect = photo.aspect
         local.captureDate = photo.captureDate

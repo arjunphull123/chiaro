@@ -5,10 +5,41 @@ import CryptoKit
 /// Photos on removable/read-only volumes (a plugged-in camera card) keep their
 /// sidecars in Application Support instead, keyed by source path (ADR 0007).
 enum Sidecar {
+    /// A named saved state of the edit — Lightroom-style snapshot.
+    struct Snapshot: Codable, Equatable, Identifiable {
+        var name: String
+        var date: Date
+        var edit: EditState
+        var id: String { "\(name)-\(date.timeIntervalSince1970)" }
+    }
+
     struct Document: Codable {
         var version = 1
         var edit: EditState
-        var rating: Int = 0
+        var starred: Bool = false
+        var versions: [Snapshot] = []
+
+        init(edit: EditState, starred: Bool, versions: [Snapshot]) {
+            self.edit = edit
+            self.starred = starred
+            self.versions = versions
+        }
+
+        // Tolerant decode; pre-flag sidecars carried a 0-5 rating.
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 1
+            edit = try c.decodeIfPresent(EditState.self, forKey: .edit) ?? EditState()
+            versions = try c.decodeIfPresent([Snapshot].self, forKey: .versions) ?? []
+            if let flag = try c.decodeIfPresent(Bool.self, forKey: .starred) {
+                starred = flag
+            } else if let legacy = try? decoder.container(keyedBy: LegacyKeys.self),
+                      let rating = try legacy.decodeIfPresent(Int.self, forKey: .rating) {
+                starred = rating > 0
+            }
+        }
+
+        private enum LegacyKeys: String, CodingKey { case rating }
     }
 
     static func read(for photoURL: URL) -> Document? {
@@ -22,9 +53,9 @@ enum Sidecar {
     }
 
     static func write(for photo: Photo) {
-        let doc = Document(edit: photo.edit, rating: photo.rating)
+        let doc = Document(edit: photo.edit, starred: photo.starred, versions: photo.snapshots)
         let target = preferredURL(photo.url)
-        if doc.edit.isNeutral && doc.rating == 0 {
+        if doc.edit.isNeutral && !doc.starred && doc.versions.isEmpty {
             try? FileManager.default.removeItem(at: besideURL(photo.url))
             try? FileManager.default.removeItem(at: storeURL(photo.url))
             return
