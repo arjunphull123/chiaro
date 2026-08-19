@@ -11,10 +11,34 @@ final class EditViewModel {
     var edit: EditState {
         didSet {
             guard edit != oldValue else { return }
+            if !isRestoringEdit {
+                if Date().timeIntervalSince(lastEditAt) > 0.8 {
+                    undoStack.append(oldValue)
+                    if undoStack.count > 100 { undoStack.removeFirst() }
+                    redoStack.removeAll()
+                }
+                lastEditAt = Date()
+            }
             photo.edit = edit
             scheduleRender()
             scheduleSave()
         }
+    }
+
+    func undo() {
+        guard let previous = undoStack.popLast() else { return }
+        redoStack.append(edit)
+        isRestoringEdit = true
+        edit = previous
+        isRestoringEdit = false
+    }
+
+    func redo() {
+        guard let next = redoStack.popLast() else { return }
+        undoStack.append(edit)
+        isRestoringEdit = true
+        edit = next
+        isRestoringEdit = false
     }
     var armed: EditParameter?
     var showOriginal = false
@@ -23,12 +47,21 @@ final class EditViewModel {
     var histogram = HistogramData()
     var hasPerson: Bool?
     var isLoading = true
+    var presetPreviews: [String: CGImage] = [:]
 
     private var basePreview: CIImage?
     private var personMask: CIImage?
     private var renderGeneration = 0
     private var saveItem: DispatchWorkItem?
     private var saveActivity: NSObjectProtocol?
+
+    // Undo/redo: EditState snapshots, coalesced so a slider drag is one step.
+    private var undoStack: [EditState] = []
+    private var redoStack: [EditState] = []
+    private var lastEditAt = Date.distantPast
+    private var isRestoringEdit = false
+    var canUndo: Bool { !undoStack.isEmpty }
+    var canRedo: Bool { !redoStack.isEmpty }
 
     init(photo: Photo) {
         self.photo = photo
@@ -40,55 +73,78 @@ final class EditViewModel {
         guard newPhoto.url != photo.url else { return }
         saveNow()
         photo = newPhoto
+        isRestoringEdit = true
         edit = newPhoto.edit
+        isRestoringEdit = false
+        undoStack.removeAll()
+        redoStack.removeAll()
         armed = nil
         preview = nil
         originalPreview = nil
         basePreview = nil
         personMask = nil
         hasPerson = nil
+        presetPreviews = [:]
         isLoading = true
         load()
     }
 
     private func load() {
+        KeepAwake.poke(30)
         let url = photo.url
         renderGeneration += 1
-        Task.detached(priority: .userInitiated) { [weak self] in
-            guard let base = RawEngine.shared.preview(for: url) else { return }
-            let baseCG = RawEngine.shared.context.createCGImage(base, from: base.extent)
-            await MainActor.run { [weak self] in
-                guard let self, self.photo.url == url else { return }
-                self.basePreview = base
-                self.originalPreview = baseCG
-                self.isLoading = false
-                self.scheduleRender()
+        Task { [weak self] in
+            guard let decoded = await Offload.on(Offload.render, { () -> (CIImage, CGImage?)? in
+                guard let base = RawEngine.shared.preview(for: url) else { return nil }
+                return (base, RawEngine.shared.context.createCGImage(base, from: base.extent))
+            }) else { return }
+            let (base, baseCG) = decoded
+            guard let self, self.photo.url == url else { return }
+            self.basePreview = base
+            self.originalPreview = baseCG
+            self.isLoading = false
+            self.scheduleRender()
+
+            // Tiny per-preset renders for the Looks carousel.
+            let cards = await Offload.on(Offload.render) { () -> [String: CGImage] in
+                let scale = 300 / max(base.extent.width, base.extent.height)
+                let small = base.transformed(by: .init(scaleX: scale, y: scale))
+                var cards: [String: CGImage] = [:]
+                for preset in Preset.builtIn {
+                    let out = RenderPipeline.render(base: small, edit: preset.edit, personMask: nil)
+                    if let cg = RawEngine.shared.context.createCGImage(out, from: out.extent) {
+                        cards[preset.name] = cg
+                    }
+                }
+                return cards
             }
-            let mask = PortraitEngine.shared.mask(for: url, image: base)
-            await MainActor.run { [weak self] in
-                guard let self, self.photo.url == url else { return }
-                self.personMask = mask
-                self.hasPerson = mask != nil
-                if self.edit.blurF > 0 || self.edit.relight != 0 { self.scheduleRender() }
-            }
+            guard self.photo.url == url else { return }
+            self.presetPreviews = cards
+
+            let mask = await Offload.on(Offload.vision) { PortraitEngine.shared.mask(for: url, image: base) }
+            guard self.photo.url == url else { return }
+            self.personMask = mask
+            self.hasPerson = mask != nil
+            if self.edit.blurF > 0 || self.edit.relight != 0 { self.scheduleRender() }
         }
     }
 
     private func scheduleRender() {
         guard let basePreview else { return }
+        KeepAwake.poke()
         renderGeneration += 1
         let generation = renderGeneration
         let edit = edit
         let mask = personMask
-        Task.detached(priority: .userInitiated) { [weak self] in
-            let output = RenderPipeline.render(base: basePreview, edit: edit, personMask: mask)
-            guard let cg = RawEngine.shared.context.createCGImage(output, from: output.extent) else { return }
-            let hist = HistogramSampler.sample(output)
-            await MainActor.run { [weak self] in
-                guard let self, generation == self.renderGeneration else { return }
-                self.preview = cg
-                self.histogram = hist
+        Task { [weak self] in
+            let result = await Offload.on(Offload.render) { () -> (CGImage, HistogramData)? in
+                let output = RenderPipeline.render(base: basePreview, edit: edit, personMask: mask)
+                guard let cg = RawEngine.shared.context.createCGImage(output, from: output.extent) else { return nil }
+                return (cg, HistogramSampler.sample(output))
             }
+            guard let self, let (cg, hist) = result, generation == self.renderGeneration else { return }
+            self.preview = cg
+            self.histogram = hist
         }
     }
 

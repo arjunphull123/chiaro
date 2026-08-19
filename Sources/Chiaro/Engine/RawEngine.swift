@@ -13,6 +13,8 @@ final class RawEngine {
     private var previewCache: [URL: CIImage] = [:]
     private var cacheOrder: [URL] = []
     private let lock = NSLock()
+    /// At most 3 full RAW decodes in flight — they're memory- and GPU-heavy.
+    private let decodeGate = DispatchSemaphore(value: 3)
 
     func fullImage(for url: URL) -> CIImage? {
         if let raw = CIRAWFilter(imageURL: url) {
@@ -30,6 +32,8 @@ final class RawEngine {
         }
         lock.unlock()
 
+        decodeGate.wait()
+        defer { decodeGate.signal() }
         guard let full = fullImage(for: url) else { return nil }
         let scale = min(1, Self.previewMaxDimension / max(full.extent.width, full.extent.height))
         var image = scale < 1

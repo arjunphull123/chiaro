@@ -1,11 +1,20 @@
 import SwiftUI
 
-/// Justified-rows gallery: photos keep their shape, packed into even-height rows.
+/// Date-grouped, justified-rows gallery: sections per capture day (like Photos),
+/// photos keep their shape within even-height rows.
 struct LibraryView: View {
     @Bindable var library: Library
+    let onExport: () -> Void
 
-    private let targetRowHeight: CGFloat = 176
     private let gap: CGFloat = 8
+
+    private var targetRowHeight: CGFloat {
+        switch library.zoom {
+        case .days: 176
+        case .months: 118
+        case .years: 78
+        }
+    }
 
     var body: some View {
         Group {
@@ -20,39 +29,111 @@ struct LibraryView: View {
 
     private var gallery: some View {
         GeometryReader { geo in
-            let rows = justifiedRows(width: geo.size.width - 28)
+            let width = geo.size.width - 32
             ScrollView {
-                VStack(alignment: .leading, spacing: gap) {
-                    toolbar
-                    ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                        HStack(spacing: gap) {
-                            ForEach(row.photos) { photo in
-                                tile(photo, height: row.height)
+                VStack(alignment: .leading, spacing: 10) {
+                    header
+                    ForEach(sections) { section in
+                        VStack(alignment: .leading, spacing: gap) {
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Text(section.title)
+                                    .font(Theme.ui(13, .semibold))
+                                    .foregroundStyle(Theme.ink)
+                                Text("\(section.photos.count)")
+                                    .font(Theme.mono(10))
+                                    .foregroundStyle(Theme.ink3)
+                            }
+                            .padding(.top, 14)
+                            ForEach(Array(justifiedRows(section.photos, width: width).enumerated()), id: \.offset) { _, row in
+                                HStack(spacing: gap) {
+                                    ForEach(row.photos) { photo in
+                                        tile(photo, height: row.height)
+                                    }
+                                }
                             }
                         }
                     }
                 }
-                .padding(14)
-                .padding(.top, 30)
+                .padding(16)
+                .padding(.top, 28)
             }
         }
     }
 
-    private var toolbar: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
             Text(library.folderName)
-                .font(Theme.ui(13, .semibold))
+                .font(Theme.ui(22, .semibold))
                 .foregroundStyle(Theme.ink)
-            Text("\(library.photos.count) photos")
-                .font(Theme.mono(10))
+            Text("\(library.photos.count) photos · \(library.photos.filter(\.isRAW).count) RAW")
+                .font(Theme.mono(11))
                 .foregroundStyle(Theme.ink3)
             Spacer()
+            Picker("", selection: $library.zoom) {
+                ForEach(Library.Zoom.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 210)
+            if !library.selection.isEmpty {
+                Button("Export…") { onExport() }
+                    .font(Theme.ui(12, .medium))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Theme.amber)
+            }
             Button("Open Folder…") { openFolder() }
-                .font(Theme.ui(11))
+                .font(Theme.ui(12))
                 .buttonStyle(.plain)
                 .foregroundStyle(Theme.ink2)
         }
-        .padding(.bottom, 6)
+    }
+
+    // MARK: - Date sections
+
+    private struct DaySection: Identifiable {
+        let id: Date
+        let title: String
+        var photos: [Photo]
+    }
+
+    private var sections: [DaySection] {
+        let calendar = Calendar.current
+        var byPeriod: [Date: [Photo]] = [:]
+        var undated: [Photo] = []
+        for photo in library.photos {
+            if let date = photo.captureDate {
+                let key = switch library.zoom {
+                case .days: calendar.startOfDay(for: date)
+                case .months: calendar.date(from: calendar.dateComponents([.year, .month], from: date))!
+                case .years: calendar.date(from: calendar.dateComponents([.year], from: date))!
+                }
+                byPeriod[key, default: []].append(photo)
+            } else {
+                undated.append(photo)
+            }
+        }
+        let formatter = switch library.zoom {
+        case .days: Self.dayFormatter
+        case .months: Self.monthFormatter
+        case .years: Self.yearFormatter
+        }
+        var result = byPeriod.keys.sorted().map { period in
+            DaySection(id: period, title: formatter.string(from: period), photos: byPeriod[period]!)
+        }
+        if !undated.isEmpty {
+            result.append(DaySection(id: .distantFuture, title: "Undated", photos: undated))
+        }
+        return result
+    }
+
+    private static let dayFormatter = makeFormatter("EEEE · MMMM d, yyyy")
+    private static let monthFormatter = makeFormatter("MMMM yyyy")
+    private static let yearFormatter = makeFormatter("yyyy")
+
+    private static func makeFormatter(_ format: String) -> DateFormatter {
+        let f = DateFormatter()
+        f.dateFormat = format
+        return f
     }
 
     private func tile(_ photo: Photo, height: CGFloat) -> some View {
@@ -90,8 +171,7 @@ struct LibraryView: View {
         }
         .contentShape(Rectangle())
         .gesture(TapGesture(count: 2).onEnded {
-            library.selection = [photo.url]
-            library.editing = photo
+            library.edit(photo)
         })
         .simultaneousGesture(TapGesture().modifiers(.command).onEnded {
             if selected { library.selection.remove(photo.url) }
@@ -107,7 +187,7 @@ struct LibraryView: View {
             Text("Chiaro")
                 .font(Theme.ui(30, .semibold))
                 .foregroundStyle(Theme.ink)
-            Text("Point it at a folder of photos. Originals are never touched.")
+            Text("Point it at a folder of photos — or your camera's card. Originals are never touched.")
                 .font(Theme.ui(13))
                 .foregroundStyle(Theme.ink2)
             Button(action: openFolder) {
@@ -140,12 +220,12 @@ struct LibraryView: View {
         var height: CGFloat
     }
 
-    private func justifiedRows(width: CGFloat) -> [Row] {
+    private func justifiedRows(_ photos: [Photo], width: CGFloat) -> [Row] {
         guard width > 100 else { return [] }
         var rows: [Row] = []
         var current: [Photo] = []
         var aspectSum: CGFloat = 0
-        for photo in library.photos {
+        for photo in photos {
             current.append(photo)
             aspectSum += photo.aspect
             let rowHeight = (width - gap * CGFloat(current.count - 1)) / aspectSum

@@ -17,17 +17,17 @@ struct AdjustmentRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(parameter.label)
-                .font(Theme.ui(11))
+                .font(Theme.ui(11.5))
                 .foregroundStyle(isArmed ? Theme.amber : Theme.ink2)
-                .frame(width: 62, alignment: .leading)
+                .frame(width: 70, alignment: .leading)
             track
             Text(parameter.format(value))
-                .font(Theme.mono(9.5))
+                .font(Theme.mono(10))
                 .foregroundStyle(isActive ? Theme.amber : Theme.ink2)
-                .frame(width: 40, alignment: .trailing)
+                .frame(width: 42, alignment: .trailing)
                 .monospacedDigit()
         }
-        .frame(height: 22)
+        .frame(height: 25)
         .contentShape(Rectangle())
         .opacity(disabled ? 0.35 : 1)
         .allowsHitTesting(!disabled)

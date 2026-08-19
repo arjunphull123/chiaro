@@ -34,5 +34,16 @@ struct HistogramView: View {
             }
         }
         .frame(height: 62)
+        .overlay(alignment: .bottomLeading) {
+            Text("SHADOWS")
+                .font(Theme.mono(7)).kerning(1).foregroundStyle(Theme.ink3)
+                .padding(.leading, 7).padding(.bottom, 4)
+        }
+        .overlay(alignment: .bottomTrailing) {
+            Text("HIGHLIGHTS")
+                .font(Theme.mono(7)).kerning(1).foregroundStyle(Theme.ink3)
+                .padding(.trailing, 7).padding(.bottom, 4)
+        }
+        .help("The photo's tones, dark to bright. A pile against the left edge means crushed shadows; against the right, blown highlights.")
     }
 }

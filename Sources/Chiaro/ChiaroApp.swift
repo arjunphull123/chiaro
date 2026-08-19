@@ -55,8 +55,8 @@ struct ChiaroApp: App {
             }
             DispatchQueue.main.async {
                 lib.open(folder)
-                if let editName {
-                    lib.editing = lib.photos.first { $0.name == editName }
+                if let editName, let photo = lib.photos.first(where: { $0.name == editName }) {
+                    lib.edit(photo)
                 }
                 if let exportName, let photo = lib.photos.first(where: { $0.name == exportName }) {
                     Task.detached {
@@ -87,7 +87,7 @@ struct ChiaroApp: App {
         WindowGroup {
             RootView(library: library, exporting: $exporting)
                 .preferredColorScheme(.dark)
-                .frame(minWidth: 980, minHeight: 640)
+                .frame(minWidth: 1080, minHeight: 700)
         }
         .windowStyle(.hiddenTitleBar)
         .commands {
@@ -99,6 +99,14 @@ struct ChiaroApp: App {
                     if panel.runModal() == .OK, let url = panel.url { library.open(url) }
                 }
                 .keyboardShortcut("o")
+            }
+            CommandGroup(replacing: .undoRedo) {
+                Button("Undo Edit") { library.activeEditor?.undo() }
+                    .keyboardShortcut("z")
+                    .disabled(!(library.activeEditor?.canUndo ?? false))
+                Button("Redo Edit") { library.activeEditor?.redo() }
+                    .keyboardShortcut("z", modifiers: [.command, .shift])
+                    .disabled(!(library.activeEditor?.canRedo ?? false))
             }
             CommandGroup(after: .pasteboard) {
                 Button("Copy Edit") { library.copyEdit() }
@@ -125,9 +133,9 @@ struct RootView: View {
             WindowBackdrop().ignoresSafeArea()
             Theme.ground.opacity(0.82).ignoresSafeArea()
             if let editing = library.editing {
-                EditView(library: library, photo: editing)
+                EditView(library: library, photo: editing, onExport: { exporting = true })
             } else {
-                LibraryView(library: library)
+                LibraryView(library: library, onExport: { exporting = true })
             }
         }
         .containerBackground(.clear, for: .window)

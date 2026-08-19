@@ -135,14 +135,14 @@ enum EditParameter: String, CaseIterable, Identifiable {
     /// Display string for the current value (Geist Mono in the UI).
     func format(_ v: Double) -> String {
         switch self {
-        case .exposure: String(format: "%+.2f", v)
+        case .exposure: v == 0 ? "0.00" : String(format: "%+.2f", v)
         case .blurF:
             v <= 0.001 ? "off" : {
                 let f = 16.0 * pow(1.4 / 16.0, v)
                 return f < 10 ? String(format: "ƒ%.1f", f) : String(format: "ƒ%.0f", f)
             }()
         case .vignette, .sharpness, .noiseReduction: String(format: "%.0f", v)
-        default: String(format: "%+.0f", v)
+        default: v == 0 ? "0" : String(format: "%+.0f", v)
         }
     }
 }

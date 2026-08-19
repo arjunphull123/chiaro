@@ -11,7 +11,7 @@ enum Theme {
     static let ink3 = Color.white.opacity(0.34)
     static let hairline = Color.white.opacity(0.08)
 
-    static let railWidth: CGFloat = 232
+    static let railWidth: CGFloat = 268
 
     private static var fontsRegistered = false
 

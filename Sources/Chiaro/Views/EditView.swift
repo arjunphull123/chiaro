@@ -2,35 +2,29 @@ import SwiftUI
 
 struct EditView: View {
     let library: Library
+    let onExport: () -> Void
     @State private var model: EditViewModel
     @FocusState private var focused: Bool
 
-    init(library: Library, photo: Photo) {
+    init(library: Library, photo: Photo, onExport: @escaping () -> Void) {
         self.library = library
+        self.onExport = onExport
         _model = State(initialValue: EditViewModel(photo: photo))
     }
 
     var body: some View {
         ZStack(alignment: .trailing) {
             CanvasView(model: model)
-            RailView(model: model)
+            RailView(model: model, library: library)
                 .ignoresSafeArea()
                 .disabled(library.agentActive)
+                .overlay(alignment: .trailing) { agentOverlay }
         }
-        .overlay(alignment: .top) {
-            if library.agentActive {
-                AgentPill().padding(.top, 14).padding(.trailing, Theme.railWidth)
-            }
-        }
-        .overlay(alignment: .bottom) {
-            FilmstripView(photos: library.photos, current: model.photo) { photo in
-                model.switchTo(photo)
-                library.selection = [photo.url]
-            }
-            .padding(.bottom, 14)
-            .padding(.trailing, Theme.railWidth)
-        }
+        .overlay(alignment: .bottom) { navPill.padding(.bottom, 16).padding(.trailing, Theme.railWidth) }
         .overlay(alignment: .topLeading) { backButton.padding(14) }
+        .overlay(alignment: .topTrailing) {
+            exportButton.padding(14).padding(.trailing, Theme.railWidth)
+        }
         .focusable()
         .focused($focused)
         .focusEffectDisabled()
@@ -56,6 +50,70 @@ struct EditView: View {
         .onDisappear { model.saveNow() }
     }
 
+    /// Frosts the entire rail while an agent drives, with the agent's stated intent.
+    @ViewBuilder private var agentOverlay: some View {
+        if library.agentActive {
+            ZStack {
+                Rectangle().fill(.ultraThinMaterial)
+                VStack(spacing: 10) {
+                    AgentPill()
+                    if let intent = library.agentIntent {
+                        Text(intent)
+                            .font(Theme.ui(11))
+                            .foregroundStyle(Theme.ink2)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 20)
+                    }
+                }
+            }
+            .frame(width: Theme.railWidth)
+            .ignoresSafeArea()
+            .transition(.opacity)
+        }
+    }
+
+    private var navPill: some View {
+        HStack(spacing: 12) {
+            Button { step(-1) } label: { chevron("chevron.left") }.buttonStyle(.plain)
+            Text("\(photoIndex + 1) / \(library.photos.count)")
+                .font(Theme.mono(10))
+                .foregroundStyle(Theme.ink2)
+                .monospacedDigit()
+            Button { step(1) } label: { chevron("chevron.right") }.buttonStyle(.plain)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .chiaroGlass(cornerRadius: 12)
+    }
+
+    private func chevron(_ name: String) -> some View {
+        Image(systemName: name)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(Theme.ink2)
+            .frame(width: 20, height: 20)
+            .contentShape(Rectangle())
+    }
+
+    private var photoIndex: Int {
+        library.photos.firstIndex(where: { $0.url == model.photo.url }) ?? 0
+    }
+
+    private var exportButton: some View {
+        Button(action: onExport) {
+            HStack(spacing: 6) {
+                Image(systemName: "square.and.arrow.up").font(.system(size: 10, weight: .semibold))
+                Text("Export").font(Theme.ui(11, .medium))
+            }
+            .foregroundStyle(Theme.amber)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .chiaroGlass(cornerRadius: 10)
+        }
+        .buttonStyle(.plain)
+        .keyboardShortcut("e")
+        .help("Full-resolution JPEG, HEIF, or 16-bit TIFF (⌘E)")
+    }
+
     private var backButton: some View {
         Button(action: close) {
             HStack(spacing: 6) {
@@ -68,12 +126,6 @@ struct EditView: View {
             .chiaroGlass(cornerRadius: 10)
         }
         .buttonStyle(.plain)
-    }
-
-    private func close() {
-        model.saveNow()
-        library.activeEditor = nil
-        library.editing = nil
     }
 
     private struct AgentPill: View {
@@ -95,13 +147,18 @@ struct EditView: View {
             .padding(.vertical, 8)
             .chiaroGlass(cornerRadius: 12)
             .onAppear { pulsing = true }
-            .transition(.opacity)
         }
+    }
+
+    private func close() {
+        model.saveNow()
+        library.activeEditor = nil
+        library.editing = nil
     }
 
     private func step(_ delta: Int) {
         guard let index = library.photos.firstIndex(where: { $0.url == model.photo.url }) else { return }
         let next = (index + delta + library.photos.count) % library.photos.count
-        model.switchTo(library.photos[next])
+        library.edit(library.photos[next])
     }
 }

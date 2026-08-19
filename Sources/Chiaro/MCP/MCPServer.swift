@@ -104,6 +104,7 @@ final class MCPServer {
     // MARK: - JSON-RPC
 
     private func handle(body: Data, reply: @escaping (Data?) -> Void) {
+        KeepAwake.poke(20)
         guard let message = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
               let method = message["method"] as? String
         else { reply(rpcError(id: nil, code: -32700, message: "parse error")); return }
@@ -197,6 +198,7 @@ final class MCPServer {
                     "name": ["type": "string"],
                     "edit": ["type": "object", "properties": editProperties],
                     "reset": ["type": "boolean", "description": "reset to neutral before applying"],
+                    "intent": ["type": "string", "description": "short description of what you're doing (e.g. 'warming skin tones') — shown live in the app UI"],
                 ],
                 "required": ["name", "edit"],
             ],
@@ -280,7 +282,7 @@ final class MCPServer {
                 parameter.set(number, in: &edit)
             }
             if let editor = library.activeEditor, editor.photo.url == p.url {
-                library.noteAgentActivity()
+                library.noteAgentActivity(intent: args["intent"] as? String)
                 editor.edit = edit // renders live in the UI
             } else {
                 p.edit = edit
@@ -289,19 +291,16 @@ final class MCPServer {
             return try text(["applied": true, "name": p.name])
         case "open_photo":
             let p = try photo(args)
-            library.selection = [p.url]
-            if let editor = library.activeEditor { editor.switchTo(p) } else { library.editing = p }
-            library.noteAgentActivity()
+            library.edit(p)
+            library.noteAgentActivity(intent: args["intent"] as? String)
             NSApp.activate(ignoringOtherApps: true)
             return try text(["opened": p.name])
         case "get_preview":
             let p = try photo(args)
             let maxDim = args["maxDimension"] as? Double ?? 768
             let url = p.url, edit = p.edit
-            let jpeg: Data = try await Task.detached(priority: .userInitiated) {
-                guard let base = RawEngine.shared.preview(for: url) else {
-                    throw ToolError("could not decode \(url.lastPathComponent)")
-                }
+            let jpeg = await Offload.on(Offload.render) { () -> Data? in
+                guard let base = RawEngine.shared.preview(for: url) else { return nil }
                 var mask: CIImage?
                 if edit.blurF > 0 || edit.relight != 0 {
                     mask = PortraitEngine.shared.mask(for: url, image: base)
@@ -309,12 +308,12 @@ final class MCPServer {
                 var out = RenderPipeline.render(base: base, edit: edit, personMask: mask)
                 let scale = maxDim / Double(max(out.extent.width, out.extent.height))
                 if scale < 1 { out = out.transformed(by: .init(scaleX: scale, y: scale)) }
-                guard let data = RawEngine.shared.context.jpegRepresentation(
+                return RawEngine.shared.context.jpegRepresentation(
                     of: out, colorSpace: CGColorSpace(name: CGColorSpace.displayP3)!,
                     options: [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: 0.85]
-                ) else { throw ToolError("render failed") }
-                return data
-            }.value
+                )
+            }
+            guard let jpeg else { throw ToolError("could not render \(url.lastPathComponent)") }
             return [["type": "image", "data": jpeg.base64EncodedString(), "mimeType": "image/jpeg"]]
         case "export":
             let p = try photo(args)
@@ -329,8 +328,11 @@ final class MCPServer {
                 options.destination = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask)[0]
                     .appendingPathComponent("Chiaro Exports")
             }
-            let out = try await Task.detached { try Exporter.export(p, options: options) }.value
-            return try text(["exported": out.path])
+            let finalOptions = options
+            let out = await Offload.on(Offload.render) { () -> Result<URL, Error> in
+                Result { try Exporter.export(p, options: finalOptions) }
+            }
+            return try text(["exported": out.get().path])
         default:
             throw ToolError("unknown tool \(name)")
         }

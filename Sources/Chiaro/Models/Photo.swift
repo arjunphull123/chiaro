@@ -9,6 +9,8 @@ final class Photo: Identifiable {
     var aspect: CGFloat = 1.5
     var edit: EditState
     var rating: Int
+    var captureDate: Date?
+    var exifSummary: String?
 
     var id: URL { url }
     var name: String { url.deletingPathExtension().lastPathComponent }

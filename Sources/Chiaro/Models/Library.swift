@@ -13,19 +13,32 @@ final class Library {
     /// (MCP tools) mutate the same EditState the UI is rendering (ADR 0008).
     weak var activeEditor: EditViewModel?
 
-    /// True while an agent is actively driving edits over MCP; the UI shows a
-    /// presence pill and soft-locks manual input. Clears 3s after the last call.
+    /// True while an agent is actively driving edits over MCP; the UI frosts the
+    /// rail with a presence pill and the agent's stated intent, and soft-locks
+    /// manual input. Clears 3s after the last call.
     var agentActive = false
+    var agentIntent: String?
     private var agentClearItem: DispatchWorkItem?
 
-    func noteAgentActivity() {
+    func noteAgentActivity(intent: String? = nil) {
         agentActive = true
+        if let intent { agentIntent = intent }
         activeEditor?.armed = nil
         agentClearItem?.cancel()
-        let item = DispatchWorkItem { [weak self] in self?.agentActive = false }
+        let item = DispatchWorkItem { [weak self] in
+            self?.agentActive = false
+            self?.agentIntent = nil
+        }
         agentClearItem = item
         DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: item)
     }
+
+    /// Library grouping granularity — Photos-style zoom levels.
+    enum Zoom: String, CaseIterable, Identifiable {
+        case days = "Days", months = "Months", years = "Years"
+        var id: String { rawValue }
+    }
+    var zoom: Zoom = .days
 
     var folderName: String { folderURL?.lastPathComponent ?? "" }
     var selectedPhotos: [Photo] { photos.filter { selection.contains($0.url) } }
@@ -55,43 +68,135 @@ final class Library {
         loadThumbnails()
     }
 
+    struct ScanResult: Sendable {
+        var image: CGImage?
+        var captureDate: Date?
+        var exifSummary: String?
+    }
+
+    /// Thumbnail extraction is blocking I/O, so it runs on its own OperationQueue —
+    /// never on the cooperative pool, where it would starve every other Task.
+    private static let scanQueue: OperationQueue = {
+        let q = OperationQueue()
+        q.maxConcurrentOperationCount = 4
+        q.qualityOfService = .utility
+        return q
+    }()
+
     private func loadThumbnails() {
-        let targets = photos
-        Task.detached(priority: .userInitiated) {
-            await withTaskGroup(of: (URL, CGImage?).self) { group in
-                var pending = targets.makeIterator()
-                var active = 0
-                func addNext(_ group: inout TaskGroup<(URL, CGImage?)>) {
-                    guard let photo = pending.next() else { return }
-                    let url = photo.url
-                    active += 1
-                    group.addTask { (url, Self.embeddedThumbnail(url)) }
-                }
-                for _ in 0..<6 { addNext(&group) }
-                for await (url, image) in group {
-                    active -= 1
-                    if let image {
-                        await MainActor.run { [targets] in
-                            guard let photo = targets.first(where: { $0.url == url }) else { return }
-                            photo.thumbnail = image
-                            photo.aspect = CGFloat(image.width) / CGFloat(image.height)
-                        }
+        KeepAwake.poke(60)
+        Self.scanQueue.cancelAllOperations()
+        let currentFolder = folderURL
+        for photo in photos {
+            let url = photo.url
+            Self.scanQueue.addOperation { [weak self] in
+                let result = Self.scan(url)
+                DispatchQueue.main.async {
+                    guard let self, self.folderURL == currentFolder,
+                          let photo = self.photos.first(where: { $0.url == url }) else { return }
+                    if let image = result.image {
+                        photo.thumbnail = image
+                        photo.aspect = CGFloat(image.width) / CGFloat(image.height)
                     }
-                    addNext(&group)
+                    photo.captureDate = result.captureDate
+                    photo.exifSummary = result.exifSummary
                 }
             }
         }
     }
 
-    /// Fast thumbnail from the file's embedded preview — never a full RAW decode.
-    nonisolated static func embeddedThumbnail(_ url: URL) -> CGImage? {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+    /// Fast thumbnail + shooting metadata from the file's embedded preview —
+    /// never a full RAW decode.
+    nonisolated static func scan(_ url: URL) -> ScanResult {
+        var result = ScanResult()
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return result }
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceThumbnailMaxPixelSize: 480,
         ]
-        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+        result.image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+
+        guard let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else {
+            return result
+        }
+        let exif = props[kCGImagePropertyExifDictionary] as? [CFString: Any] ?? [:]
+        if let stamp = exif[kCGImagePropertyExifDateTimeOriginal] as? String {
+            result.captureDate = Self.exifDateFormatter.date(from: stamp)
+        }
+        var parts: [String] = []
+        if let f = exif[kCGImagePropertyExifFNumber] as? Double {
+            parts.append(String(format: "ƒ%.1f", f))
+        }
+        if let t = exif[kCGImagePropertyExifExposureTime] as? Double, t > 0 {
+            parts.append(t >= 1 ? String(format: "%.0fs", t) : "1/\(Int((1 / t).rounded()))")
+        }
+        if let iso = (exif[kCGImagePropertyExifISOSpeedRatings] as? [Any])?.first as? Int {
+            parts.append("ISO \(iso)")
+        }
+        if let mm = exif[kCGImagePropertyExifFocalLenIn35mmFilm] as? Int {
+            parts.append("\(mm)mm")
+        }
+        result.exifSummary = parts.isEmpty ? nil : parts.joined(separator: " · ")
+        return result
+    }
+
+    nonisolated static let exifDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy:MM:dd HH:mm:ss"
+        return f
+    }()
+
+    // MARK: - Import on edit
+
+    /// Editing a photo that lives on a camera card first copies the RAW into the
+    /// local library (~/Pictures/Chiaro Library/<capture day>/), so the photo and
+    /// its edits survive the card being ejected or reformatted. Local photos are
+    /// returned unchanged; a failed copy falls back to editing in place.
+    func localized(_ photo: Photo) -> Photo {
+        guard Self.isRemovable(photo.url) else { return photo }
+        let day = (photo.captureDate ?? Date()).formatted(.iso8601.year().month().day())
+        let folder = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Chiaro Library/\(day)")
+        let target = folder.appendingPathComponent(photo.url.lastPathComponent)
+        let fm = FileManager.default
+        do {
+            try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+            if !fm.fileExists(atPath: target.path) {
+                try fm.copyItem(at: photo.url, to: target)
+            }
+        } catch {
+            return photo
+        }
+        let local = Photo(url: target)
+        local.edit = photo.edit
+        local.rating = photo.rating
+        local.thumbnail = photo.thumbnail
+        local.aspect = photo.aspect
+        local.captureDate = photo.captureDate
+        local.exifSummary = photo.exifSummary
+        Sidecar.write(for: local)
+        if let index = photos.firstIndex(where: { $0.url == photo.url }) {
+            photos[index] = local
+        }
+        if selection.remove(photo.url) != nil { selection.insert(local.url) }
+        return local
+    }
+
+    /// The one entry point for opening the editor — always localizes first.
+    func edit(_ photo: Photo) {
+        let target = localized(photo)
+        selection = [target.url]
+        if let activeEditor { activeEditor.switchTo(target) } else { editing = target }
+    }
+
+    static func isRemovable(_ url: URL) -> Bool {
+        let values = try? url.resourceValues(forKeys: [
+            .volumeIsRemovableKey, .volumeIsEjectableKey, .volumeIsReadOnlyKey,
+        ])
+        return values?.volumeIsRemovable ?? false
+            || values?.volumeIsEjectable ?? false
+            || values?.volumeIsReadOnly ?? false
     }
 
     // MARK: - Edit transfer
