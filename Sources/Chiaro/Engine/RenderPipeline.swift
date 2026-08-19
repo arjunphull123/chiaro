@@ -32,6 +32,9 @@ enum RenderPipeline {
         if edit.whites != 0 || edit.blacks != 0 || edit.highlights > 0 {
             image = toneCurve(image, edit: edit)
         }
+        if edit.curve != CurvePoint.identity {
+            image = userCurve(image, points: edit.curve)
+        }
         if edit.contrast != 0 || edit.saturation != 0 {
             let f = CIFilter.colorControls()
             f.inputImage = image
@@ -93,6 +96,20 @@ enum RenderPipeline {
         f.point3 = CGPoint(x: 0.75, y: 0.75 + 0.12 * h)
         f.point4 = p4
         return f.outputImage ?? image
+    }
+
+    /// User tone curve: monotone spline sampled into a 256-entry LUT for CIColorCurves.
+    private static func userCurve(_ image: CIImage, points: [CurvePoint]) -> CIImage {
+        let samples = CurveSampler.sample(points, count: 256)
+        var floats = [Float]()
+        floats.reserveCapacity(256 * 3)
+        for y in samples { floats.append(contentsOf: [y, y, y]) }
+        let data = floats.withUnsafeBufferPointer { Data(buffer: $0) }
+        return image.applyingFilter("CIColorCurves", parameters: [
+            "inputCurvesData": data,
+            "inputCurvesDomain": CIVector(x: 0, y: 1),
+            "inputColorSpace": CGColorSpace(name: CGColorSpace.displayP3)!,
+        ])
     }
 
     private static func portrait(_ image: CIImage, edit: EditState, mask: CIImage, scale: CGFloat) -> CIImage {

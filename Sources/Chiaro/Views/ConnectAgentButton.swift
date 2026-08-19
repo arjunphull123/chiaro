@@ -1,5 +1,39 @@
 import SwiftUI
 
+/// Stylized starburst for Claude connection state (drawn, not an asset).
+struct ClaudeSpark: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let cx = Double(rect.midX), cy = Double(rect.midY)
+        let radius = Double(min(rect.width, rect.height)) / 2
+        let rays = 10
+        for i in 0..<rays {
+            let angle = Double(i) / Double(rays) * 2 * .pi
+            let spread = 0.34
+            let base = radius * 0.16
+            path.move(to: CGPoint(x: cx + Foundation.cos(angle - spread) * base, y: cy + Foundation.sin(angle - spread) * base))
+            path.addLine(to: CGPoint(x: cx + Foundation.cos(angle) * radius, y: cy + Foundation.sin(angle) * radius))
+            path.addLine(to: CGPoint(x: cx + Foundation.cos(angle + spread) * base, y: cy + Foundation.sin(angle + spread) * base))
+            path.closeSubpath()
+        }
+        return path
+    }
+}
+
+struct AgentDot: View {
+    let connected: Bool
+
+    var body: some View {
+        if connected && AgentStatus.shared.isClaude {
+            ClaudeSpark().fill(Theme.claude).frame(width: 11, height: 11)
+        } else {
+            Circle()
+                .fill(connected ? Theme.claude : Theme.ink3)
+                .frame(width: 6, height: 6)
+        }
+    }
+}
+
 /// "Connect Agent": copyable orientation prompt pointing any coding agent at the
 /// local MCP server (ADR 0008). The server self-describes via tools/list schemas;
 /// this prompt is just the address and etiquette.
@@ -17,13 +51,13 @@ struct AgentRailStatus: View {
                         Image(systemName: "lock.fill")
                             .font(.system(size: 9, weight: .semibold))
                             .foregroundStyle(Theme.amber)
-                        Text("\(AgentStatus.shared.clientName?.uppercased() ?? "AGENT") IS EDITING…")
+                        Text("\(AgentStatus.shared.displayName.uppercased()) IS EDITING…")
                             .font(Theme.mono(9, .medium))
                             .kerning(1.4)
                             .foregroundStyle(Theme.ink)
                             .lineLimit(1)
                         Spacer()
-                        Circle().fill(Theme.amber).frame(width: 6, height: 6)
+                        AgentDot(connected: true)
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -44,10 +78,8 @@ struct AgentRailStatus: View {
                     showing.toggle()
                 } label: {
                     HStack(spacing: 8) {
-                        Circle()
-                            .fill(connected ? Color(hex: 0x4FC463) : Theme.ink3)
-                            .frame(width: 6, height: 6)
-                        Text(connected ? "\(AgentStatus.shared.clientName ?? "Agent") connected" : "Connect Agent")
+                        AgentDot(connected: connected)
+                        Text(connected ? "\(AgentStatus.shared.displayName) connected" : "Connect Agent")
                             .font(Theme.ui(11, .medium))
                             .foregroundStyle(connected ? Theme.ink : Theme.ink2)
                             .lineLimit(1)
@@ -60,7 +92,7 @@ struct AgentRailStatus: View {
                     .padding(.vertical, 8)
                     .background(
                         RoundedRectangle(cornerRadius: 9)
-                            .stroke(connected ? Color(hex: 0x4FC463).opacity(0.35) : Theme.hairline)
+                            .stroke(connected ? Theme.claude.opacity(0.4) : Theme.hairline)
                     )
                 }
                 .buttonStyle(.plain)
@@ -80,10 +112,8 @@ struct ConnectAgentButton: View {
                 showing.toggle()
             } label: {
                 HStack(spacing: 6) {
-                    Circle()
-                        .fill(connected ? Color(hex: 0x4FC463) : Theme.ink3)
-                        .frame(width: 6, height: 6)
-                    Text(connected ? (AgentStatus.shared.clientName ?? "Agent") + " connected" : "Connect Agent")
+                    AgentDot(connected: connected)
+                    Text(connected ? AgentStatus.shared.displayName + " connected" : "Connect Agent")
                         .font(Theme.ui(12, .medium))
                 }
                 .foregroundStyle(connected ? Theme.ink : Theme.ink2)
@@ -91,7 +121,7 @@ struct ConnectAgentButton: View {
                 .padding(.vertical, 7)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(connected ? Color(hex: 0x4FC463).opacity(0.4) : Theme.hairline)
+                        .stroke(connected ? Theme.claude.opacity(0.4) : Theme.hairline)
                 )
             }
             .buttonStyle(.plain)

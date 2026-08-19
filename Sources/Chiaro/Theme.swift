@@ -6,6 +6,8 @@ enum Theme {
     static let panel = Color(hex: 0x232326)
     static let ground = Color(hex: 0x131315)
     static let amber = Color(hex: 0xE8A33D)
+    /// Anthropic's terracotta — used only for Claude connection state.
+    static let claude = Color(hex: 0xD97757)
     static let ink = Color.white.opacity(0.87)
     static let ink2 = Color.white.opacity(0.52)
     static let ink3 = Color.white.opacity(0.34)

@@ -1,5 +1,12 @@
 import Foundation
 
+/// One control point on the tone curve, both axes 0…1.
+struct CurvePoint: Codable, Equatable, Hashable {
+    var x: Double
+    var y: Double
+    static let identity = [CurvePoint(x: 0, y: 0), CurvePoint(x: 1, y: 1)]
+}
+
 /// The complete, serializable description of one photo's edit (ADR 0003).
 /// Every UI input path mutates this; the render pipeline is a pure function of it.
 struct EditState: Codable, Equatable {
@@ -25,6 +32,8 @@ struct EditState: Codable, Equatable {
     var blurF: Double = 0         // 0...1 (0 = off/f16, 1 = f1.4)
     var relight: Double = 0       // -100...100
     var maskReach: Double = 0     // -100...100: grow (+) or shrink (−) the subject mask
+    // Tone curve: control points, always including endpoints
+    var curve: [CurvePoint] = CurvePoint.identity
 
     static let neutral = EditState()
     var isNeutral: Bool { self == .neutral }
@@ -39,6 +48,10 @@ struct EditState: Codable, Equatable {
                 p.set(v, in: &self)
             }
         }
+        if let pts = try c.decodeIfPresent([CurvePoint].self, forKey: CodingKeys(stringValue: "curve")!),
+           pts.count >= 2 {
+            curve = pts.sorted { $0.x < $1.x }
+        }
     }
 
     struct CodingKeys: CodingKey {
@@ -52,6 +65,9 @@ struct EditState: Codable, Equatable {
         var c = encoder.container(keyedBy: CodingKeys.self)
         for p in EditParameter.allCases where p.value(in: self) != p.defaultValue {
             try c.encode(p.value(in: self), forKey: CodingKeys(stringValue: p.rawValue)!)
+        }
+        if curve != CurvePoint.identity {
+            try c.encode(curve, forKey: CodingKeys(stringValue: "curve")!)
         }
     }
 }

@@ -17,6 +17,7 @@ struct RailView: View {
                         "Light", [.exposure, .contrast, .highlights, .shadows, .whites, .blacks],
                         help: "Brightness and tonal balance"
                     )
+                    curveSection
                     section(
                         "Color", [.temp, .tint, .vibrance, .saturation],
                         help: "White balance and color strength"
@@ -76,6 +77,30 @@ struct RailView: View {
                     .foregroundStyle(Theme.ink3)
             }
         }
+    }
+
+    private var curveSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                Text("CURVE")
+                    .font(Theme.mono(9.5, .medium))
+                    .kerning(1.4)
+                    .foregroundStyle(Theme.ink2)
+                Rectangle().fill(Theme.hairline).frame(height: 1)
+                if model.edit.curve != CurvePoint.identity {
+                    Button("Reset") { model.edit.curve = CurvePoint.identity }
+                        .buttonStyle(.plain)
+                        .font(Theme.ui(9.5))
+                        .foregroundStyle(Theme.ink3)
+                }
+            }
+            .padding(.top, 10)
+            CurveEditorView(edit: $model.edit, histogram: model.histogram)
+            Text("click adds a point · drag shapes it · double-click removes")
+                .font(Theme.mono(8))
+                .foregroundStyle(Theme.ink3)
+        }
+        .help("Tone curve: precise control over the brightness response")
     }
 
     private func section(_ title: String, _ params: [EditParameter], help: String) -> some View {

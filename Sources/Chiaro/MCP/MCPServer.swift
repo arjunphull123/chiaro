@@ -168,14 +168,22 @@ final class MCPServer {
         init(_ message: String) { errorDescription = message }
     }
 
-    private static let editProperties: [String: Any] = Dictionary(
-        uniqueKeysWithValues: EditParameter.allCases.map { p in
-            (p.rawValue, [
-                "type": "number",
-                "description": "range \(p.range.lowerBound)...\(p.range.upperBound)",
-            ] as [String: Any])
-        }
-    )
+    private static let editProperties: [String: Any] = {
+        var props = Dictionary(
+            uniqueKeysWithValues: EditParameter.allCases.map { p in
+                (p.rawValue, [
+                    "type": "number",
+                    "description": "range \(p.range.lowerBound)...\(p.range.upperBound)",
+                ] as [String: Any])
+            }
+        )
+        props["curve"] = [
+            "type": "array",
+            "items": ["type": "array", "items": ["type": "number"]],
+            "description": "tone curve control points [[x,y],...], each 0-1, sorted by x, including endpoints — e.g. a gentle S: [[0,0],[0.25,0.2],[0.75,0.8],[1,1]]",
+        ] as [String: Any]
+        return props
+    }()
 
     static let toolDefinitions: [[String: Any]] = [
         [
@@ -276,6 +284,19 @@ final class MCPServer {
             guard let params = args["edit"] as? [String: Any] else { throw ToolError("missing edit object") }
             var edit = (args["reset"] as? Bool == true) ? EditState.neutral : p.edit
             for (key, value) in params {
+                if key == "curve" {
+                    guard let raw = value as? [[Any]] else { throw ToolError("curve must be [[x,y],...]") }
+                    let pts = raw.compactMap { pair -> CurvePoint? in
+                        guard pair.count == 2,
+                              let x = (pair[0] as? Double) ?? (pair[0] as? Int).map(Double.init),
+                              let y = (pair[1] as? Double) ?? (pair[1] as? Int).map(Double.init)
+                        else { return nil }
+                        return CurvePoint(x: x.clamped(to: 0...1), y: y.clamped(to: 0...1))
+                    }
+                    guard pts.count >= 2 else { throw ToolError("curve needs at least 2 points") }
+                    edit.curve = pts.sorted { $0.x < $1.x }
+                    continue
+                }
                 guard let parameter = EditParameter(rawValue: key) else {
                     throw ToolError("unknown parameter \(key); valid: \(EditParameter.allCases.map(\.rawValue).joined(separator: ", "))")
                 }
