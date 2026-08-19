@@ -20,13 +20,19 @@ struct EditView: View {
                 .ignoresSafeArea()
                 .disabled(library.agentActive)
         }
-        .overlay(alignment: .bottom) {
-            if !model.cropMode {
-                navPill.padding(.bottom, 16).padding(.trailing, Theme.railWidth)
-            }
-        }
         .overlay(alignment: .topLeading) {
-            backButton.padding(.top, 10).padding(.leading, 14) // just below the traffic lights
+            HStack(spacing: 12) {
+                HStack(spacing: 7) {
+                    AppMark(size: 16)
+                    Text("Chiaro")
+                        .font(Theme.serif(16, .semibold))
+                        .kerning(-0.4)
+                        .foregroundStyle(Theme.ink)
+                }
+                backButton
+            }
+            .padding(.top, 10)
+            .padding(.leading, 14) // just below the traffic lights
         }
         .overlay(alignment: .topTrailing) {
             HStack(spacing: 8) {
@@ -106,33 +112,6 @@ struct EditView: View {
         }
     }
 
-    private var navPill: some View {
-        HStack(spacing: 12) {
-            Button { step(-1) } label: { chevron("chevron.left") }.buttonStyle(.plain)
-        .clickCursor()
-            Text("\(photoIndex + 1) / \(library.photos.count)")
-                .font(Theme.mono(10))
-                .foregroundStyle(Theme.ink2)
-                .monospacedDigit()
-            Button { step(1) } label: { chevron("chevron.right") }.buttonStyle(.plain)
-        .clickCursor()
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .chiaroGlass(cornerRadius: 12)
-    }
-
-    private func chevron(_ name: String) -> some View {
-        Image(systemName: name)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(Theme.ink2)
-            .frame(width: 20, height: 20)
-            .contentShape(Rectangle())
-    }
-
-    private var photoIndex: Int {
-        library.photos.firstIndex(where: { $0.url == model.photo.url }) ?? 0
-    }
 
     private func glassIcon(_ icon: String, disabled: Bool, help: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { Image(systemName: icon) }

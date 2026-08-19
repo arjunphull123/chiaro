@@ -260,7 +260,7 @@ struct ExportSheet: View {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
-        panel.prompt = "Export Here"
+        panel.prompt = "Export here"
         if panel.runModal() == .OK { options.destination = panel.url }
     }
 

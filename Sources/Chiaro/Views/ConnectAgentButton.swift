@@ -113,7 +113,7 @@ struct AgentConnectPopover: View {
             }
         }
         // One fixed size for every state: animated popover resizes crash NSPopover.
-        .frame(width: 380, height: 370)
+        .frame(width: 380, height: 312)
         .presentationBackground(.ultraThinMaterial)
     }
 
@@ -121,7 +121,7 @@ struct AgentConnectPopover: View {
     private var historyContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("\(AgentStatus.shared.displayName) in Chiaro")
-                .font(Theme.serif(17, .semibold))
+                .font(Theme.ui(14, .semibold))
                 .foregroundStyle(Theme.ink)
             ScrollView {
                 VStack(alignment: .leading, spacing: 7) {
@@ -141,7 +141,7 @@ struct AgentConnectPopover: View {
             }
             .frame(maxHeight: .infinity)
             DisclosureGroup("Connection prompt") {
-                promptBlock(scrollHeight: 96).padding(.top, 6)
+                promptBlock(scrollHeight: 80).padding(.top, 6)
             }
             .font(Theme.ui(11, .medium))
             .tint(Theme.ink3)
@@ -153,13 +153,13 @@ struct AgentConnectPopover: View {
     private var connectContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Drive Chiaro with any agent")
-                .font(Theme.serif(17, .semibold))
+                .font(Theme.ui(14, .semibold))
                 .foregroundStyle(Theme.ink)
             Text("Paste this into any MCP-capable agent — Claude Code, Cursor, whatever you run — and it can see, edit, and export your photos, live in this window. It will confirm once connected.")
                 .font(Theme.ui(11.5))
                 .foregroundStyle(Theme.ink2)
                 .fixedSize(horizontal: false, vertical: true)
-            promptBlock(scrollHeight: 150)
+            promptBlock(scrollHeight: 128)
         }
         .padding(18)
     }
@@ -182,7 +182,7 @@ struct AgentConnectPopover: View {
                 copied = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copied = false }
             } label: {
-                Text(copied ? "Copied ✓" : "Copy Prompt")
+                Text(copied ? "Copied ✓" : "Copy prompt")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(AmberButtonStyle())

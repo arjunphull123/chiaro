@@ -137,10 +137,13 @@ struct RootView: View {
             // graphite ground, and the rail's frost samples it (ADR 0006).
             WindowBackdrop().ignoresSafeArea()
             Theme.ground.opacity(0.6).ignoresSafeArea()
+            // Library stays mounted beneath the editor so its scroll position
+            // survives a round trip into a photo and back.
+            LibraryView(library: library, onExport: { exporting = true })
+                .opacity(library.editing == nil ? 1 : 0)
+                .allowsHitTesting(library.editing == nil)
             if let editing = library.editing {
                 EditView(library: library, photo: editing, onExport: { exporting = true })
-            } else {
-                LibraryView(library: library, onExport: { exporting = true })
             }
         }
         .containerBackground(.clear, for: .window)

@@ -65,11 +65,11 @@ struct LibraryView: View {
     /// Pinned frosted header: title, zoom slider, and the real actions.
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
-            HStack(spacing: 7) {
-                AppMark(size: 15)
+            HStack(spacing: 8) {
+                AppMark(size: 18)
                 Text("Chiaro")
-                    .font(Theme.serif(16, .semibold))
-                    .kerning(-0.4)
+                    .font(Theme.serif(19, .semibold))
+                    .kerning(-0.5)
                     .foregroundStyle(Theme.ink)
             }
             Rectangle().fill(Theme.hairline).frame(width: 1, height: 18)
@@ -204,6 +204,8 @@ struct LibraryView: View {
         return f
     }
 
+    @State private var hoveredTile: URL?
+
     private func tile(_ photo: Photo, height: CGFloat) -> some View {
         let selected = library.selection.contains(photo.url)
         return ZStack(alignment: .bottomTrailing) {
@@ -224,6 +226,28 @@ struct LibraryView: View {
                 RoundedRectangle(cornerRadius: 7)
                     .stroke(selected ? Theme.amber : .clear, lineWidth: 2)
             )
+            if hoveredTile == photo.url {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(photo.name)
+                        .font(Theme.ui(10.5, .semibold))
+                        .foregroundStyle(.white)
+                    if let exif = photo.exifSummary {
+                        Text(exif)
+                            .font(Theme.mono(8.5))
+                            .foregroundStyle(.white.opacity(0.65))
+                    }
+                }
+                .padding(.horizontal, 9)
+                .padding(.vertical, 7)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    LinearGradient(colors: [.clear, .black.opacity(0.78)], startPoint: .top, endPoint: .bottom)
+                )
+                .frame(width: height * photo.aspect, alignment: .leading)
+                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 7, bottomTrailingRadius: 7))
+                .allowsHitTesting(false)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            }
             HStack(spacing: 4) {
                 if photo.rating > 0 {
                     Text(String(repeating: "★", count: photo.rating))
@@ -239,6 +263,9 @@ struct LibraryView: View {
         }
         .contentShape(Rectangle())
         .clickCursor()
+        .onHover { inside in
+            hoveredTile = inside ? photo.url : (hoveredTile == photo.url ? nil : hoveredTile)
+        }
         .gesture(TapGesture(count: 2).onEnded {
             library.edit(photo)
         })
