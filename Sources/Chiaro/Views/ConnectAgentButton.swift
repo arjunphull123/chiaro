@@ -24,17 +24,18 @@ struct AgentRailStatus: View {
                         if active {
                             brand.icon.frame(width: 13, height: 13)
                         } else {
+                            Spacer(minLength: 0)
                             Image(systemName: "handshake")
                                 .font(.system(size: 11))
                                 .foregroundStyle(Theme.ink3)
                         }
                         Text(editing
                             ? "\(AgentStatus.shared.displayName) is editing…"
-                            : connected ? "\(AgentStatus.shared.displayName) is connected" : "Connect Agent")
+                            : connected ? "\(AgentStatus.shared.displayName) is connected" : "Connect your agent via MCP")
                             .font(Theme.ui(11.5, .medium))
                             .foregroundStyle(active ? Theme.ink : Theme.ink2)
                             .lineLimit(1)
-                        Spacer()
+                        Spacer(minLength: 0)
                         if editing {
                             Image(systemName: "lock.fill")
                                 .font(.system(size: 9, weight: .semibold))
@@ -126,6 +127,49 @@ struct AgentConnectPopover: View {
     }
 
     var body: some View {
+        if AgentStatus.shared.actions.isEmpty {
+            connectContent
+        } else {
+            historyContent
+        }
+    }
+
+    /// Once an agent has done things, the popover becomes its activity log.
+    private var historyContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("\(AgentStatus.shared.displayName) in Chiaro")
+                .font(Theme.ui(14, .semibold))
+                .foregroundStyle(Theme.ink)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 7) {
+                    ForEach(AgentStatus.shared.actions) { action in
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(action.date.formatted(date: .omitted, time: .shortened))
+                                .font(Theme.mono(9))
+                                .foregroundStyle(Theme.ink3)
+                            Text(action.text)
+                                .font(Theme.ui(11))
+                                .foregroundStyle(Theme.ink2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(height: 180)
+            DisclosureGroup("Connection prompt") {
+                connectContent.padding(.top, 6)
+            }
+            .font(Theme.ui(11, .medium))
+            .tint(Theme.ink3)
+            .foregroundStyle(Theme.ink2)
+        }
+        .padding(18)
+        .frame(width: 380)
+        .background(Theme.ground)
+    }
+
+    private var connectContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Drive Chiaro with any coding agent")
                 .font(Theme.ui(14, .semibold))

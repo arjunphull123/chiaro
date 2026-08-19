@@ -46,10 +46,32 @@ final class Library {
     var folderName: String { folderURL?.lastPathComponent ?? "" }
     var selectedPhotos: [Photo] { photos.filter { selection.contains($0.url) } }
 
+    static func recentFolders() -> [URL] {
+        (UserDefaults.standard.stringArray(forKey: "recentFolders") ?? [])
+            .map(URL.init(fileURLWithPath:))
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+    }
+
+    /// DCIM folders on mounted camera cards — the "camera just plugged in" path.
+    static func cameraCardFolders() -> [URL] {
+        let fm = FileManager.default
+        let volumes = (try? fm.contentsOfDirectory(at: URL(fileURLWithPath: "/Volumes"), includingPropertiesForKeys: nil)) ?? []
+        return volumes.flatMap { volume -> [URL] in
+            let dcim = volume.appendingPathComponent("DCIM")
+            guard fm.fileExists(atPath: dcim.path) else { return [] }
+            let subs = (try? fm.contentsOfDirectory(at: dcim, includingPropertiesForKeys: nil)) ?? []
+            return subs.filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
+        }
+    }
+
     func open(_ url: URL) {
         folderURL = url
         editing = nil
         selection = []
+        var recents = UserDefaults.standard.stringArray(forKey: "recentFolders") ?? []
+        recents.removeAll { $0 == url.path }
+        recents.insert(url.path, at: 0)
+        UserDefaults.standard.set(Array(recents.prefix(5)), forKey: "recentFolders")
         let fm = FileManager.default
         let urls = (try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? []
 
@@ -75,6 +97,7 @@ final class Library {
         var image: CGImage?
         var captureDate: Date?
         var exifSummary: String?
+        var pixelSize: CGSize?
     }
 
     /// Thumbnail extraction is blocking I/O, so it runs on its own OperationQueue —
@@ -103,6 +126,7 @@ final class Library {
                     }
                     photo.captureDate = result.captureDate
                     photo.exifSummary = result.exifSummary
+                    photo.pixelSize = result.pixelSize
                 }
             }
         }
@@ -122,6 +146,10 @@ final class Library {
 
         guard let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else {
             return result
+        }
+        if let w = props[kCGImagePropertyPixelWidth] as? Double,
+           let h = props[kCGImagePropertyPixelHeight] as? Double {
+            result.pixelSize = CGSize(width: w, height: h)
         }
         let exif = props[kCGImagePropertyExifDictionary] as? [CFString: Any] ?? [:]
         if let stamp = exif[kCGImagePropertyExifDateTimeOriginal] as? String {

@@ -13,9 +13,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct ChiaroApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var library = Library()
-    @State private var exporting = false
+    @State private var exporting: Bool
 
     init() {
+        _exporting = State(initialValue: CommandLine.arguments.contains("--show-export"))
         Theme.registerFonts()
         let lib = library
         DispatchQueue.main.async {

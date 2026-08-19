@@ -233,25 +233,97 @@ struct LibraryView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 16) {
-            Text("Chiaro")
-                .font(Theme.ui(30, .semibold))
-                .foregroundStyle(Theme.ink)
-            Text("Point it at a folder of photos — or your camera's card. Originals are never touched.")
-                .font(Theme.ui(13))
-                .foregroundStyle(Theme.ink2)
-            Button(action: openFolder) {
-                Text("Open Folder…")
-                    .font(Theme.ui(13, .medium))
-                    .foregroundStyle(Color(hex: 0x131315))
-                    .padding(.horizontal, 22)
-                    .padding(.vertical, 9)
-                    .background(Capsule().fill(Theme.amber))
+        VStack(spacing: 0) {
+            Spacer()
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Chiaro")
+                    .font(Theme.ui(44, .semibold))
+                    .foregroundStyle(Theme.ink)
+                Rectangle().fill(Theme.amber).frame(width: 44, height: 3)
+                    .padding(.top, 10)
+                Text("A quiet, fast RAW editor. Your originals are never touched.")
+                    .font(Theme.ui(13.5))
+                    .foregroundStyle(Theme.ink2)
+                    .padding(.top, 14)
+
+                VStack(spacing: 6) {
+                    ForEach(Library.cameraCardFolders(), id: \.self) { folder in
+                        sourceRow(
+                            icon: "camera.fill", tint: Theme.amber,
+                            title: "\(folder.lastPathComponent) — camera card",
+                            subtitle: cardSummary(folder), url: folder
+                        )
+                    }
+                    ForEach(Library.recentFolders(), id: \.self) { folder in
+                        sourceRow(
+                            icon: "folder", tint: Theme.ink2,
+                            title: folder.lastPathComponent,
+                            subtitle: folder.deletingLastPathComponent().path
+                                .replacingOccurrences(of: NSHomeDirectory(), with: "~"),
+                            url: folder
+                        )
+                    }
+                }
+                .padding(.top, 28)
+
+                HStack(spacing: 12) {
+                    Button("Open Folder…") { openFolder() }
+                        .buttonStyle(AmberButtonStyle())
+                        .clickCursor()
+                        .keyboardShortcut("o")
+                    Text("or drop a folder anywhere")
+                        .font(Theme.ui(11))
+                        .foregroundStyle(Theme.ink3)
+                }
+                .padding(.top, 22)
             }
-            .buttonStyle(.plain)
-        .clickCursor()
-            .keyboardShortcut("o")
+            .frame(width: 400)
+            Spacer()
+            Spacer()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .dropDestination(for: URL.self) { urls, _ in
+            guard let url = urls.first,
+                  (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+            else { return false }
+            library.open(url)
+            return true
+        }
+    }
+
+    private func sourceRow(icon: String, tint: Color, title: String, subtitle: String, url: URL) -> some View {
+        Button {
+            library.open(url)
+        } label: {
+            HStack(spacing: 11) {
+                Image(systemName: icon)
+                    .font(.system(size: 13))
+                    .foregroundStyle(tint)
+                    .frame(width: 20)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title).font(Theme.ui(12.5, .medium)).foregroundStyle(Theme.ink)
+                    Text(subtitle).font(Theme.mono(9.5)).foregroundStyle(Theme.ink3).lineLimit(1)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(Theme.ink3)
+            }
+            .padding(.horizontal, 13)
+            .padding(.vertical, 9)
+            .background(RoundedRectangle(cornerRadius: 9).fill(Color.white.opacity(0.04)))
+            .overlay(RoundedRectangle(cornerRadius: 9).stroke(Theme.hairline))
+        }
+        .buttonStyle(.plain)
+        .clickCursor()
+    }
+
+    private func cardSummary(_ folder: URL) -> String {
+        let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+        let photos = files.filter { Photo.imageExtensions.contains($0.pathExtension.lowercased()) }
+        let raws = photos.filter { Photo.rawExtensions.contains($0.pathExtension.lowercased()) }
+        return "\(raws.isEmpty ? photos.count : raws.count) photos · \(folder.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent)"
     }
 
     private func openFolder() {

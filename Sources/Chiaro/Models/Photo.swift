@@ -11,6 +11,7 @@ final class Photo: Identifiable {
     var rating: Int
     var captureDate: Date?
     var exifSummary: String?
+    var pixelSize: CGSize?
 
     var id: URL { url }
     var name: String { url.deletingPathExtension().lastPathComponent }

@@ -283,8 +283,9 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "name": ["type": "string"],
-                    "format": ["type": "string", "enum": ["jpeg", "heif", "tiff16"]],
-                    "quality": ["type": "number", "description": "0.5-1.0, default 0.92"],
+                    "format": ["type": "string", "enum": ["jpeg", "heif", "tiff", "original"]],
+                    "quality": ["type": "number", "description": "0.5-1.0, default 0.85"],
+                    "maxDimension": ["type": "number", "description": "longest edge in px; omit for full resolution"],
                 ],
                 "required": ["name"],
             ],
@@ -307,6 +308,7 @@ final class MCPServer {
             return [["type": "text", "text": String(decoding: data, as: UTF8.self)]]
         }
 
+        logAction(name, args: args, library: library)
         switch name {
         case "list_photos":
             return try text([
@@ -385,9 +387,11 @@ final class MCPServer {
             var options = ExportOptions()
             switch args["format"] as? String {
             case "heif": options.format = .heif
-            case "tiff16": options.format = .tiff16
+            case "tiff", "tiff16": options.format = .tiff
+            case "original": options.format = .original
             default: options.format = .jpeg
             }
+            if let maxDim = args["maxDimension"] as? Double { options.maxDimension = maxDim }
             if let q = args["quality"] as? Double { options.quality = q }
             if Self.volumeIsRemovable(p.url) {
                 options.destination = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask)[0]
@@ -401,6 +405,22 @@ final class MCPServer {
         default:
             throw ToolError("unknown tool \(name)")
         }
+    }
+
+    @MainActor
+    private func logAction(_ tool: String, args: [String: Any], library: Library) {
+        let name = args["name"] as? String ?? ""
+        let text: String
+        switch tool {
+        case "list_photos": text = "surveyed the library"
+        case "get_edit": text = "read the settings of \(name)"
+        case "get_preview": text = "looked at \(name)"
+        case "open_photo": text = "opened \(name)"
+        case "set_edit": text = (args["intent"] as? String).map { "\(name) — \($0)" } ?? "adjusted \(name)"
+        case "export": text = "exported \(name)"
+        default: text = "\(tool) \(name)"
+        }
+        AgentStatus.shared.log(text)
     }
 
     private static func volumeIsRemovable(_ url: URL) -> Bool {

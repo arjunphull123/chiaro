@@ -9,6 +9,19 @@ final class AgentStatus {
     var clientName: String?
     var lastSeen: Date?
 
+    struct Action: Identifiable {
+        let id = UUID()
+        let date: Date
+        let text: String
+    }
+    /// Rolling log of what agents have done this session, newest first.
+    private(set) var actions: [Action] = []
+
+    func log(_ text: String) {
+        actions.insert(Action(date: Date(), text: text), at: 0)
+        if actions.count > 50 { actions.removeLast() }
+    }
+
     var brand: AgentBrand { AgentBrand.match(clientName) }
     var displayName: String { brand.name == "Agent" ? (clientName ?? "Agent") : brand.name }
 
