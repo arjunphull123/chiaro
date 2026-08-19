@@ -4,11 +4,12 @@ import CoreImage.CIFilterBuiltins
 /// Pure function (base image, edit, optional person mask) -> adjusted image.
 /// Order is fixed by SPEC.md; every node reads only EditState values.
 enum RenderPipeline {
-    static func render(base: CIImage, edit: EditState, personMask: CIImage?, skipCrop: Bool = false) -> CIImage {
+    static func render(base: CIImage, edit: EditState, personMask: CIImage?, depthMap: CIImage? = nil, skipCrop: Bool = false) -> CIImage {
         var image = applyGeometry(base, edit: edit, skipCrop: skipCrop)
-        // The person mask is aligned to the un-transformed base, so it gets the
-        // same geometry before use.
+        // Masks are aligned to the un-transformed base, so they get the same
+        // geometry before use.
         let personMask = personMask.map { applyGeometry($0, edit: edit, skipCrop: skipCrop) }
+        let depthMap = depthMap.map { applyGeometry($0, edit: edit, skipCrop: skipCrop) }
         let scale = max(base.extent.width, base.extent.height) / RawEngine.previewMaxDimension
 
         if edit.temp != 0 || edit.tint != 0 {
@@ -72,8 +73,8 @@ enum RenderPipeline {
             f.radius = Float(1.7 * scale)
             image = f.outputImage ?? image
         }
-        if let personMask, edit.blurF > 0 || edit.relight != 0 {
-            image = portrait(image, edit: edit, mask: personMask, scale: scale)
+        if edit.blurF > 0 || edit.relight != 0 {
+            image = portrait(image, edit: edit, personMask: personMask, depthMap: depthMap, scale: scale)
         }
         if edit.vignette > 0 {
             let f = CIFilter.vignette()
@@ -162,25 +163,45 @@ enum RenderPipeline {
         ])
     }
 
-    private static func portrait(_ image: CIImage, edit: EditState, mask: CIImage, scale: CGFloat) -> CIImage {
+    private static func portrait(_ image: CIImage, edit: EditState, personMask: CIImage?, depthMap: CIImage?, scale: CGFloat) -> CIImage {
         var result = image
-        var subjectMask = mask.cropped(to: image.extent)
-        if edit.maskReach != 0 {
+        var subjectMask = personMask?.cropped(to: image.extent)
+        if edit.maskReach != 0, let mask = subjectMask {
             // Gamma on the confidence mask: + grows the protected subject, − shrinks it.
-            subjectMask = subjectMask.applyingFilter("CIGammaAdjust", parameters: [
+            subjectMask = mask.applyingFilter("CIGammaAdjust", parameters: [
                 "inputPower": pow(2, -edit.maskReach / 60),
             ]).cropped(to: image.extent)
         }
         if edit.blurF > 0 {
-            let inverted = subjectMask.applyingFilter("CIColorInvert")
-            let blur = CIFilter.maskedVariableBlur()
-            // Pre-clamp so edge pixels don't pull in transparent black.
-            blur.inputImage = result.clampedToExtent()
-            blur.mask = inverted
-            blur.radius = Float(edit.blurF * 14 * scale)
-            result = blur.outputImage?.cropped(to: image.extent) ?? result
+            // The blur amount mask: white = full radius. Depth mode grades it by
+            // distance from the focus plane; subject mode blurs everything but
+            // the person.
+            let amountMask: CIImage?
+            if edit.depthBlur, let depthMap {
+                let focusPlane = CIImage(color: CIColor(
+                    red: 1 - edit.focusDepth, green: 1 - edit.focusDepth, blue: 1 - edit.focusDepth
+                )).cropped(to: image.extent)
+                amountMask = depthMap.cropped(to: image.extent)
+                    .applyingFilter("CIColorAbsoluteDifference", parameters: ["inputImage2": focusPlane])
+                    .applyingFilter("CIColorMatrix", parameters: [
+                        "inputRVector": CIVector(x: 1.6, y: 0, z: 0, w: 0),
+                        "inputGVector": CIVector(x: 1.6, y: 0, z: 0, w: 0),
+                        "inputBVector": CIVector(x: 1.6, y: 0, z: 0, w: 0),
+                    ])
+                    .applyingFilter("CIColorClamp")
+            } else {
+                amountMask = subjectMask?.applyingFilter("CIColorInvert")
+            }
+            if let amountMask {
+                let blur = CIFilter.maskedVariableBlur()
+                // Pre-clamp so edge pixels don't pull in transparent black.
+                blur.inputImage = result.clampedToExtent()
+                blur.mask = amountMask
+                blur.radius = Float(edit.blurF * 14 * scale)
+                result = blur.outputImage?.cropped(to: image.extent) ?? result
+            }
         }
-        if edit.relight != 0 {
+        if edit.relight != 0, let subjectMask {
             let relit = result.applyingFilter("CIExposureAdjust", parameters: [
                 kCIInputEVKey: edit.relight / 100 * 1.2,
             ])

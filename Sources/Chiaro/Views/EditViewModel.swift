@@ -143,9 +143,12 @@ final class EditViewModel {
         let edit = edit
         let mask = personMask
         let skipCrop = cropMode
+        let url = photo.url
         Task { [weak self] in
             let result = await Offload.on(Offload.render) { () -> (CGImage, HistogramData)? in
-                let output = RenderPipeline.render(base: basePreview, edit: edit, personMask: mask, skipCrop: skipCrop)
+                let depth = edit.depthBlur && edit.blurF > 0
+                    ? DepthEngine.shared.depthMap(for: url, image: basePreview) : nil
+                let output = RenderPipeline.render(base: basePreview, edit: edit, personMask: mask, depthMap: depth, skipCrop: skipCrop)
                 guard let cg = RawEngine.shared.context.createCGImage(output, from: output.extent) else { return nil }
                 return (cg, HistogramSampler.sample(output))
             }

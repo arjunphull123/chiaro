@@ -1,4 +1,5 @@
 import SwiftUI
+import TipKit
 
 
 /// "Connect agent": copyable orientation prompt pointing any coding agent at the
@@ -7,16 +8,26 @@ import SwiftUI
 /// One pill at the top of the edit rail, cycling through the agent lifecycle:
 /// "Connect agent" → "<client> connected" → "🔒 Agent is editing…" (+ intent).
 struct AgentRailStatus: View {
+    private let agentTip = AgentTip()
     let library: Library
     @State private var showing = false
 
     var body: some View {
+        if AgentTip.isEligible {
+            timeline.popoverTip(agentTip, arrowEdge: .trailing)
+        } else {
+            timeline
+        }
+    }
+
+    private var timeline: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             let editing = library.agentActive
             let connected = AgentStatus.shared.isConnected(now: context.date)
             let brand = AgentStatus.shared.brand
             let active = editing || connected
             Button {
+                agentTip.invalidate(reason: .actionPerformed)
                 showing.toggle()
             } label: {
                 VStack(alignment: .leading, spacing: 5) {

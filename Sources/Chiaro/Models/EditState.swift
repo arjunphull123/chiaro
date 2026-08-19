@@ -41,6 +41,8 @@ struct EditState: Codable, Equatable {
     var blurF: Double = 0         // 0...1 (0 = off/f16, 1 = f1.4)
     var relight: Double = 0       // -100...100
     var maskReach: Double = 0     // -100...100: grow (+) or shrink (−) the subject mask
+    var depthBlur: Bool = false   // blur by scene depth instead of the subject mask
+    var focusDepth: Double = 0.5  // 0 = nearest, 1 = farthest — the plane kept sharp
     // Tone curve: control points, always including endpoints
     var curve: [CurvePoint] = CurvePoint.identity
     // Geometry
@@ -67,6 +69,9 @@ struct EditState: Codable, Equatable {
         if let rect = try c.decodeIfPresent(CropRect.self, forKey: CodingKeys(stringValue: "crop")!) {
             crop = rect
         }
+        if let flag = try c.decodeIfPresent(Bool.self, forKey: CodingKeys(stringValue: "depthBlur")!) {
+            depthBlur = flag
+        }
     }
 
     struct CodingKeys: CodingKey {
@@ -87,6 +92,9 @@ struct EditState: Codable, Equatable {
         if crop != .full {
             try c.encode(crop, forKey: CodingKeys(stringValue: "crop")!)
         }
+        if depthBlur {
+            try c.encode(true, forKey: CodingKeys(stringValue: "depthBlur")!)
+        }
     }
 }
 
@@ -96,7 +104,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
     case temp, tint, vibrance, saturation
     case clarity, vignette
     case sharpness, noiseReduction
-    case blurF, relight, maskReach
+    case blurF, relight, maskReach, focusDepth
     case straighten
 
     var id: String { rawValue }
@@ -108,6 +116,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .temp: "Temp"
         case .relight: "Relight"
         case .maskReach: "Mask"
+        case .focusDepth: "Focus"
         case .straighten: "Straighten"
         default: rawValue.prefix(1).uppercased() + rawValue.dropFirst()
         }
@@ -118,12 +127,14 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .exposure: -3...3
         case .straighten: -45...45
         case .vignette, .sharpness, .noiseReduction: 0...100
-        case .blurF: 0...1
+        case .blurF, .focusDepth: 0...1
         default: -100...100
         }
     }
 
-    var defaultValue: Double { 0 }
+    var defaultValue: Double {
+        self == .focusDepth ? 0.5 : 0
+    }
 
     /// Detent positions for haptic feedback while scrubbing (ADR 0005).
     var detents: [Double] {
@@ -135,6 +146,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
             }
         case .exposure: [-2, -1, 0, 1, 2]
         case .vignette, .sharpness, .noiseReduction: []
+        case .focusDepth: [0.5]
         default: [0]
         }
     }
@@ -166,6 +178,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .blurF: \.blurF
         case .relight: \.relight
         case .maskReach: \.maskReach
+        case .focusDepth: \.focusDepth
         case .straighten: \.straighten
         }
     }
@@ -180,6 +193,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
                 return f < 10 ? String(format: "ƒ%.1f", f) : String(format: "ƒ%.0f", f)
             }()
         case .vignette, .sharpness, .noiseReduction: String(format: "%.0f", v)
+        case .focusDepth: v <= 0.02 ? "near" : v >= 0.98 ? "far" : String(format: "%.0f%%", v * 100)
         case .straighten: String(format: "%.1f°", v)
         default: v == 0 ? "0" : String(format: "%+.0f", v)
         }

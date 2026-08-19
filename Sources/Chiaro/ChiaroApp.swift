@@ -1,4 +1,5 @@
 import SwiftUI
+import TipKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
@@ -18,6 +19,8 @@ struct ChiaroApp: App {
     init() {
         _exporting = State(initialValue: CommandLine.arguments.contains("--show-export"))
         Theme.registerFonts()
+        if CommandLine.arguments.contains("--show-tips") { Tips.showAllTipsForTesting() }
+        try? Tips.configure([.displayFrequency(.immediate), .datastoreLocation(.applicationDefault)])
         let lib = library
         // --quiet: dev-harness launches don't steal focus from the foreground app.
         let quiet = CommandLine.arguments.contains("--quiet")
@@ -87,6 +90,11 @@ struct ChiaroApp: App {
                 }
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 4) { attemptClick(40) }
+        }
+        if args.contains("--download-depth") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                DepthModelStore.shared.downloadIfNeeded()
+            }
         }
         if let i = args.firstIndex(of: "--snapshot"), i + 1 < args.count {
             let path = args[i + 1]

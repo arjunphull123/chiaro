@@ -1,4 +1,5 @@
 import SwiftUI
+import TipKit
 
 struct EditView: View {
     let library: Library
@@ -93,6 +94,7 @@ struct EditView: View {
         }
         .onAppear {
             focused = true
+            AgentTip.noteEditorOpened()
             library.activeEditor = model
             installScrollMonitor()
         }

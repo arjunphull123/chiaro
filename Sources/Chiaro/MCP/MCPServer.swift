@@ -224,6 +224,10 @@ final class MCPServer {
                            "w": ["type": "number"], "h": ["type": "number"]],
             "description": "normalized crop {x,y,w,h}, 0-1, y from top, applied after straighten",
         ] as [String: Any]
+        props["depthBlur"] = [
+            "type": "boolean",
+            "description": "blur by scene depth instead of the subject mask; pair with focusDepth (0 near, 1 far). Requires the depth model downloaded in the app — otherwise blur is skipped",
+        ]
         props["curve"] = [
             "type": "array",
             "items": ["type": "array", "items": ["type": "number"]],
@@ -368,6 +372,11 @@ final class MCPServer {
                     )
                     continue
                 }
+                if key == "depthBlur" {
+                    guard let flag = value as? Bool else { throw ToolError("depthBlur must be a boolean") }
+                    edit.depthBlur = flag
+                    continue
+                }
                 if key == "curve" {
                     guard let raw = value as? [[Any]] else { throw ToolError("curve must be [[x,y],...]") }
                     let pts = raw.compactMap { pair -> CurvePoint? in
@@ -413,7 +422,9 @@ final class MCPServer {
                 if edit.blurF > 0 || edit.relight != 0 {
                     mask = PortraitEngine.shared.mask(for: url, image: base)
                 }
-                var out = RenderPipeline.render(base: base, edit: edit, personMask: mask)
+                let depth = edit.depthBlur && edit.blurF > 0
+                    ? DepthEngine.shared.depthMap(for: url, image: base) : nil
+                var out = RenderPipeline.render(base: base, edit: edit, personMask: mask, depthMap: depth)
                 let scale = maxDim / Double(max(out.extent.width, out.extent.height))
                 if scale < 1 { out = out.transformed(by: .init(scaleX: scale, y: scale)) }
                 return RawEngine.shared.context.jpegRepresentation(

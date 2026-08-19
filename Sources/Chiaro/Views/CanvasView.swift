@@ -1,4 +1,5 @@
 import SwiftUI
+import TipKit
 
 /// The photo canvas: fits inside the region left of the rail, zoomable and pannable
 /// (may slide under the rail when zoomed), and doubles as the scrub surface when a
@@ -49,12 +50,13 @@ struct CanvasView: View {
                 }
             }
             .contentShape(Rectangle())
+            .popoverTip(ScrubTip(), arrowEdge: .top)
             .gesture(dragGesture)
             .gesture(magnifyGesture)
             .onTapGesture(count: 2) { if !model.cropMode { toggleZoom() } }
             .overlay(alignment: .bottom) {
                 Group {
-                    if model.cropMode { cropPanel } else { readout }
+                    if model.cropMode { cropPanel } else { readout.popoverTip(FineTuneTip(), arrowEdge: .bottom) }
                 }
                 .padding(.bottom, 78)
                 .padding(.trailing, Theme.railWidth)

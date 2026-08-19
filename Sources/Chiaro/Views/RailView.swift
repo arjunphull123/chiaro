@@ -111,20 +111,72 @@ struct RailView: View {
 
     private var portraitSection: some View {
         VStack(alignment: .leading, spacing: 3) {
-            sectionLabel("Portrait", help: "Background blur and subject light, from AI person detection")
-            switch model.hasPerson {
-            case .none:
-                Text("finding subject…")
-                    .font(Theme.mono(10)).foregroundStyle(Theme.ink3)
-                    .frame(height: 24)
-            case .some(false):
-                Text("no person found in this photo")
-                    .font(Theme.mono(10)).foregroundStyle(Theme.ink3)
-                    .frame(height: 24)
-            case .some(true):
-                ForEach([EditParameter.blurF, .relight, .maskReach]) { p in
-                    AdjustmentRow(parameter: p, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
-                }
+            sectionLabel("Portrait", help: "Background blur — by detected subject or by scene depth — and subject light")
+            HStack(spacing: 6) {
+                Chip(title: "Subject", selected: !model.edit.depthBlur) { model.edit.depthBlur = false }
+                Chip(title: "Depth", selected: model.edit.depthBlur) { model.edit.depthBlur = true }
+            }
+            .padding(.bottom, 4)
+            if model.edit.depthBlur {
+                depthContent
+            } else {
+                subjectContent
+            }
+        }
+    }
+
+    @ViewBuilder private var subjectContent: some View {
+        switch model.hasPerson {
+        case .none:
+            Text("finding subject…")
+                .font(Theme.mono(10)).foregroundStyle(Theme.ink3)
+                .frame(height: 24)
+        case .some(false):
+            Text("no person found in this photo")
+                .font(Theme.mono(10)).foregroundStyle(Theme.ink3)
+                .frame(height: 24)
+        case .some(true):
+            ForEach([EditParameter.blurF, .relight, .maskReach]) { p in
+                AdjustmentRow(parameter: p, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
+            }
+        }
+    }
+
+    /// Depth-map blur: the model is an opt-in 50 MB download on first use.
+    @ViewBuilder private var depthContent: some View {
+        switch DepthModelStore.shared.availability {
+        case .missing:
+            Button("Download depth model (50 MB)") {
+                DepthModelStore.shared.downloadIfNeeded()
+            }
+            .buttonStyle(OutlineButtonStyle())
+            .clickCursor()
+            .help("Apple's Depth Anything V2, run on-device — enables focus-plane blur")
+        case .downloading(let progress):
+            HStack(spacing: 7) {
+                ProgressView(value: progress)
+                    .progressViewStyle(.linear)
+                    .tint(Theme.amber)
+                Text("\(Int(progress * 100))%")
+                    .font(Theme.mono(9)).foregroundStyle(Theme.ink3).monospacedDigit()
+            }
+            .frame(height: 24)
+        case .preparing:
+            Text("preparing model…")
+                .font(Theme.mono(10)).foregroundStyle(Theme.ink3)
+                .frame(height: 24)
+        case .failed(let message):
+            VStack(alignment: .leading, spacing: 4) {
+                Text(message)
+                    .font(Theme.mono(9)).foregroundStyle(Theme.ink3)
+                    .lineLimit(2)
+                Button("Try again") { DepthModelStore.shared.downloadIfNeeded() }
+                    .buttonStyle(OutlineButtonStyle())
+                    .clickCursor()
+            }
+        case .ready:
+            ForEach([EditParameter.blurF, .focusDepth, .relight]) { p in
+                AdjustmentRow(parameter: p, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
             }
         }
     }
