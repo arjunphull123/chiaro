@@ -39,7 +39,7 @@ struct LibraryView: View {
                         VStack(alignment: .leading, spacing: gap) {
                             HStack(alignment: .firstTextBaseline, spacing: 8) {
                                 Text(section.title)
-                                    .font(Theme.ui(13, .semibold))
+                                    .font(Theme.serif(16))
                                     .foregroundStyle(Theme.ink)
                                 Text("\(section.photos.count)")
                                     .font(Theme.mono(10))
@@ -85,17 +85,18 @@ struct LibraryView: View {
                 .foregroundStyle(Theme.ink3)
             Spacer()
             zoomSlider
-            ConnectAgentButton()
-            Button("Export…") { onExport() }
-                .buttonStyle(AmberButtonStyle())
-                .clickCursor()
-                .disabled(library.selection.isEmpty)
-                .opacity(library.selection.isEmpty ? 0.4 : 1)
-                .help("Export selected photos (⌘E)")
             Button("Open Folder…") { openFolder() }
-                .buttonStyle(AmberButtonStyle())
+                .buttonStyle(OutlineButtonStyle())
                 .clickCursor()
                 .help("⌘O")
+            Button("Open in Editor") {
+                if let photo = library.selectedPhotos.first { library.edit(photo) }
+            }
+            .buttonStyle(AmberButtonStyle())
+            .clickCursor()
+            .disabled(library.selection.isEmpty)
+            .opacity(library.selection.isEmpty ? 0.4 : 1)
+            .help("Edit the selected photo (⏎)")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 11)

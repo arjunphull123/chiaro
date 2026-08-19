@@ -82,9 +82,8 @@ struct RailView: View {
     private var curveSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 5) {
-                Text("CURVE")
-                    .font(Theme.mono(9.5, .medium))
-                    .kerning(1.4)
+                Text("Curve")
+                    .font(Theme.serif(13))
                     .foregroundStyle(Theme.ink2)
                 Rectangle().fill(Theme.hairline).frame(height: 1)
                 if model.edit.curve != CurvePoint.identity {
@@ -132,9 +131,8 @@ struct RailView: View {
 
     private func sectionLabel(_ title: String, help: String) -> some View {
         HStack(spacing: 5) {
-            Text(title.uppercased())
-                .font(Theme.mono(9.5, .medium))
-                .kerning(1.4)
+            Text(title)
+                .font(Theme.serif(13))
                 .foregroundStyle(Theme.ink2)
             Rectangle().fill(Theme.hairline).frame(height: 1)
         }
@@ -161,7 +159,7 @@ struct RailView: View {
     }
 
     private var scrubHint: some View {
-        Text("Tip: click a control, then drag on the photo or the dial — or scroll sideways for fine moves. Hold \\ to compare with the original.")
+        Text("Click a control, then drag on the photo or the dial — hold \\ to compare with the original")
             .font(Theme.ui(10))
             .foregroundStyle(Theme.ink3)
             .fixedSize(horizontal: false, vertical: true)

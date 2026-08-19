@@ -34,15 +34,16 @@ struct HistogramView: View {
             }
         }
         .frame(height: 62)
-        .overlay(alignment: .bottomLeading) {
-            Text("SHADOWS")
-                .font(Theme.mono(7)).kerning(1).foregroundStyle(Theme.ink3)
-                .padding(.leading, 7).padding(.bottom, 4)
-        }
-        .overlay(alignment: .bottomTrailing) {
-            Text("HIGHLIGHTS")
-                .font(Theme.mono(7)).kerning(1).foregroundStyle(Theme.ink3)
-                .padding(.trailing, 7).padding(.bottom, 4)
+        .padding(.bottom, 14)
+        .overlay(alignment: .bottom) {
+            HStack {
+                Text("Shadows")
+                Spacer()
+                Text("Highlights")
+            }
+            .font(Theme.ui(8.5))
+            .foregroundStyle(Theme.ink3)
+            .padding(.horizontal, 2)
         }
         .help("The photo's tones, dark to bright. A pile against the left edge means crushed shadows; against the right, blown highlights.")
     }

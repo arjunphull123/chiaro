@@ -150,11 +150,7 @@ struct ExportSheet: View {
                 }
                 Spacer()
                 Button("Cancel") { isPresented = false }
-                    .buttonStyle(.plain)
-                    .font(Theme.ui(12))
-                    .foregroundStyle(Theme.ink2)
-                    .padding(.horizontal, 14).padding(.vertical, 7)
-                    .background(RoundedRectangle(cornerRadius: 8).stroke(Theme.hairline))
+                    .buttonStyle(OutlineButtonStyle())
                     .clickCursor()
                     .keyboardShortcut(.escape)
                 Button(photos.count == 1 ? "Export Photo" : "Export \(photos.count) Photos") {
@@ -179,9 +175,9 @@ struct ExportSheet: View {
 
     private func sectionLabel(_ title: String) -> some View {
         HStack(spacing: 5) {
-            Text(title.uppercased())
-                .font(Theme.mono(9, .medium)).kerning(1.4)
-                .foregroundStyle(Theme.ink3)
+            Text(title)
+                .font(Theme.serif(12.5))
+                .foregroundStyle(Theme.ink2)
             Rectangle().fill(Theme.hairline).frame(height: 1)
         }
     }
@@ -204,16 +200,7 @@ struct ExportSheet: View {
     }
 
     private func chip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(Theme.ui(10.5, selected ? .medium : .regular))
-                .foregroundStyle(selected ? Theme.amber : Theme.ink2)
-                .padding(.horizontal, 10).padding(.vertical, 5)
-                .background(Capsule().fill(Color.white.opacity(selected ? 0.08 : 0.03)))
-                .overlay(Capsule().stroke(selected ? Theme.amber.opacity(0.5) : Theme.hairline))
-        }
-        .buttonStyle(.plain)
-        .clickCursor()
+        Chip(title: title, selected: selected, action: action)
     }
 
     // MARK: - Logic

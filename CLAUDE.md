@@ -26,6 +26,11 @@ via Apple's RAW engine.
 - **No AI attribution anywhere.** No `Co-Authored-By` trailers, no "Generated with"
   lines in commits, PRs, code, or docs. Commits are authored by the repo owner, period.
 - SwiftUI-first; drop to AppKit only where SwiftUI genuinely can't (and note why inline).
+- **Typography roles:** Fraunces = headers/wordmark (sentence case, never uppercase);
+  Geist = all UI text; Geist Mono = data only (values, EXIF, counts, timestamps).
+- **UI copy:** sentence case, no trailing periods on labels/tips.
+- **Buttons come from DesignSystem.swift** (Amber/Outline/Glass/GlassIcon styles, Chip);
+  ad-hoc button chrome is a bug.
 
 ## MCP
 

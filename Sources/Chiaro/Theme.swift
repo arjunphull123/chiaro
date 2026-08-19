@@ -23,7 +23,7 @@ enum Theme {
         guard let dir = Bundle.module.url(forResource: "Fonts", withExtension: nil),
               let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
         else { return }
-        for url in files where url.pathExtension == "otf" {
+        for url in files where ["otf", "ttf"].contains(url.pathExtension) {
             CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
         }
     }
@@ -40,18 +40,10 @@ enum Theme {
     static func mono(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
         .custom(weight == .medium ? "Geist Mono Medium" : "Geist Mono Regular", size: size)
     }
-}
 
-/// Primary action: filled amber, near-black text.
-struct AmberButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(Theme.ui(12, .semibold))
-            .foregroundStyle(Color(hex: 0x131315))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Theme.amber))
-            .opacity(configuration.isPressed ? 0.75 : 1)
+    /// Fraunces: the header/brand voice. Sentence case, never uppercase.
+    static func serif(_ size: CGFloat) -> Font {
+        .custom("Fraunces", size: size)
     }
 }
 

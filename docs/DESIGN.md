@@ -30,9 +30,13 @@ photo's colors).
 - Primary text: white at 85% · secondary: white at 50%
 - **Accent — safelight amber `#E8A33D`**: active slider fills, selection borders,
   edited badge, focused control. Used sparingly; never on large surfaces.
-- Typography: **Geist** for UI chrome (11–13pt controls, wordmark); **Geist Mono** for
-  every numeral — slider values, ƒ-stops, EXIF, histogram labels — with tabular figures.
-  Both bundled in-app (SIL OFL 1.1).
+- Typography: **Fraunces** for headers and the wordmark ("Chiaro", sentence case,
+  never uppercase); **Geist** for all UI text; **Geist Mono** sparingly, for data only
+  (values, ƒ-stops, EXIF, counts) with tabular figures. All bundled (SIL OFL 1.1).
+- UI copy is sentence case with no trailing periods on labels and tips.
+- Components live in DesignSystem.swift: AmberButtonStyle (one primary per surface),
+  OutlineButtonStyle (secondary), GlassButtonStyle/GlassIconButtonStyle (canvas
+  overlays), Chip (selectable pills).
 
 ## Controls
 

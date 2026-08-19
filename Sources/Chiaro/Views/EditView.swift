@@ -30,18 +30,10 @@ struct EditView: View {
         }
         .overlay(alignment: .topTrailing) {
             HStack(spacing: 8) {
-                Button {
-                    model.cropMode.toggle()
-                } label: {
-                    Image(systemName: "crop")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(model.cropMode ? Theme.amber : Theme.ink2)
-                        .frame(width: 30, height: 28)
-                        .chiaroGlass(cornerRadius: 10)
-                }
-                .buttonStyle(.plain)
-                .clickCursor()
-                .help("Crop & straighten (C)")
+                Button { model.cropMode.toggle() } label: { Image(systemName: "crop") }
+                    .buttonStyle(GlassIconButtonStyle(tint: model.cropMode ? Theme.amber : Theme.ink2))
+                    .clickCursor()
+                    .help("Crop & straighten (C)")
                 glassIcon("arrow.uturn.backward", disabled: !model.canUndo, help: "Undo (⌘Z)") { model.undo() }
                 glassIcon("arrow.uturn.forward", disabled: !model.canRedo, help: "Redo (⇧⌘Z)") { model.redo() }
                 glassAction("Copy Edits", icon: "doc.on.doc", disabled: model.edit.isNeutral) {
@@ -143,31 +135,21 @@ struct EditView: View {
     }
 
     private func glassIcon(_ icon: String, disabled: Bool, help: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(disabled ? Theme.ink3 : Theme.ink2)
-                .frame(width: 30, height: 28)
-                .chiaroGlass(cornerRadius: 10)
-        }
-        .buttonStyle(.plain)
-        .clickCursor()
-        .disabled(disabled)
-        .help(help)
+        Button(action: action) { Image(systemName: icon) }
+            .buttonStyle(GlassIconButtonStyle(tint: disabled ? Theme.ink3 : Theme.ink2))
+            .clickCursor()
+            .disabled(disabled)
+            .help(help)
     }
 
     private func glassAction(_ title: String, icon: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon).font(.system(size: 10, weight: .semibold))
-                Text(title).font(Theme.ui(11, .medium))
+                Text(title)
             }
-            .foregroundStyle(disabled ? Theme.ink3 : Theme.ink2)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .chiaroGlass(cornerRadius: 10)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(GlassButtonStyle(tint: disabled ? Theme.ink3 : Theme.ink2))
         .clickCursor()
         .disabled(disabled)
     }
@@ -176,14 +158,10 @@ struct EditView: View {
         Button(action: onExport) {
             HStack(spacing: 6) {
                 Image(systemName: "square.and.arrow.up").font(.system(size: 10, weight: .semibold))
-                Text("Export").font(Theme.ui(11, .medium))
+                Text("Export")
             }
-            .foregroundStyle(Theme.amber)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .chiaroGlass(cornerRadius: 10)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(GlassButtonStyle(tint: Theme.amber))
         .clickCursor()
         .keyboardShortcut("e")
         .help("Full-resolution JPEG, HEIF, or 16-bit TIFF (⌘E)")
@@ -193,14 +171,10 @@ struct EditView: View {
         Button(action: close) {
             HStack(spacing: 6) {
                 Image(systemName: "chevron.left").font(.system(size: 10, weight: .semibold))
-                Text("Library").font(Theme.ui(11, .medium))
+                Text("Library")
             }
-            .foregroundStyle(Theme.ink2)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .chiaroGlass(cornerRadius: 10)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(GlassButtonStyle())
         .clickCursor()
     }
 

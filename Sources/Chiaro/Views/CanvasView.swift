@@ -116,8 +116,8 @@ struct CanvasView: View {
                 aspectChip("16:9", 16.0 / 9)
             }
             HStack(spacing: 10) {
-                Text("STRAIGHTEN")
-                    .font(Theme.mono(8.5)).kerning(1.4)
+                Text("Straighten")
+                    .font(Theme.ui(10))
                     .foregroundStyle(Theme.ink3)
                 Slider(value: straightenBinding, in: -45...45)
                     .tint(Theme.amber)
@@ -135,9 +135,7 @@ struct CanvasView: View {
                     model.edit.straighten = 0
                     model.cropAspect = nil
                 }
-                .buttonStyle(.plain)
-                .font(Theme.ui(11))
-                .foregroundStyle(Theme.ink2)
+                .buttonStyle(OutlineButtonStyle())
                 .clickCursor()
                 Button("Done") { model.cropMode = false }
                     .buttonStyle(AmberButtonStyle())
@@ -165,19 +163,9 @@ struct CanvasView: View {
     }
 
     private func aspectChip(_ title: String, _ aspect: Double?) -> some View {
-        let selected = model.cropAspect == aspect
-        return Button {
+        Chip(title: title, selected: model.cropAspect == aspect) {
             model.applyCropAspect(aspect)
-        } label: {
-            Text(title)
-                .font(Theme.ui(10.5, selected ? .medium : .regular))
-                .foregroundStyle(selected ? Theme.amber : Theme.ink2)
-                .padding(.horizontal, 10).padding(.vertical, 5)
-                .background(Capsule().fill(Color.white.opacity(selected ? 0.08 : 0.03)))
-                .overlay(Capsule().stroke(selected ? Theme.amber.opacity(0.5) : Theme.hairline))
         }
-        .buttonStyle(.plain)
-        .clickCursor()
     }
 
     /// The one slider in the app: a floating glass dial for the armed parameter
@@ -188,9 +176,8 @@ struct CanvasView: View {
             let t = (armed.value(in: model.edit) - range.lowerBound) / (range.upperBound - range.lowerBound)
             VStack(spacing: 7) {
                 HStack(spacing: 10) {
-                    Text(armed.label.uppercased())
-                        .font(Theme.mono(9))
-                        .kerning(1.6)
+                    Text(armed.label)
+                        .font(Theme.ui(11, .medium))
                         .foregroundStyle(Theme.ink2)
                     Text(armed.format(armed.value(in: model.edit)))
                         .font(Theme.mono(19, .medium))

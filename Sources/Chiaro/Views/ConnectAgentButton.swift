@@ -113,16 +113,21 @@ struct AgentConnectPopover: View {
     private var prompt: String {
         let url = "http://127.0.0.1:\(MCPServer.shared.port == 0 ? MCPServer.preferredPort : MCPServer.shared.port)/mcp"
         return """
-        Chiaro, a RAW photo editor, is running on this Mac with a local MCP server at \(url) \
-        (streamable HTTP; discovery file at ~/.chiaro/mcp.json). Connect to it — with Claude Code: \
-        `claude mcp add --transport http chiaro \(url)` — then call tools/list for the full schema.
+        You are being connected to Chiaro, a RAW photo editor running on this Mac. \
+        It serves MCP at \(url) (streamable HTTP; discovery file at ~/.chiaro/mcp.json).
 
-        How to work: orient with list_photos; read a photo's settings with get_edit; LOOK at a photo \
-        (rendered with its current edit) via get_preview before and after changes; adjust with \
-        set_edit (send only the parameters you're changing, and include an `intent` string describing \
-        what you're doing — it's shown to the user live in the app); open_photo displays a photo in \
-        the editor so the user can watch; export writes the finished file. All edits are \
-        non-destructive and render live. Iterate visually: edit, get_preview, judge, refine.
+        1. Connect using your MCP support. Claude Code: `claude mcp add --transport http chiaro \(url)`. \
+        Other agents: add an HTTP MCP server named "chiaro" with that URL to your MCP configuration.
+        2. Confirm the connection by calling the list_photos tool — Chiaro shows you as \
+        connected the moment your first request arrives.
+        3. Then tell the user you are connected, briefly summarize what is in their library, \
+        and ask what they would like to do.
+
+        Working notes: get_edit reads a photo's settings. get_preview returns the photo rendered \
+        with its current edit — look before and after every change. set_edit changes only the \
+        parameters you send and accepts an `intent` string that is shown to the user live. \
+        open_photo displays a photo in the editor so the user can watch. export writes the \
+        finished file. All edits are non-destructive and render live.
         """
     }
 
@@ -143,7 +148,7 @@ struct AgentConnectPopover: View {
     private var historyContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("\(AgentStatus.shared.displayName) in Chiaro")
-                .font(Theme.ui(14, .semibold))
+                .font(Theme.serif(16))
                 .foregroundStyle(Theme.ink)
             ScrollView {
                 VStack(alignment: .leading, spacing: 7) {
@@ -174,10 +179,10 @@ struct AgentConnectPopover: View {
 
     private var connectContent: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Drive Chiaro with any coding agent")
-                .font(Theme.ui(14, .semibold))
+            Text("Drive Chiaro with any agent")
+                .font(Theme.serif(16))
                 .foregroundStyle(Theme.ink)
-            Text("Chiaro serves MCP while it runs. Paste this into Claude Code (or any MCP-capable agent) and it can see, edit, and export your photos — live in this window.")
+            Text("Paste this into any MCP-capable agent — Claude Code, Cursor, whatever you run — and it can see, edit, and export your photos, live in this window. It will confirm once connected.")
                 .font(Theme.ui(11.5))
                 .foregroundStyle(Theme.ink2)
                 .fixedSize(horizontal: false, vertical: true)
