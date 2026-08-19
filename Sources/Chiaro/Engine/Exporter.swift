@@ -80,19 +80,16 @@ enum Exporter {
         guard let full = engine.fullImage(for: photo.url) else {
             throw CocoaError(.fileReadCorruptFile)
         }
-        var edit = photo.edit
-        _ = edit // silences the var warning when cleanup is empty
-        let cleaned = edit.cleanup.isEmpty ? full
-            : CleanupEngine.shared.applied(to: full, url: photo.url, strokes: edit.cleanup)
+        let edit = photo.edit
         var mask: CIImage?
         if edit.blurF > 0 || edit.relight != 0 {
             mask = PortraitEngine.shared.mask(
-                for: photo.url, image: cleaned,
+                for: photo.url, image: full,
                 kind: edit.blurMode == .person ? .person : .subject)
         }
         let depth = edit.blurMode == .depth && edit.blurF > 0
-            ? DepthEngine.shared.depthMap(for: photo.url, image: cleaned) : nil
-        var rendered = RenderPipeline.render(base: cleaned, edit: edit, personMask: mask, depthMap: depth)
+            ? DepthEngine.shared.depthMap(for: photo.url, image: full) : nil
+        var rendered = RenderPipeline.render(base: full, edit: edit, personMask: mask, depthMap: depth)
         if let maxDim = options.maxDimension {
             let scale = maxDim / Double(max(rendered.extent.width, rendered.extent.height))
             if scale < 1 {

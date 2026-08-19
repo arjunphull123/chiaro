@@ -27,11 +27,13 @@ struct EditView: View {
         .focused($focused)
         .focusEffectDisabled()
         .onKeyPress(.escape) {
-            if model.cleanupMode { model.cleanupMode = false }
-            else if model.selectedLocalID != nil { model.selectedLocalID = nil }
+            if model.selectedLocalID != nil { model.selectedLocalID = nil }
             else if model.depthSceneVisible { model.depthSceneCommand = .exit }
             else if model.cropMode { model.cropMode = false }
-            else if model.armed != nil { model.armed = nil }
+            else if model.armed != nil || model.armedHSL != nil {
+                model.armed = nil
+                model.armedHSL = nil
+            }
             else { close() }
             return .handled
         }
@@ -71,13 +73,31 @@ struct EditView: View {
         }
         .overlay(alignment: .topTrailing) {
             HStack(spacing: 8) {
-                Button { model.cropMode.toggle() } label: { Image(systemName: "crop") }
-                    .buttonStyle(GlassIconButtonStyle(tint: model.cropMode ? Theme.amber : Theme.ink2))
-                    .clickCursor()
-                    .help("Crop & straighten (C)")
-                cleanupButton
-                glassIcon("arrow.uturn.backward", disabled: !model.canUndo, help: "Undo (⌘Z)") { model.undo() }
-                glassIcon("arrow.uturn.forward", disabled: !model.canRedo, help: "Redo (⇧⌘Z)") { model.redo() }
+                Button {
+                    model.cropMode.toggle()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "crop").font(.system(size: 10, weight: .semibold))
+                        Text("Crop")
+                    }
+                }
+                .buttonStyle(GlassButtonStyle(tint: model.cropMode ? Theme.amber : Theme.ink2))
+                .clickCursor()
+                .help("Crop, straighten, rotate, and flip (C)")
+                glassAction("Undo", icon: "arrow.uturn.backward", disabled: !model.canUndo) { model.undo() }
+                glassAction("Redo", icon: "arrow.uturn.forward", disabled: !model.canRedo) { model.redo() }
+                Button {
+                    model.showOriginal.toggle()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: model.showOriginal ? "eye.fill" : "eye")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text("View original")
+                    }
+                }
+                .buttonStyle(GlassButtonStyle(tint: model.showOriginal ? Theme.amber : Theme.ink2))
+                .clickCursor()
+                .help("Compare with the unedited photo — or hold \\")
                 glassAction("Copy edits", icon: "doc.on.doc", disabled: model.edit.isNeutral) {
                     library.copiedEdit = model.edit
                 }
@@ -109,10 +129,14 @@ struct EditView: View {
     private func installScrollMonitor() {
         guard scrollMonitor == nil else { return }
         scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
-            guard !library.agentActive, !model.depthSceneVisible, !model.cleanupMode,
-                  let parameter = model.armed else { return event }
+            guard !library.agentActive, !model.depthSceneVisible else { return event }
             let dx = event.scrollingDeltaX
             guard abs(dx) > abs(event.scrollingDeltaY), dx != 0 else { return event }
+            if model.armedHSL != nil {
+                model.scrub(deltaX: dx)
+                return nil
+            }
+            guard let parameter = model.armed else { return event }
             let span = parameter.range.upperBound - parameter.range.lowerBound
             let old = parameter.value(in: model.edit)
             parameter.set(old + dx / 500 * span, in: &model.edit)
@@ -150,14 +174,6 @@ struct EditView: View {
         library.photos.firstIndex(where: { $0.url == model.photo.url }) ?? 0
     }
 
-    private func glassIcon(_ icon: String, disabled: Bool, help: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Image(systemName: icon) }
-            .buttonStyle(GlassIconButtonStyle())
-            .clickCursor()
-            .disabled(disabled)
-            .help(help)
-    }
-
     private func glassAction(_ title: String, icon: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 6) {
@@ -168,36 +184,6 @@ struct EditView: View {
         .buttonStyle(GlassButtonStyle())
         .clickCursor()
         .disabled(disabled)
-    }
-
-    /// Clean up is a mode like crop — it lives with the utilities. First
-    /// click downloads the model (40 MB); after that it toggles the brush.
-    @ViewBuilder private var cleanupButton: some View {
-        switch CleanupModelStore.shared.availability {
-        case .missing, .failed:
-            Button { CleanupModelStore.shared.downloadIfNeeded() } label: {
-                Image(systemName: "bandage")
-            }
-            .buttonStyle(GlassIconButtonStyle())
-            .clickCursor()
-            .help("Clean up — first use downloads the on-device model (40 MB)")
-        case .downloading(let progress):
-            ProgressView(value: progress)
-                .progressViewStyle(.circular)
-                .controlSize(.small)
-                .frame(width: 30, height: 28)
-                .help("Downloading the cleanup model…")
-        case .preparing:
-            ProgressView()
-                .controlSize(.small)
-                .frame(width: 30, height: 28)
-                .help("Preparing the cleanup model…")
-        case .ready:
-            Button { model.cleanupMode.toggle() } label: { Image(systemName: "bandage") }
-                .buttonStyle(GlassIconButtonStyle(tint: model.cleanupMode ? Theme.amber : Theme.ink2))
-                .clickCursor()
-                .help("Clean up — brush over distractions to remove them")
-        }
     }
 
     private var exportButton: some View {

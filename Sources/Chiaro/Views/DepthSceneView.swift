@@ -2,10 +2,10 @@ import SwiftUI
 import SceneKit
 
 /// Spatial focus: the photo morphs into a depth-displaced point cloud, the
-/// camera swings to a 3/4 view, and two gridded slice planes rise in to bound
-/// the sharp zone. Drag to orbit (full 180°, plus overhead), grab a handle to
-/// slide a plane along the depth axis, scroll to zoom. Exit reverses the
-/// choreography back into the flat photo.
+/// camera swings to a 3/4 view, and one gridded slice plane rises in — the
+/// far edge of sharpness. Everything in front of it stays sharp; blur ramps
+/// behind it. Drag to orbit (full 180°, plus overhead), grab a handle to
+/// slide the plane, scroll to zoom. Exit reverses the choreography.
 /// AppKit because SceneKit has no SwiftUI surface.
 enum DepthSceneCommand: Equatable {
     case exit
@@ -54,8 +54,7 @@ enum DepthScene {
         rig.addChildNode(cloud)
 
         let planeSize = CGSize(width: CGFloat(grid.aspect) * planeHeight, height: planeHeight)
-        rig.addChildNode(slicePlane(name: "near", size: planeSize, emphasis: 1))
-        rig.addChildNode(slicePlane(name: "far", size: planeSize, emphasis: 0.6))
+        rig.addChildNode(slicePlane(name: "edge", size: planeSize, emphasis: 1))
 
         updatePlanes(in: scene, focusDepth: focusDepth, focusRange: focusRange, hidden: true)
         return scene
@@ -184,16 +183,11 @@ enum DepthScene {
     }
 
     static func updatePlanes(in scene: SCNScene, focusDepth: Double, focusRange: Double, hidden: Bool = false) {
-        guard let rig = scene.rootNode.childNode(withName: "rig", recursively: false) else { return }
-        let target = 1 - focusDepth
-        let half = focusRange * 0.4
-        let nearZ = CGFloat((Float(target + half) - 0.5) * zSpan)
-        let farZ = CGFloat((Float(target - half) - 0.5) * zSpan)
-        for (name, z) in [("near", nearZ), ("far", farZ)] {
-            guard let plane = rig.childNode(withName: name, recursively: false) else { continue }
-            plane.position = SCNVector3(0, -planeHeight / 2, z)
-            plane.scale = SCNVector3(1, hidden ? 0.001 : 1, 1)
-        }
+        guard let rig = scene.rootNode.childNode(withName: "rig", recursively: false),
+              let plane = rig.childNode(withName: "edge", recursively: false) else { return }
+        let farEdge = (1 - focusDepth) - focusRange * 0.4
+        plane.position = SCNVector3(0, -planeHeight / 2, CGFloat((Float(farEdge) - 0.5) * zSpan))
+        plane.scale = SCNVector3(1, hidden ? 0.001 : 1, 1)
     }
 
     static func cameraPosition(yaw: CGFloat, pitch: CGFloat, radius: CGFloat) -> SCNVector3 {
@@ -273,7 +267,7 @@ struct DepthSceneView: NSViewRepresentable {
 
         private var radius: CGFloat = 2.3
 
-        private enum DragTarget { case near, far, orbit }
+        private enum DragTarget { case plane, orbit }
         private var dragTarget: DragTarget?
         private var startFocus = 0.0
         private var startRange = 0.0
@@ -457,9 +451,7 @@ struct DepthSceneView: NSViewRepresentable {
                     .ignoreHiddenNodes: false,
                 ])
                 let names = hits.compactMap(\.node.name)
-                if names.contains(where: { $0.hasPrefix("near-handle") }) { dragTarget = .near }
-                else if names.contains(where: { $0.hasPrefix("far-handle") }) { dragTarget = .far }
-                else { dragTarget = .orbit }
+                dragTarget = names.contains(where: { $0.hasPrefix("edge-handle") }) ? .plane : .orbit
             case .changed:
                 switch dragTarget {
                 case .orbit:
@@ -468,8 +460,8 @@ struct DepthSceneView: NSViewRepresentable {
                     model.sceneYaw = (startYaw - translation.x / 220).clamped(to: -.pi / 2 ... .pi / 2)
                     model.scenePitch = (startPitch + translation.y / 220).clamped(to: -0.1 ... .pi / 2 - 0.06)
                     applyOrbit()
-                case .near, .far:
-                    dragPlane(near: dragTarget == .near, translation: translation)
+                case .plane:
+                    dragPlane(translation: translation)
                 case nil:
                     break
                 }
@@ -479,9 +471,10 @@ struct DepthSceneView: NSViewRepresentable {
             }
         }
 
-        /// Screen-space drag projected onto the depth axis, so plane dragging
-        /// tracks the cursor from any camera angle.
-        private func dragPlane(near: Bool, translation: NSPoint) {
+        /// Screen-space drag projected onto the depth axis, so the plane
+        /// tracks the cursor from any camera angle. Moving the plane moves
+        /// the whole sharp zone (focus); Range stays put.
+        private func dragPlane(translation: NSPoint) {
             guard let view else { return }
             let a = view.projectPoint(SCNVector3(0, DepthScene.sceneLift, 0))
             let b = view.projectPoint(SCNVector3(0, DepthScene.sceneLift, 0.5))
@@ -490,15 +483,7 @@ struct DepthSceneView: NSViewRepresentable {
             guard lengthSquared > 1 else { return }
             let worldDz = 0.5 * Double((translation.x * axis.x + translation.y * axis.y) / lengthSquared)
             let focusDz = -worldDz / Double(DepthScene.zSpan) // +z = nearer = smaller focus value
-
-            let startHalf = startRange * 0.4
-            let nearEdge = startFocus - startHalf
-            let farEdge = startFocus + startHalf
-            let newNear = near ? (nearEdge + focusDz).clamped(to: -0.2...1.2) : nearEdge
-            let newFar = near ? farEdge : (farEdge + focusDz).clamped(to: -0.2...1.2)
-            let lo = min(newNear, newFar), hi = max(newNear, newFar)
-            model.edit.focusDepth = ((lo + hi) / 2).clamped(to: 0...1)
-            model.edit.focusRange = ((hi - lo) / 2 / 0.4).clamped(to: 0...1)
+            model.edit.focusDepth = (startFocus + focusDz).clamped(to: 0...1)
             refresh()
         }
 

@@ -108,13 +108,22 @@ struct RailView: View {
                 if model.edit.curve != CurvePoint.identity {
                     Button("Reset") { model.edit.curve = CurvePoint.identity }
                         .buttonStyle(.plain)
-        .clickCursor()
+                        .clickCursor()
                         .font(Theme.ui(9.5))
                         .foregroundStyle(Theme.ink3)
                 }
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(Theme.ink3)
+                    .rotationEffect(.degrees(isCollapsed("Curve") ? -90 : 0))
             }
+            .contentShape(Rectangle())
+            .onTapGesture { toggleCollapsed("Curve") }
+            .clickCursor()
             .padding(.top, 10)
-            CurveEditorView(edit: $model.edit, histogram: model.histogram)
+            if !isCollapsed("Curve") {
+                CurveEditorView(edit: $model.edit, histogram: model.histogram)
+            }
         }
         .help("Tone curve — click adds a point, drag shapes it, double-click removes")
     }
@@ -122,8 +131,10 @@ struct RailView: View {
     private func section(_ title: String, _ params: [EditParameter], help: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             sectionLabel(title, help: help)
-            ForEach(params) { p in
-                AdjustmentRow(parameter: p, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
+            if !isCollapsed(title) {
+                ForEach(params) { p in
+                    AdjustmentRow(parameter: p, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
+                }
             }
         }
     }
@@ -131,16 +142,18 @@ struct RailView: View {
     private var portraitSection: some View {
         VStack(alignment: .leading, spacing: 3) {
             sectionLabel("Background blur", help: "What stays sharp: the lifted subject, detected people, or everything nearer than the focus plane")
-            HStack(spacing: 6) {
-                Chip(title: "Subject", selected: model.edit.blurMode == .subject) { model.setBlurMode(.subject) }
-                Chip(title: "Person", selected: model.edit.blurMode == .person) { model.setBlurMode(.person) }
-                Chip(title: "Depth", selected: model.edit.blurMode == .depth) { model.setBlurMode(.depth) }
+            if !isCollapsed("Background blur") {
+            HStack(spacing: 5) {
+                modePill("Subject", .subject)
+                modePill("Person", .person)
+                modePill("Depth", .depth)
             }
             .padding(.bottom, 4)
             if model.edit.blurMode == .depth {
                 depthContent
             } else {
                 subjectContent
+            }
             }
         }
     }
@@ -240,6 +253,7 @@ struct RailView: View {
     private var colorMixSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             sectionLabel("Color mix", help: "Per-hue adjustments — pick a band, then shift its hue, saturation, and luminance")
+            if !isCollapsed("Color mix") {
             HStack(spacing: 8) {
                 Spacer(minLength: 0)
                 ForEach(0..<8, id: \.self) { i in
@@ -262,9 +276,10 @@ struct RailView: View {
                 Spacer(minLength: 0)
             }
             .padding(.bottom, 2)
-            bandRow("Hue", keyPath: \.h)
-            bandRow("Saturation", keyPath: \.s)
-            bandRow("Luminance", keyPath: \.l)
+            bandRow(.h)
+            bandRow(.s)
+            bandRow(.l)
+            }
         }
     }
 
@@ -272,8 +287,12 @@ struct RailView: View {
     @FocusState private var typingField: String?
 
     /// Scrub row for one component of the selected band — same feel as
-    /// AdjustmentRow, bound into the hsl array. Click the value to type it.
-    private func bandRow(_ label: String, keyPath: WritableKeyPath<HSLBand, Double>) -> some View {
+    /// AdjustmentRow: click arms the glass dial, drag scrubs, click the
+    /// value to type it.
+    private func bandRow(_ component: EditViewModel.HSLComponent) -> some View {
+        let label = component.rawValue
+        let keyPath = component.keyPath
+        let isArmed = model.armedHSL?.band == selectedBand && model.armedHSL?.component == component
         let value = model.edit.hsl[selectedBand][keyPath: keyPath]
         let fieldID = "hsl-\(selectedBand)-\(label)"
         return HStack {
@@ -312,7 +331,14 @@ struct RailView: View {
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 5)
-        .background(RoundedRectangle(cornerRadius: 7).fill(Color.white.opacity(0.03)))
+        .background(
+            RoundedRectangle(cornerRadius: 7)
+                .fill(isArmed ? Theme.amber.opacity(0.1) : Color.white.opacity(0.03))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 7)
+                .stroke(isArmed ? Theme.amber.opacity(0.6) : .clear)
+        )
         .contentShape(Rectangle())
         .gesture(
             DragGesture(minimumDistance: 1)
@@ -327,6 +353,9 @@ struct RailView: View {
                 .onEnded { _ in bandScrubStart = nil }
         )
         .onTapGesture(count: 2) { model.edit.hsl[selectedBand][keyPath: keyPath] = 0 }
+        .onTapGesture {
+            model.armedHSL = isArmed ? nil : (selectedBand, component)
+        }
         .clickCursor()
     }
 
@@ -349,8 +378,16 @@ struct RailView: View {
                 .menuStyle(.borderlessButton)
                 .fixedSize()
                 .clickCursor()
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(Theme.ink3)
+                    .rotationEffect(.degrees(isCollapsed("Masking") ? -90 : 0))
+                    .contentShape(Rectangle())
+                    .onTapGesture { toggleCollapsed("Masking") }
+                    .clickCursor()
             }
             .padding(.top, 10)
+            if !isCollapsed("Masking") {
             ForEach(Array(model.edit.locals.enumerated()), id: \.element.id) { index, local in
                 let selected = model.selectedLocalID == local.id
                 HStack(spacing: 6) {
@@ -414,8 +451,25 @@ struct RailView: View {
                 .padding(.horizontal, 9)
                 .padding(.top, 2)
             }
+            }
         }
         .help("Masked corrections — a radial or linear region, or the detected subject")
+    }
+
+    private func modePill(_ title: String, _ mode: BlurMode) -> some View {
+        let selected = model.edit.blurMode == mode
+        return Button { model.setBlurMode(mode) } label: {
+            Text(title)
+                .font(Theme.ui(10.5, selected ? .medium : .regular))
+                .foregroundStyle(selected ? Theme.amber : Theme.ink2)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(Color.white.opacity(selected ? 0.08 : 0.03)))
+                .overlay(Capsule().stroke(selected ? Theme.amber.opacity(0.5) : Theme.hairline))
+        }
+        .buttonStyle(.plain)
+        .clickCursor()
     }
 
     private func addLocal(_ kind: LocalAdjustment.Kind) {
@@ -466,72 +520,6 @@ struct RailView: View {
         .clickCursor()
     }
 
-    private var cleanupSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            sectionLabel("Clean up", help: "Brush over distractions to remove them — inpainted on-device, nothing generated elsewhere")
-            switch CleanupModelStore.shared.availability {
-            case .missing:
-                Button("Download cleanup model (40 MB)") {
-                    CleanupModelStore.shared.downloadIfNeeded()
-                }
-                .buttonStyle(OutlineButtonStyle())
-                .clickCursor()
-            case .downloading(let progress):
-                HStack(spacing: 7) {
-                    ProgressView(value: progress)
-                        .progressViewStyle(.linear)
-                        .tint(Theme.amber)
-                    Text("\(Int(progress * 100))%")
-                        .font(Theme.mono(9)).foregroundStyle(Theme.ink3).monospacedDigit()
-                }
-                .frame(height: 24)
-            case .preparing:
-                HStack(spacing: 7) {
-                    ProgressView().controlSize(.mini)
-                    Text("Preparing…")
-                        .font(Theme.ui(10.5)).foregroundStyle(Theme.ink3)
-                }
-                .frame(height: 24)
-            case .failed(let message):
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(message).font(Theme.ui(9.5)).foregroundStyle(Theme.ink3).lineLimit(2)
-                    Button("Try again") { CleanupModelStore.shared.downloadIfNeeded() }
-                        .buttonStyle(OutlineButtonStyle())
-                        .clickCursor()
-                }
-            case .ready:
-                Button {
-                    model.cleanupMode.toggle()
-                } label: {
-                    HStack(spacing: 7) {
-                        Image(systemName: "bandage")
-                            .font(.system(size: 11, weight: .semibold))
-                        Text(model.cleanupMode ? "Painting — brush over distractions" : "Remove distractions")
-                            .font(Theme.ui(11, .medium))
-                        if !model.edit.cleanup.isEmpty {
-                            Text("\(model.edit.cleanup.count)")
-                                .font(Theme.mono(9))
-                                .foregroundStyle(Theme.ink3)
-                        }
-                    }
-                    .foregroundStyle(model.cleanupMode ? Theme.amber : Theme.ink2)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 7)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(model.cleanupMode ? Theme.amber.opacity(0.12) : Color.white.opacity(0.04))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(model.cleanupMode ? Theme.amber.opacity(0.6) : Theme.hairline)
-                    )
-                }
-                .buttonStyle(.plain)
-                .clickCursor()
-            }
-        }
-    }
-
     @State private var savingPreset = false
     @State private var presetName = ""
 
@@ -548,8 +536,16 @@ struct RailView: View {
                     .font(Theme.ui(9.5))
                     .foregroundStyle(Theme.ink3)
                     .disabled(model.edit.isNeutral)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(Theme.ink3)
+                    .rotationEffect(.degrees(isCollapsed("Presets") ? -90 : 0))
+                    .contentShape(Rectangle())
+                    .onTapGesture { toggleCollapsed("Presets") }
+                    .clickCursor()
             }
             .padding(.top, 10)
+            if !isCollapsed("Presets") {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 5), GridItem(.flexible(), spacing: 5)], spacing: 5) {
                 ForEach(PresetStore.shared.all) { preset in
                     let selected = preset.matches(model.edit)
@@ -576,6 +572,7 @@ struct RailView: View {
                     }
                 }
             }
+            }
         }
         .help("Starting points — tone and color only; crop and portrait stay put")
         .alert("Save preset", isPresented: $savingPreset) {
@@ -591,13 +588,32 @@ struct RailView: View {
         }
     }
 
+    @AppStorage("collapsedSections") private var collapsedRaw = ""
+
+    private func isCollapsed(_ title: String) -> Bool {
+        collapsedRaw.split(separator: ",").map(String.init).contains(title)
+    }
+
+    private func toggleCollapsed(_ title: String) {
+        var set = Set(collapsedRaw.split(separator: ",").map(String.init))
+        if !set.insert(title).inserted { set.remove(title) }
+        collapsedRaw = set.sorted().joined(separator: ",")
+    }
+
     private func sectionLabel(_ title: String, help: String) -> some View {
         HStack(spacing: 5) {
             Text(title)
                 .font(Theme.ui(12, .medium))
                 .foregroundStyle(Theme.ink2)
             Rectangle().fill(Theme.hairline).frame(height: 1)
+            Image(systemName: "chevron.down")
+                .font(.system(size: 8, weight: .semibold))
+                .foregroundStyle(Theme.ink3)
+                .rotationEffect(.degrees(isCollapsed(title) ? -90 : 0))
         }
+        .contentShape(Rectangle())
+        .onTapGesture { toggleCollapsed(title) }
+        .clickCursor()
         .padding(.top, 10)
         .padding(.bottom, 6)
         .help(help)

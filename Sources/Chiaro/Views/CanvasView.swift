@@ -49,16 +49,8 @@ struct CanvasView: View {
                         .offset(x: pan.width + gesturePan.width, y: pan.height + gesturePan.height)
                         .position(x: fitRegion.width / 2, y: fitRegion.height / 2)
                         .shadow(color: .black.opacity(0.45), radius: 24, y: 8)
-                    if model.cleanupMode {
-                        cleanupOverlay(fitSize: fitSize)
-                            .frame(width: fitSize.width, height: fitSize.height)
-                            .scaleEffect(zoom * gestureZoom)
-                            .offset(x: pan.width + gesturePan.width, y: pan.height + gesturePan.height)
-                            .position(x: fitRegion.width / 2, y: fitRegion.height / 2)
-                            .allowsHitTesting(false)
-                    }
                     if let localIndex = model.edit.locals.firstIndex(where: { $0.id == model.selectedLocalID }),
-                       !model.cropMode, !model.cleanupMode, !model.depthSceneVisible {
+                       !model.cropMode, !model.depthSceneVisible {
                         localGizmo(index: localIndex, fitSize: fitSize)
                             .frame(width: fitSize.width, height: fitSize.height)
                             .scaleEffect(zoom * gestureZoom)
@@ -89,8 +81,6 @@ struct CanvasView: View {
                 Group {
                     if model.cropMode {
                         cropPanel
-                    } else if model.cleanupMode {
-                        cleanupPanel
                     } else if model.depthSceneVisible && model.edit.blurMode == .depth {
                         depthSceneCard
                     } else {
@@ -145,15 +135,9 @@ struct CanvasView: View {
     private func dragGesture(_ fitRegion: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { g in
-                if model.cleanupMode, !model.spacePan {
-                    guard let (u, v) = normalizedPoint(g.location, in: fitRegion) else { return }
-                    if model.activeStroke == nil {
-                        model.activeStroke = CleanupStroke(points: [], radius: model.cleanupBrush)
-                    }
-                    model.activeStroke?.points.append(CurvePoint(x: u, y: v))
-                } else if model.spacePan {
+                if model.spacePan {
                     gesturePan = g.translation
-                } else if model.armed != nil {
+                } else if model.armed != nil || model.armedHSL != nil {
                     let dx = g.location.x - (lastScrubX ?? g.startLocation.x)
                     lastScrubX = g.location.x
                     model.scrub(deltaX: dx)
@@ -162,10 +146,6 @@ struct CanvasView: View {
                 }
             }
             .onEnded { _ in
-                if model.cleanupMode, model.activeStroke != nil {
-                    model.commitActiveStroke()
-                    return
-                }
                 lastScrubX = nil
                 pan = CGSize(width: pan.width + gesturePan.width, height: pan.height + gesturePan.height)
                 gesturePan = .zero
@@ -197,6 +177,19 @@ struct CanvasView: View {
     /// Crop mode controls: aspect presets, straighten, reset, done.
     private var cropPanel: some View {
         VStack(spacing: 10) {
+            HStack(spacing: 6) {
+                transformButton("Level", icon: "level") { model.autoLevel() }
+                transformButton("Headshot", icon: "person.crop.square") { model.autoHeadshotCrop() }
+                transformButton("Rotate", icon: "rotate.right") {
+                    model.edit.rotation = (model.edit.rotation + 90) % 360
+                }
+                transformButton("Flip H", icon: "arrow.left.and.right.righttriangle.left.righttriangle.right") {
+                    model.edit.flipH.toggle()
+                }
+                transformButton("Flip V", icon: "arrow.up.and.down.righttriangle.up.righttriangle.down") {
+                    model.edit.flipV.toggle()
+                }
+            }
             HStack(spacing: 5) {
                 aspectChip("Free", nil)
                 aspectChip("Original", originalAspect)
@@ -252,6 +245,17 @@ struct CanvasView: View {
                 HapticDetents.tickIfCrossed(parameter: .straighten, from: old, to: newValue)
             }
         )
+    }
+
+    private func transformButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: icon).font(.system(size: 9, weight: .semibold))
+                Text(title)
+            }
+        }
+        .buttonStyle(OutlineButtonStyle())
+        .clickCursor()
     }
 
     private func aspectChip(_ title: String, _ aspect: Double?) -> some View {
@@ -321,82 +325,22 @@ struct CanvasView: View {
             .clickCursor()
     }
 
-    /// Committed and in-progress Clean up strokes, amber over the photo.
-    private func cleanupOverlay(fitSize: CGSize) -> some View {
-        Canvas { context, _ in
-            for stroke in model.edit.cleanup + [model.activeStroke].compactMap({ $0 }) {
-                var path = Path()
-                let points = stroke.points.map {
-                    CGPoint(x: $0.x * fitSize.width, y: $0.y * fitSize.height)
-                }
-                guard let first = points.first else { continue }
-                path.move(to: first)
-                if points.count == 1 { path.addLine(to: first) }
-                for point in points.dropFirst() { path.addLine(to: point) }
-                context.stroke(
-                    path,
-                    with: .color(Theme.amber.opacity(0.45)),
-                    style: StrokeStyle(lineWidth: stroke.radius * 2 * fitSize.width, lineCap: .round, lineJoin: .round)
-                )
-            }
-        }
-    }
-
-    /// Clean up controls: brush size, stroke undo, done.
-    private var cleanupPanel: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 10) {
-                Text("Clean up · brush")
-                    .font(Theme.ui(11, .medium))
-                    .foregroundStyle(Theme.ink2)
-                Text(String(format: "%.0f", model.cleanupBrush * 1000))
-                    .font(Theme.mono(19, .medium))
-                    .foregroundStyle(Theme.amber)
-                    .monospacedDigit()
-            }
-            ZStack(alignment: .leading) {
-                Capsule().fill(Color.white.opacity(0.18)).frame(height: 2)
-                let t = (model.cleanupBrush - 0.005) / 0.075
-                Capsule().fill(Theme.amber).frame(width: max(0, t * 260), height: 2)
-                RoundedRectangle(cornerRadius: 1.5)
-                    .fill(Theme.amber)
-                    .frame(width: 3, height: 14)
-                    .shadow(color: Theme.amber.opacity(0.6), radius: 4)
-                    .offset(x: t * 260 - 1.5)
-            }
-            .frame(width: 260, height: 14)
-            .contentShape(Rectangle().inset(by: -10))
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { g in
-                        model.cleanupBrush = (0.005 + Double(g.location.x / 260) * 0.075).clamped(to: 0.005...0.08)
-                    }
-            )
-            HStack(spacing: 8) {
-                Button("Undo stroke") {
-                    if !model.edit.cleanup.isEmpty { model.edit.cleanup.removeLast() }
-                }
-                .buttonStyle(OutlineButtonStyle())
-                .clickCursor()
-                .disabled(model.edit.cleanup.isEmpty)
-                Button("Clear") { model.edit.cleanup = [] }
-                    .buttonStyle(OutlineButtonStyle())
-                    .clickCursor()
-                    .disabled(model.edit.cleanup.isEmpty)
-                Button("Done") { model.cleanupMode = false }
-                    .buttonStyle(AmberButtonStyle())
-                    .clickCursor()
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 13)
-        .chiaroGlass(cornerRadius: 15)
-    }
-
     /// The one slider in the app: a floating glass dial for the armed parameter
     /// (ADR 0005). Drag it, drag the photo, or scroll — same EditState either way.
     @ViewBuilder private var readout: some View {
-        if let armed = model.armed {
+        if let armedHSL = model.armedHSL {
+            let value = model.edit.hsl[armedHSL.band][keyPath: armedHSL.component.keyPath]
+            let band = HSLBand.names[armedHSL.band]
+            dialCard(
+                label: "\(band.prefix(1).uppercased() + band.dropFirst()) \(armedHSL.component.rawValue.lowercased())",
+                value: value == 0 ? "0" : String(format: "%+.0f", value),
+                t: (value + 100) / 200,
+                detents: [0.5],
+                doneHelp: "Done — back to pan and zoom (esc)",
+                onDrag: { dx in model.scrub(deltaX: dx * 1.6) },
+                onDone: { model.armedHSL = nil }
+            )
+        } else if let armed = model.armed {
             let range = armed.range
             dialCard(
                 label: armed.label,

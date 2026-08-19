@@ -237,10 +237,13 @@ final class MCPServer {
             "type": "array",
             "description": "local adjustments: [{kind: radial|linear|subject, ax, ay, bx, by (normalized, y from top; radial: a=center b=radii, linear: gradient a→b), feather 0-100, invert, exposure -3..3, contrast/highlights/shadows/temp/tint/saturation/clarity -100..100}]. Empty array clears",
         ]
-        props["cleanup"] = [
-            "type": "array",
-            "description": "Clean up strokes: [{points: [[x,y],...] normalized (y from top), radius: fraction of width}] — brushed regions are removed and inpainted on-device (needs the cleanup model downloaded in the app). Empty array clears",
+        props["rotation"] = [
+            "type": "integer",
+            "enum": [0, 90, 180, 270],
+            "description": "clockwise rotation, applied before straighten/crop",
         ]
+        props["flipH"] = ["type": "boolean", "description": "mirror horizontally"]
+        props["flipV"] = ["type": "boolean", "description": "mirror vertically"]
         props["curve"] = [
             "type": "array",
             "items": ["type": "array", "items": ["type": "number"]],
@@ -495,6 +498,18 @@ final class MCPServer {
                     }
                     continue
                 }
+                if key == "rotation" {
+                    guard let degrees = value as? Int, [0, 90, 180, 270].contains(degrees) else {
+                        throw ToolError("rotation must be 0, 90, 180, or 270")
+                    }
+                    edit.rotation = degrees
+                    continue
+                }
+                if key == "flipH" || key == "flipV" {
+                    guard let flag = value as? Bool else { throw ToolError("\(key) must be a boolean") }
+                    if key == "flipH" { edit.flipH = flag } else { edit.flipV = flag }
+                    continue
+                }
                 if key == "locals" {
                     if let empty = value as? [Any], empty.isEmpty { edit.locals = []; continue }
                     guard let raw = value as? [[String: Any]],
@@ -503,28 +518,6 @@ final class MCPServer {
                         throw ToolError("locals must be [{kind, ax, ay, bx, by, feather, ...adjustments}] — kind is radial, linear, or subject")
                     }
                     edit.locals = decoded
-                    continue
-                }
-                if key == "cleanup" {
-                    guard let raw = value as? [[String: Any]] else {
-                        if let empty = value as? [Any], empty.isEmpty { edit.cleanup = []; continue }
-                        throw ToolError("cleanup must be [{points: [[x,y],...], radius}]")
-                    }
-                    edit.cleanup = try raw.map { dict in
-                        guard let pts = dict["points"] as? [[Any]],
-                              let radius = (dict["radius"] as? Double) ?? (dict["radius"] as? Int).map(Double.init) else {
-                            throw ToolError("each stroke needs points and radius")
-                        }
-                        let points = pts.compactMap { pair -> CurvePoint? in
-                            guard pair.count == 2,
-                                  let x = (pair[0] as? Double) ?? (pair[0] as? Int).map(Double.init),
-                                  let y = (pair[1] as? Double) ?? (pair[1] as? Int).map(Double.init)
-                            else { return nil }
-                            return CurvePoint(x: x.clamped(to: 0...1), y: y.clamped(to: 0...1))
-                        }
-                        guard !points.isEmpty else { throw ToolError("stroke points must be [[x,y],...]") }
-                        return CleanupStroke(points: points, radius: radius.clamped(to: 0.002...0.12))
-                    }
                     continue
                 }
                 if key == "curve" {
@@ -567,10 +560,7 @@ final class MCPServer {
             let maxDim = args["maxDimension"] as? Double ?? 768
             let url = p.url, edit = p.edit
             let jpeg = await Offload.on(Offload.render) { () -> Data? in
-                guard var base = RawEngine.shared.preview(for: url) else { return nil }
-                if !edit.cleanup.isEmpty {
-                    base = CleanupEngine.shared.applied(to: base, url: url, strokes: edit.cleanup)
-                }
+                guard let base = RawEngine.shared.preview(for: url) else { return nil }
                 var mask: CIImage?
                 if edit.blurF > 0 || edit.relight != 0 {
                     mask = PortraitEngine.shared.mask(

@@ -36,16 +36,6 @@ struct HSLBand: Codable, Equatable {
     static let centers: [Double] = [0, 30, 60, 120, 180, 240, 285, 330]
 }
 
-/// One Clean up brush stroke: normalized points (y from top) + brush radius
-/// as a fraction of image width.
-struct CleanupStroke: Codable, Equatable {
-    var points: [CurvePoint]
-    var radius: Double
-    var cacheKey: String {
-        "\(points.count),\(points.first?.x ?? 0),\(points.last?.y ?? 0),\(radius);"
-    }
-}
-
 /// One local adjustment: a mask (radial ellipse, linear gradient, or the
 /// detected subject) carrying its own tonal corrections. Coordinates are
 /// normalized, y from the top. Radial: a = center, b = radii. Linear: the
@@ -133,13 +123,14 @@ struct EditState: Codable, Equatable {
     var focusRange: Double = 0.25 // width of the sharp zone around the focus plane
     // Local adjustments: masked corrections, applied after global ones
     var locals: [LocalAdjustment] = []
-    // Clean up: brush strokes over removed objects (inpainted on-device)
-    var cleanup: [CleanupStroke] = []
     // Color mixer: 8 hue bands (see HSLBand.names)
     var hsl: [HSLBand] = Array(repeating: HSLBand(), count: 8)
     // Tone curve: control points, always including endpoints
     var curve: [CurvePoint] = CurvePoint.identity
     // Geometry
+    var rotation: Int = 0         // 0/90/180/270, clockwise, applied first
+    var flipH = false
+    var flipV = false
     var straighten: Double = 0    // -45...45 degrees
     var crop: CropRect = .full    // normalized, applied after straighten
 
@@ -163,6 +154,11 @@ struct EditState: Codable, Equatable {
         if let rect = try c.decodeIfPresent(CropRect.self, forKey: CodingKeys(stringValue: "crop")!) {
             crop = rect
         }
+        if let degrees = try c.decodeIfPresent(Int.self, forKey: CodingKeys(stringValue: "rotation")!) {
+            rotation = ((degrees % 360) + 360) % 360 / 90 * 90
+        }
+        flipH = try c.decodeIfPresent(Bool.self, forKey: CodingKeys(stringValue: "flipH")!) ?? false
+        flipV = try c.decodeIfPresent(Bool.self, forKey: CodingKeys(stringValue: "flipV")!) ?? false
         if let raw = try c.decodeIfPresent(String.self, forKey: CodingKeys(stringValue: "blurMode")!),
            let mode = BlurMode(rawValue: raw) {
             blurMode = mode
@@ -192,12 +188,14 @@ struct EditState: Codable, Equatable {
         if !locals.isEmpty {
             try c.encode(locals, forKey: CodingKeys(stringValue: "locals")!)
         }
-        if !cleanup.isEmpty {
-            try c.encode(cleanup, forKey: CodingKeys(stringValue: "cleanup")!)
-        }
         if hsl.contains(where: { !$0.isNeutral }) {
             try c.encode(hsl, forKey: CodingKeys(stringValue: "hsl")!)
         }
+        if rotation != 0 {
+            try c.encode(rotation, forKey: CodingKeys(stringValue: "rotation")!)
+        }
+        if flipH { try c.encode(true, forKey: CodingKeys(stringValue: "flipH")!) }
+        if flipV { try c.encode(true, forKey: CodingKeys(stringValue: "flipV")!) }
         if blurMode != .subject {
             try c.encode(blurMode.rawValue, forKey: CodingKeys(stringValue: "blurMode")!)
         }

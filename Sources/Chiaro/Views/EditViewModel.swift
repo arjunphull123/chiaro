@@ -1,4 +1,5 @@
 import SwiftUI
+import Vision
 import CoreImage
 import Observation
 
@@ -40,8 +41,24 @@ final class EditViewModel {
         edit = next
         isRestoringEdit = false
     }
+    /// Which color-mix control is armed (drives the same glass dial).
+    enum HSLComponent: String {
+        case h = "Hue", s = "Saturation", l = "Luminance"
+        var keyPath: WritableKeyPath<HSLBand, Double> {
+            switch self {
+            case .h: \.h
+            case .s: \.s
+            case .l: \.l
+            }
+        }
+    }
+    var armedHSL: (band: Int, component: HSLComponent)? {
+        didSet { if armedHSL != nil { armed = nil } }
+    }
+
     var armed: EditParameter? {
         didSet {
+            if armed != nil { armedHSL = nil }
             // Focus peaking overlays only while Focus is armed.
             let peakers: Set<EditParameter?> = [.focusDepth, .focusRange]
             guard armed != oldValue, peakers.contains(armed) || peakers.contains(oldValue) else { return }
@@ -50,20 +67,6 @@ final class EditViewModel {
     }
     /// The local adjustment being edited (gizmo shows on the canvas).
     var selectedLocalID: UUID?
-
-    /// Clean up: brush mode, radius (fraction of image width), and the
-    /// stroke being painted right now.
-    var cleanupMode = false {
-        didSet { if cleanupMode { armed = nil } }
-    }
-    var cleanupBrush: Double = 0.025
-    var activeStroke: CleanupStroke?
-
-    func commitActiveStroke() {
-        guard let stroke = activeStroke, !stroke.points.isEmpty else { activeStroke = nil; return }
-        edit.cleanup.append(stroke)
-        activeStroke = nil
-    }
 
     /// Held-space pan: drag moves the photo even while a parameter is armed.
     var spacePan = false {
@@ -109,7 +112,12 @@ final class EditViewModel {
     /// 3D depth scene visibility, and one-shot commands routed to it
     /// (exit / view presets) — the scene lives behind an NSViewRepresentable.
     var depthSceneVisible = false {
-        didSet { if depthSceneVisible { armed = nil } }
+        didSet {
+            if depthSceneVisible {
+                armed = nil
+                armedHSL = nil
+            }
+        }
     }
     var depthSceneCommand: DepthSceneCommand?
     /// Orbit state, shared with the orientation cube.
@@ -199,6 +207,53 @@ final class EditViewModel {
         }
     }
 
+    /// Auto-level: Vision's horizon detector sets the straighten angle.
+    func autoLevel() {
+        guard let basePreview else { return }
+        Task { [weak self] in
+            let angle = await Offload.on(Offload.vision) { () -> Double? in
+                let request = VNDetectHorizonRequest()
+                let handler = VNImageRequestHandler(ciImage: basePreview)
+                try? handler.perform([request])
+                guard let observation = request.results?.first else { return nil }
+                return Double(observation.angle) * 180 / .pi
+            }
+            guard let self, let angle else { return }
+            self.edit.straighten = (-angle).clamped(to: -45...45)
+        }
+    }
+
+    /// Auto headshot: find the face, frame it 4:5 with headroom.
+    func autoHeadshotCrop() {
+        guard let basePreview, let cg = preview else { return }
+        let imageAspect = Double(cg.width) / Double(cg.height)
+        Task { [weak self] in
+            let face = await Offload.on(Offload.vision) { () -> CGRect? in
+                let request = VNDetectFaceRectanglesRequest()
+                let handler = VNImageRequestHandler(ciImage: basePreview)
+                try? handler.perform([request])
+                let faces = request.results ?? []
+                // The biggest face wins.
+                return faces.max(by: { $0.boundingBox.height < $1.boundingBox.height })?.boundingBox
+            }
+            guard let self, let face else { return }
+            // Vision boxes are bottom-left origin; crop space is top-down.
+            let faceTop = 1 - (face.origin.y + face.height)
+            let faceCenterX = face.origin.x + face.width / 2
+            let cropH = (Double(face.height) / 0.42).clamped(to: 0.2...1)
+            let cropW = (0.8 * cropH / imageAspect).clamped(to: 0.1...1)
+            var crop = CropRect(
+                x: faceCenterX - cropW / 2,
+                y: Double(faceTop) - cropH * 0.17,
+                w: cropW, h: cropH
+            )
+            crop.x = crop.x.clamped(to: 0...(1 - crop.w))
+            crop.y = crop.y.clamped(to: 0...(1 - crop.h))
+            self.edit.crop = crop
+            self.cropAspectName = nil
+        }
+    }
+
     func setBlurMode(_ mode: BlurMode) {
         if mode == .depth {
             enableDepthBlur()
@@ -245,11 +300,9 @@ final class EditViewModel {
         let peaking = (armed == .focusDepth || armed == .focusRange) && edit.blurMode == .depth
         Task { [weak self] in
             let result = await Offload.on(Offload.render) { () -> (CGImage, HistogramData)? in
-                let base = edit.cleanup.isEmpty ? basePreview
-                    : CleanupEngine.shared.applied(to: basePreview, url: url, strokes: edit.cleanup)
                 let depth = edit.blurMode == .depth && (edit.blurF > 0 || peaking)
-                    ? DepthEngine.shared.depthMap(for: url, image: base) : nil
-                let output = RenderPipeline.render(base: base, edit: edit, personMask: mask, depthMap: depth, skipCrop: skipCrop, focusPeaking: peaking)
+                    ? DepthEngine.shared.depthMap(for: url, image: basePreview) : nil
+                let output = RenderPipeline.render(base: basePreview, edit: edit, personMask: mask, depthMap: depth, skipCrop: skipCrop, focusPeaking: peaking)
                 guard let cg = RawEngine.shared.context.createCGImage(output, from: output.extent) else { return nil }
                 return (cg, HistogramSampler.sample(output))
             }
@@ -295,6 +348,12 @@ final class EditViewModel {
 
     /// Scrub input from the canvas (ADR 0005): 1:1, fixed per-parameter sensitivity.
     func scrub(deltaX: CGFloat) {
+        if let armedHSL {
+            let keyPath = armedHSL.component.keyPath
+            let old = edit.hsl[armedHSL.band][keyPath: keyPath]
+            edit.hsl[armedHSL.band][keyPath: keyPath] = (old + Double(deltaX) / 420 * 200).clamped(to: -100...100)
+            return
+        }
         guard let armed else { return }
         let span = armed.range.upperBound - armed.range.lowerBound
         let old = armed.value(in: edit)

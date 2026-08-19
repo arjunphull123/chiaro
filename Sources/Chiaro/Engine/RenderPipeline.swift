@@ -123,6 +123,12 @@ enum RenderPipeline {
     /// frame visible for the crop-mode canvas.
     static func applyGeometry(_ image: CIImage, edit: EditState, skipCrop: Bool = false) -> CIImage {
         var result = image
+        // Orientation first — lossless 90° steps and mirrors.
+        if edit.flipH { result = result.oriented(.upMirrored) }
+        if edit.flipV { result = result.oriented(.downMirrored) }
+        for _ in 0..<(((edit.rotation % 360) + 360) % 360 / 90) {
+            result = result.oriented(.right)
+        }
         if edit.straighten != 0 {
             let extent = result.extent
             let radians = -edit.straighten * .pi / 180
