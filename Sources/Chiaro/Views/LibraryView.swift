@@ -531,6 +531,25 @@ struct LibraryView: View {
 
     @State private var hoveredTile: URL?
 
+    /// Star + Chiaro mark, bottom-right, sitting in the caption scrim.
+    @ViewBuilder private func badgePair(_ photo: Photo) -> some View {
+        if photo.starred || photo.hasEdits {
+            HStack(spacing: 6) {
+                if photo.starred {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.amber)
+                }
+                if photo.hasEdits {
+                    AppMark(size: 14)
+                }
+            }
+            .padding(8)
+            .shadow(color: .black.opacity(0.8), radius: 3)
+            .allowsHitTesting(false)
+        }
+    }
+
     private func tile(_ photo: Photo, height: CGFloat) -> some View {
         let selected = library.selection.contains(photo.url)
         let width = height * photo.aspect
@@ -552,12 +571,8 @@ struct LibraryView: View {
                 RoundedRectangle(cornerRadius: 7)
                     .stroke(selected ? Theme.amber : .clear, lineWidth: 2)
             )
-            .overlay(alignment: .topLeading) {
-                if photo.hasEdits {
-                    AppMark(size: 10)
-                        .padding(6)
-                        .shadow(color: .black.opacity(0.7), radius: 2)
-                }
+            .overlay(alignment: .bottomTrailing) {
+                badgePair(photo)
             }
             if hoveredTile == photo.url || library.showFilenames {
                 VStack(alignment: .leading, spacing: 1) {
@@ -571,14 +586,14 @@ struct LibraryView: View {
                     }
                 }
                 .padding(.horizontal, 9)
-                .padding(.top, 30)
-                .padding(.bottom, 7)
+                .padding(.top, 46)
+                .padding(.bottom, 8)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
                     LinearGradient(
                         stops: [.init(color: .clear, location: 0),
-                                .init(color: .black.opacity(0.55), location: 0.45),
-                                .init(color: .black.opacity(0.92), location: 1)],
+                                .init(color: .black.opacity(0.5), location: 0.35),
+                                .init(color: .black.opacity(0.95), location: 1)],
                         startPoint: .top, endPoint: .bottom
                     )
                 )
@@ -587,13 +602,7 @@ struct LibraryView: View {
                 .allowsHitTesting(false)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             }
-            if photo.starred {
-                Image(systemName: "star.fill")
-                    .font(.system(size: 9))
-                    .foregroundStyle(Theme.amber)
-                    .padding(6)
-                    .shadow(color: .black.opacity(0.7), radius: 2)
-            }
+
         }
         .modifier(PhotoInteractions(photo: photo, library: library, hoveredTile: $hoveredTile, onExport: onExport))
     }
@@ -620,8 +629,8 @@ struct LibraryView: View {
                         .foregroundStyle(.white)
                         .lineLimit(1)
                         .padding(.horizontal, 7)
-                        .padding(.top, 14)
-                        .padding(.bottom, 5)
+                        .padding(.top, 24)
+                        .padding(.bottom, 6)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(
                             LinearGradient(colors: [.clear, .black.opacity(0.8)], startPoint: .top, endPoint: .bottom)
@@ -630,21 +639,8 @@ struct LibraryView: View {
                         .allowsHitTesting(false)
                 }
             }
-            .overlay(alignment: .topTrailing) {
-                if photo.starred {
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 9))
-                        .foregroundStyle(Theme.amber)
-                        .padding(6)
-                        .shadow(color: .black.opacity(0.7), radius: 2)
-                }
-            }
-            .overlay(alignment: .topLeading) {
-                if photo.hasEdits {
-                    AppMark(size: 10)
-                        .padding(6)
-                        .shadow(color: .black.opacity(0.7), radius: 2)
-                }
+            .overlay(alignment: .bottomTrailing) {
+                badgePair(photo)
             }
             .overlay(
                 RoundedRectangle(cornerRadius: 7)

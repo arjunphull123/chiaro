@@ -222,10 +222,9 @@ struct CanvasView: View {
                     .frame(width: 42, alignment: .trailing)
                     .monospacedDigit()
             }
+            .frame(width: 264)
             ArcRuler(value: straightenBinding)
                 .frame(width: 264, height: 46)
-            skewRow("Vertical", parameter: .skewV)
-            skewRow("Horizontal", parameter: .skewH)
             HStack(spacing: 8) {
                 Button("Reset") {
                     model.edit.crop = .full
@@ -243,28 +242,8 @@ struct CanvasView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 13)
+        .fixedSize()
         .chiaroGlass(cornerRadius: 15)
-    }
-
-    private func skewRow(_ label: String, parameter: EditParameter) -> some View {
-        HStack(spacing: 10) {
-            Text(label)
-                .font(Theme.ui(10))
-                .foregroundStyle(Theme.ink3)
-                .frame(width: 62, alignment: .leading)
-            Slider(value: Binding(
-                get: { parameter.value(in: model.edit) },
-                set: { parameter.set($0, in: &model.edit) }
-            ), in: -30...30)
-                .tint(Theme.amber)
-                .controlSize(.mini)
-            Text(parameter.format(parameter.value(in: model.edit)))
-                .font(Theme.mono(10))
-                .foregroundStyle(parameter.value(in: model.edit) == 0 ? Theme.ink3 : Theme.amber)
-                .frame(width: 42, alignment: .trailing)
-                .monospacedDigit()
-        }
-        .frame(width: 264)
     }
 
     private var originalAspect: Double? {

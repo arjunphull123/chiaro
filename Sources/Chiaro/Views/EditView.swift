@@ -139,6 +139,11 @@ struct EditView: View {
             guard !library.agentActive, !model.depthSceneVisible else { return event }
             let dx = event.scrollingDeltaX
             guard abs(dx) > abs(event.scrollingDeltaY), dx != 0 else { return event }
+            if model.cropMode {
+                // The arc ruler follows the scroll.
+                model.edit.straighten = (model.edit.straighten - Double(dx) / 8).clamped(to: -45...45)
+                return nil
+            }
             if model.armedHSL != nil {
                 model.scrub(deltaX: dx)
                 return nil

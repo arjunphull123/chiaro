@@ -29,7 +29,7 @@ enum AutoEnhance {
 
         var lumas: [Double] = []
         var sumR = 0.0, sumG = 0.0, sumB = 0.0, wbCount = 0.0
-        var saturationSum = 0.0
+        var saturationSum = 0.0, saturationCount = 0.0
         var subjectLumaSum = 0.0, subjectWeight = 0.0
         var highlightClipped = 0.0, shadowCrushed = 0.0
 
@@ -42,10 +42,14 @@ enum AutoEnhance {
             let hi = max(r, g, b), lo = min(r, g, b)
             if hi > 0.98 { highlightClipped += 1 }
             if hi < 0.02 { shadowCrushed += 1 }
-            // Clipped pixels bias the statistics — exclude them from WB.
             if hi < 0.98, lo > 0.01 {
-                sumR += r; sumG += g; sumB += b; wbCount += 1
                 saturationSum += hi > 0 ? (hi - lo) / hi : 0
+                saturationCount += 1
+                // Robust gray-world: only near-neutral pixels vote, so a
+                // vegetation-heavy frame can't drag skin toward magenta.
+                if hi > 0, (hi - lo) / hi < 0.25 {
+                    sumR += r; sumG += g; sumB += b; wbCount += 1
+                }
             }
             if let maskPixels {
                 let w = Double(maskPixels[i * 4]) / 255
@@ -83,14 +87,16 @@ enum AutoEnhance {
         // Gentle contrast when the histogram is narrow.
         edit.contrast = ((0.82 - (p995 - p005)) * 80).clamped(to: 0...22)
 
-        // Gray-world white balance, conservatively.
-        if wbCount > total * 0.3 {
+        // Gray-world white balance from the neutral pool, conservatively —
+        // and only when enough of the frame is actually neutral.
+        if wbCount > total * 0.12 {
             let meanR = sumR / wbCount, meanG = sumG / wbCount, meanB = sumB / wbCount
-            edit.temp = (((meanB - meanR) / meanG) * 240).clamped(to: -30...30)
-            edit.tint = ((((meanR + meanB) / 2 - meanG) / meanG) * 200).clamped(to: -18...18)
-            // Flat color gets a vibrance nudge.
-            let meanSaturation = saturationSum / wbCount
-            edit.vibrance = ((0.26 - meanSaturation) * 80).clamped(to: 0...20)
+            edit.temp = (((meanB - meanR) / meanG) * 200).clamped(to: -20...20)
+            edit.tint = ((((meanR + meanB) / 2 - meanG) / meanG) * 160).clamped(to: -10...10)
+        }
+        if saturationCount > 0 {
+            let meanSaturation = saturationSum / saturationCount
+            edit.vibrance = ((0.26 - meanSaturation) * 70).clamped(to: 0...15)
         }
         return edit
     }
