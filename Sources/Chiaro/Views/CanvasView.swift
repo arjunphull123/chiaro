@@ -22,27 +22,13 @@ struct CanvasView: View {
                 if model.depthSceneVisible && model.edit.blurMode == .depth {
                     DepthSceneView(model: model, fitFraction: fitFraction(in: fitRegion))
                         .frame(width: fitRegion.width, height: fitRegion.height)
-                        .position(x: fitRegion.width / 2, y: fitRegion.height / 2)
-                        .overlay(alignment: .top) {
-                            Button {
-                                model.depthSceneCommand = .exit
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
-                                    Text("Exit 3D focus")
-                                }
-                            }
-                            .buttonStyle(AmberButtonStyle())
-                            .clickCursor()
-                            .padding(.top, 14)
-                            .help("Back to the photo (esc)")
-                        }
                         .overlay(alignment: .topTrailing) {
                             ViewCubeView(model: model)
                                 .frame(width: 78, height: 78)
-                                .padding(.top, 52)
-                                .padding(.trailing, 14)
+                                .padding(.top, 54)
+                                .padding(.trailing, 10)
                         }
+                        .position(x: fitRegion.width / 2, y: fitRegion.height / 2)
                 } else if let cg = model.showOriginal ? model.originalPreview : model.preview {
                     let imageSize = CGSize(width: cg.width, height: cg.height)
                     let fitScale = min(
@@ -80,7 +66,13 @@ struct CanvasView: View {
 
             .overlay(alignment: .bottom) {
                 Group {
-                    if model.cropMode { cropPanel } else { readout }
+                    if model.cropMode {
+                        cropPanel
+                    } else if model.depthSceneVisible && model.edit.blurMode == .depth {
+                        depthSceneCard
+                    } else {
+                        readout
+                    }
                 }
                 .padding(.bottom, 78)
                 .padding(.trailing, Theme.railWidth)
@@ -255,62 +247,91 @@ struct CanvasView: View {
     @ViewBuilder private var readout: some View {
         if let armed = model.armed {
             let range = armed.range
-            let t = (armed.value(in: model.edit) - range.lowerBound) / (range.upperBound - range.lowerBound)
-            VStack(spacing: 7) {
-                HStack(spacing: 10) {
-                    Text(armed.label)
-                        .font(Theme.ui(11, .medium))
-                        .foregroundStyle(Theme.ink2)
-                    Text(armed.format(armed.value(in: model.edit)))
-                        .font(Theme.mono(19, .medium))
-                        .foregroundStyle(Theme.amber)
-                        .monospacedDigit()
-                }
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.18)).frame(height: 2)
-                    ForEach(armed.detents, id: \.self) { d in
-                        let dt = (d - range.lowerBound) / (range.upperBound - range.lowerBound)
-                        Rectangle().fill(Color.white.opacity(0.3))
-                            .frame(width: 2, height: 7)
-                            .offset(x: dt * 260)
-                    }
-                    Capsule().fill(Theme.amber).frame(width: max(0, t * 260), height: 2)
-                    RoundedRectangle(cornerRadius: 1.5)
-                        .fill(Theme.amber)
-                        .frame(width: 3, height: 14)
-                        .shadow(color: Theme.amber.opacity(0.6), radius: 4)
-                        .offset(x: t * 260 - 1.5)
-                }
-                .frame(width: 260, height: 14)
-                .contentShape(Rectangle().inset(by: -10))
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { g in
-                            let dx = g.location.x - (lastDialX ?? g.startLocation.x)
-                            lastDialX = g.location.x
-                            model.scrub(deltaX: dx * 1.6)
-                        }
-                        .onEnded { _ in lastDialX = nil }
-                )
-            }
-            .padding(.horizontal, 22)
-            .padding(.vertical, 12)
-            .chiaroGlass(cornerRadius: 15)
-            .overlay(alignment: .topTrailing) {
-                Button { model.armed = nil } label: {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(Theme.ink)
-                        .frame(width: 20, height: 20)
-                        .background(Circle().fill(Color.white.opacity(0.12)))
-                        .overlay(Circle().stroke(Theme.hairline))
-                }
-                .buttonStyle(.plain)
-                .clickCursor()
-                .padding(5)
-                .help("Done — back to pan and zoom (esc)")
-            }
-            .transition(.opacity)
+            dialCard(
+                label: armed.label,
+                value: armed.format(armed.value(in: model.edit)),
+                t: (armed.value(in: model.edit) - range.lowerBound) / (range.upperBound - range.lowerBound),
+                detents: armed.detents.map { ($0 - range.lowerBound) / (range.upperBound - range.lowerBound) },
+                doneHelp: "Done — back to pan and zoom (esc)",
+                onDrag: { dx in model.scrub(deltaX: dx * 1.6) },
+                onDone: { model.armed = nil }
+            )
         }
+    }
+
+    /// The 3D scene's card: same glass dial, driving Range — Focus is set
+    /// spatially (planes, dots) — and its checkmark exits the scene.
+    private var depthSceneCard: some View {
+        dialCard(
+            label: "3D focus · range",
+            value: EditParameter.focusRange.format(model.edit.focusRange),
+            t: model.edit.focusRange,
+            detents: [0.25],
+            doneHelp: "Exit 3D focus (esc)",
+            onDrag: { dx in
+                model.edit.focusRange = (model.edit.focusRange + Double(dx) / 260).clamped(to: 0...1)
+            },
+            onDone: { model.depthSceneCommand = .exit }
+        )
+    }
+
+    private func dialCard(
+        label: String, value: String, t: Double, detents: [Double], doneHelp: String,
+        onDrag: @escaping (CGFloat) -> Void, onDone: @escaping () -> Void
+    ) -> some View {
+        VStack(spacing: 7) {
+            HStack(spacing: 10) {
+                Text(label)
+                    .font(Theme.ui(11, .medium))
+                    .foregroundStyle(Theme.ink2)
+                Text(value)
+                    .font(Theme.mono(19, .medium))
+                    .foregroundStyle(Theme.amber)
+                    .monospacedDigit()
+            }
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.white.opacity(0.18)).frame(height: 2)
+                ForEach(detents, id: \.self) { dt in
+                    Rectangle().fill(Color.white.opacity(0.3))
+                        .frame(width: 2, height: 7)
+                        .offset(x: dt * 260)
+                }
+                Capsule().fill(Theme.amber).frame(width: max(0, t * 260), height: 2)
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(Theme.amber)
+                    .frame(width: 3, height: 14)
+                    .shadow(color: Theme.amber.opacity(0.6), radius: 4)
+                    .offset(x: t * 260 - 1.5)
+            }
+            .frame(width: 260, height: 14)
+            .contentShape(Rectangle().inset(by: -10))
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { g in
+                        let dx = g.location.x - (lastDialX ?? g.startLocation.x)
+                        lastDialX = g.location.x
+                        onDrag(dx)
+                    }
+                    .onEnded { _ in lastDialX = nil }
+            )
+        }
+        .padding(.horizontal, 22)
+        .padding(.vertical, 12)
+        .chiaroGlass(cornerRadius: 15)
+        .overlay(alignment: .topTrailing) {
+            Button(action: onDone) {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(Theme.ink)
+                    .frame(width: 20, height: 20)
+                    .background(Circle().fill(Color.white.opacity(0.12)))
+                    .overlay(Circle().stroke(Theme.hairline))
+            }
+            .buttonStyle(.plain)
+            .clickCursor()
+            .padding(5)
+            .help(doneHelp)
+        }
+        .transition(.opacity)
     }
 }

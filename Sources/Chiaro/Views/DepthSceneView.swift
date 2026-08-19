@@ -18,30 +18,9 @@ enum DepthScene {
     static let amber = NSColor(red: 0.91, green: 0.64, blue: 0.24, alpha: 1)
     /// The rig sits slightly high in frame — the canvas bottom carries chrome.
     static let sceneLift: CGFloat = 0.09
-    /// Where hidden slice planes wait before rising in.
-    static let planeRestY: CGFloat = -1.9
+    static let planeHeight: CGFloat = 1.16
     static let restYaw: CGFloat = 0.46
     static let restPitch: CGFloat = 0.26
-
-    /// Tiling grid texture: one vertical + one horizontal line per tile, so
-    /// the tiling closes a uniform lattice with no doubled seams.
-    static let gridTexture: NSImage = {
-        let size = 256
-        let image = NSImage(size: NSSize(width: size, height: size))
-        image.lockFocus()
-        NSColor.clear.set()
-        NSRect(x: 0, y: 0, width: size, height: size).fill()
-        amber.withAlphaComponent(0.4).setStroke()
-        let path = NSBezierPath()
-        path.lineWidth = 1
-        path.move(to: NSPoint(x: 0.5, y: 0))
-        path.line(to: NSPoint(x: 0.5, y: CGFloat(size)))
-        path.move(to: NSPoint(x: 0, y: 0.5))
-        path.line(to: NSPoint(x: CGFloat(size), y: 0.5))
-        path.stroke()
-        image.unlockFocus()
-        return image
-    }()
 
     static func build(grid: DepthEngine.PointGrid, focusDepth: Double, focusRange: Double) -> SCNScene {
         let scene = SCNScene()
@@ -74,7 +53,7 @@ enum DepthScene {
         cloud.name = "cloud"
         rig.addChildNode(cloud)
 
-        let planeSize = CGSize(width: CGFloat(grid.aspect) * 1.16, height: 1.16)
+        let planeSize = CGSize(width: CGFloat(grid.aspect) * planeHeight, height: planeHeight)
         rig.addChildNode(slicePlane(name: "near", size: planeSize, emphasis: 1))
         rig.addChildNode(slicePlane(name: "far", size: planeSize, emphasis: 0.6))
 
@@ -124,9 +103,14 @@ enum DepthScene {
         return geometry
     }
 
-    /// A slice of the scene: faint fill, uniform lattice, hairline border,
-    /// and grab handles at all four edge midpoints.
+    /// A slice of the scene: faint fill, screen-constant 1px lattice (line
+    /// primitives — projection can't fatten them), and grab handles at all
+    /// four edge midpoints. The returned container pivots at the plane's
+    /// bottom edge so it grows in from the ground.
     private static func slicePlane(name: String, size: CGSize, emphasis: CGFloat) -> SCNNode {
+        let container = SCNNode()
+        container.name = name
+
         let sheet = SCNNode(geometry: SCNPlane(width: size.width, height: size.height))
         let sheetMaterial = SCNMaterial()
         sheetMaterial.diffuse.contents = amber.withAlphaComponent(0.06 * emphasis)
@@ -135,44 +119,14 @@ enum DepthScene {
         sheetMaterial.writesToDepthBuffer = false // never occlude the cloud
         sheet.geometry?.materials = [sheetMaterial]
         sheet.renderingOrder = 100
-        sheet.name = name
+        sheet.name = "\(name)-sheet"
+        sheet.position = SCNVector3(0, size.height / 2, 0)
+        container.addChildNode(sheet)
 
-        let grid = SCNNode(geometry: SCNPlane(width: size.width, height: size.height))
-        let gridMaterial = SCNMaterial()
-        gridMaterial.diffuse.contents = gridTexture
-        gridMaterial.diffuse.wrapS = .repeat
-        gridMaterial.diffuse.wrapT = .repeat
-        gridMaterial.diffuse.contentsTransform = SCNMatrix4MakeScale(
-            (size.width / size.height * 7).rounded(), 7, 1)
-        gridMaterial.transparency = 0.6
-        gridMaterial.lightingModel = .constant
-        gridMaterial.isDoubleSided = true
-        gridMaterial.writesToDepthBuffer = false
-        grid.geometry?.materials = [gridMaterial]
-        grid.renderingOrder = 100
+        let grid = SCNNode(geometry: latticeGeometry(size: size, emphasis: emphasis))
+        grid.renderingOrder = 101
         grid.name = "\(name)-grid"
         sheet.addChildNode(grid)
-
-        // Hairline border from four bars (a wireframe box would draw its
-        // triangulation diagonals).
-        let bar: CGFloat = 0.004
-        let edges: [(CGFloat, CGFloat, CGFloat, CGFloat)] = [
-            (size.width + bar, bar, 0, size.height / 2),
-            (size.width + bar, bar, 0, -size.height / 2),
-            (bar, size.height + bar, -size.width / 2, 0),
-            (bar, size.height + bar, size.width / 2, 0),
-        ]
-        for (w, h, x, y) in edges {
-            let edge = SCNNode(geometry: SCNBox(width: w, height: h, length: bar, chamferRadius: 0))
-            let material = SCNMaterial()
-            material.diffuse.contents = amber.withAlphaComponent(0.8 * emphasis)
-            material.lightingModel = .constant
-            material.writesToDepthBuffer = false
-            edge.geometry?.materials = [material]
-            edge.renderingOrder = 101
-            edge.name = "\(name)-frame"
-            sheet.addChildNode(edge)
-        }
 
         // Grab handles at all four edge midpoints, each with an oversize
         // invisible hit target so they're easy to catch mid-orbit.
@@ -199,7 +153,34 @@ enum DepthScene {
             sheet.addChildNode(handle)
         }
 
-        return sheet
+        return container
+    }
+
+    /// Uniform lattice from line primitives — 1px on screen at any distance.
+    private static func latticeGeometry(size: CGSize, emphasis: CGFloat) -> SCNGeometry {
+        let rows = 7
+        let cols = Int((size.width / size.height * 7).rounded())
+        var vertices = [SCNVector3]()
+        for i in 0...cols {
+            let x = -size.width / 2 + size.width * CGFloat(i) / CGFloat(cols)
+            vertices.append(SCNVector3(x, -size.height / 2, 0))
+            vertices.append(SCNVector3(x, size.height / 2, 0))
+        }
+        for j in 0...rows {
+            let y = -size.height / 2 + size.height * CGFloat(j) / CGFloat(rows)
+            vertices.append(SCNVector3(-size.width / 2, y, 0))
+            vertices.append(SCNVector3(size.width / 2, y, 0))
+        }
+        let source = SCNGeometrySource(vertices: vertices)
+        let element = SCNGeometryElement(
+            indices: Array(0..<Int32(vertices.count)), primitiveType: .line)
+        let geometry = SCNGeometry(sources: [source], elements: [element])
+        let material = SCNMaterial()
+        material.diffuse.contents = amber.withAlphaComponent(0.55 * emphasis)
+        material.lightingModel = .constant
+        material.writesToDepthBuffer = false
+        geometry.materials = [material]
+        return geometry
     }
 
     static func updatePlanes(in scene: SCNScene, focusDepth: Double, focusRange: Double, hidden: Bool = false) {
@@ -208,9 +189,11 @@ enum DepthScene {
         let half = focusRange * 0.4
         let nearZ = CGFloat((Float(target + half) - 0.5) * zSpan)
         let farZ = CGFloat((Float(target - half) - 0.5) * zSpan)
-        let y = hidden ? planeRestY : 0
-        rig.childNode(withName: "near", recursively: false)?.position = SCNVector3(0, y, nearZ)
-        rig.childNode(withName: "far", recursively: false)?.position = SCNVector3(0, y, farZ)
+        for (name, z) in [("near", nearZ), ("far", farZ)] {
+            guard let plane = rig.childNode(withName: name, recursively: false) else { continue }
+            plane.position = SCNVector3(0, -planeHeight / 2, z)
+            plane.scale = SCNVector3(1, hidden ? 0.001 : 1, 1)
+        }
     }
 
     static func cameraPosition(yaw: CGFloat, pitch: CGFloat, radius: CGFloat) -> SCNVector3 {
@@ -238,6 +221,8 @@ struct DepthSceneView: NSViewRepresentable {
         }
         let pan = NSPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.pan(_:)))
         view.addGestureRecognizer(pan)
+        let click = NSClickGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.click(_:)))
+        view.addGestureRecognizer(click)
         context.coordinator.view = view
         return view
     }
@@ -270,6 +255,7 @@ struct DepthSceneView: NSViewRepresentable {
         weak var view: SCNView?
         var builtURL: URL?
         var fitFraction: CGFloat = 0.85
+        private var grid: DepthEngine.PointGrid?
         /// Choreography guard: while entering/exiting/snapping, gestures and
         /// SwiftUI-driven position sync stay out of the camera's way.
         var isAnimating = false
@@ -312,6 +298,7 @@ struct DepthSceneView: NSViewRepresentable {
             let model = model
             Task {
                 guard let grid = await model.depthGrid() else { return }
+                self.grid = grid
                 let scene = DepthScene.build(
                     grid: grid, focusDepth: model.edit.focusDepth, focusRange: model.edit.focusRange)
                 self.view?.scene = scene
@@ -499,6 +486,69 @@ struct DepthSceneView: NSViewRepresentable {
             model.edit.focusDepth = ((lo + hi) / 2).clamped(to: 0...1)
             model.edit.focusRange = ((hi - lo) / 2 / 0.4).clamped(to: 0...1)
             refresh()
+        }
+
+        /// Click a dot to focus there: nearest cloud point in screen space
+        /// becomes the focus plane, with a brief pulse where it landed.
+        @objc func click(_ gesture: NSClickGestureRecognizer) {
+            guard let view, let grid, !isAnimating else { return }
+            let location = gesture.location(in: view)
+            // Handles own their clicks (they're for dragging).
+            let hitNames = view.hitTest(location, options: [
+                .searchMode: SCNHitTestSearchMode.all.rawValue,
+                .ignoreHiddenNodes: false,
+            ]).compactMap(\.node.name)
+            guard !hitNames.contains(where: { $0.contains("handle") }) else { return }
+
+            var best: (distance: CGFloat, index: Int)?
+            for row in stride(from: 0, to: grid.height, by: 2) {
+                for col in stride(from: 0, to: grid.width, by: 2) {
+                    let i = row * grid.width + col
+                    let u = Float(col) / Float(grid.width - 1)
+                    let v = Float(row) / Float(grid.height - 1)
+                    let world = SCNVector3(
+                        CGFloat((u - 0.5) * grid.aspect),
+                        CGFloat(0.5 - v) + DepthScene.sceneLift,
+                        CGFloat((grid.disparity[i] - 0.5) * DepthScene.zSpan)
+                    )
+                    let projected = view.projectPoint(world)
+                    let dx = CGFloat(projected.x) - location.x
+                    let dy = CGFloat(projected.y) - location.y
+                    let distance = dx * dx + dy * dy
+                    if best == nil || distance < best!.distance {
+                        best = (distance, i)
+                    }
+                }
+            }
+            guard let best, best.distance < 24 * 24 else { return }
+            let disparity = Double(grid.disparity[best.index])
+            model.edit.focusDepth = (1 - disparity).clamped(to: 0...1)
+            refresh()
+            pulse(at: best.index, grid: grid)
+        }
+
+        private func pulse(at index: Int, grid: DepthEngine.PointGrid) {
+            guard let rig = view?.scene?.rootNode.childNode(withName: "rig", recursively: false) else { return }
+            let col = index % grid.width
+            let row = index / grid.width
+            let u = Float(col) / Float(grid.width - 1)
+            let v = Float(row) / Float(grid.height - 1)
+            let node = SCNNode(geometry: SCNSphere(radius: 0.03))
+            let material = SCNMaterial()
+            material.diffuse.contents = DepthScene.amber
+            material.lightingModel = .constant
+            node.geometry?.materials = [material]
+            node.position = SCNVector3(
+                CGFloat((u - 0.5) * grid.aspect),
+                CGFloat(0.5 - v),
+                CGFloat((grid.disparity[index] - 0.5) * DepthScene.zSpan)
+            )
+            node.renderingOrder = 103
+            rig.addChildNode(node)
+            node.runAction(.sequence([
+                .group([.scale(to: 2.4, duration: 0.45), .fadeOut(duration: 0.45)]),
+                .removeFromParentNode(),
+            ]))
         }
 
         func zoom(by delta: CGFloat) {
