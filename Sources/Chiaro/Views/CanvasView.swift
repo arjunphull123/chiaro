@@ -212,17 +212,6 @@ struct CanvasView: View {
                         .font(Theme.mono(19, .medium))
                         .foregroundStyle(Theme.amber)
                         .monospacedDigit()
-                    Button { model.armed = nil } label: {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(Theme.ink)
-                            .frame(width: 22, height: 22)
-                            .background(Circle().fill(Color.white.opacity(0.1)))
-                            .overlay(Circle().stroke(Theme.hairline))
-                    }
-                    .buttonStyle(.plain)
-                    .clickCursor()
-                    .help("Done — back to pan and zoom (esc)")
                 }
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.white.opacity(0.18)).frame(height: 2)
@@ -254,6 +243,20 @@ struct CanvasView: View {
             .padding(.horizontal, 22)
             .padding(.vertical, 12)
             .chiaroGlass(cornerRadius: 15)
+            .overlay(alignment: .topTrailing) {
+                Button { model.armed = nil } label: {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Theme.ink)
+                        .frame(width: 20, height: 20)
+                        .background(Circle().fill(Color.white.opacity(0.12)))
+                        .overlay(Circle().stroke(Theme.hairline))
+                }
+                .buttonStyle(.plain)
+                .clickCursor()
+                .padding(5)
+                .help("Done — back to pan and zoom (esc)")
+            }
             .transition(.opacity)
         }
     }

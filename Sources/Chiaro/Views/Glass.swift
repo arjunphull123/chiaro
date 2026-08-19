@@ -8,10 +8,14 @@ struct ChiaroGlass: ViewModifier {
 
     func body(content: Content) -> some View {
         if #available(macOS 26.0, *) {
+            // The dark underlay keeps glass chrome legible over bright photo
+            // regions — glass alone washes out on white.
             if let tint {
                 content.glassEffect(.regular.tint(tint), in: .rect(cornerRadius: cornerRadius))
+                    .background(RoundedRectangle(cornerRadius: cornerRadius).fill(Color.black.opacity(0.28)))
             } else {
                 content.glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
+                    .background(RoundedRectangle(cornerRadius: cornerRadius).fill(Color.black.opacity(0.28)))
             }
         } else {
             content

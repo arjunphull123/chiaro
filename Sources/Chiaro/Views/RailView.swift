@@ -7,11 +7,34 @@ struct RailView: View {
     let library: Library
 
     var body: some View {
-        ScrollView(showsIndicators: true) {
+        VStack(alignment: .leading, spacing: 0) {
+            // Pinned above the fold: agent presence and the photo's identity.
             VStack(alignment: .leading, spacing: 12) {
                 AgentRailStatus(library: library)
+                photoHeader
+                    .opacity(library.agentActive ? 0.4 : 1)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 42) // aligns with the canvas action cluster
+            .padding(.bottom, 12)
+            scroll
+        }
+        .frame(width: Theme.railWidth)
+        .frame(maxHeight: .infinity)
+        .background(alignment: .leading) {
+            // Heavy frost: strong blur sampled from whatever is behind the window,
+            // under a graphite scrim opaque enough to read as material, not photo.
+            Rectangle().fill(.ultraThinMaterial)
+                .overlay(Theme.panel.opacity(0.52))
+                .overlay(alignment: .leading) { Theme.hairline.frame(width: 1) }
+                .ignoresSafeArea()
+        }
+    }
+
+    private var scroll: some View {
+        ScrollView(showsIndicators: true) {
+            VStack(alignment: .leading, spacing: 12) {
                 Group {
-                    photoHeader
                     HistogramView(data: model.histogram)
                     section(
                         "Light", [.exposure, .contrast, .highlights, .shadows, .whites, .blacks],
@@ -31,24 +54,14 @@ struct RailView: View {
                 .opacity(library.agentActive ? 0.4 : 1)
                 .animation(.easeOut(duration: 0.2), value: library.agentActive)
             }
-            .padding(16)
-            .padding(.top, 26) // pill top aligns with the canvas action cluster
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
         }
         .overlay(alignment: .bottom) {
             // Hints that the rail continues below the fold.
             LinearGradient(colors: [.clear, .black.opacity(0.35)], startPoint: .top, endPoint: .bottom)
                 .frame(height: 26)
                 .allowsHitTesting(false)
-        }
-        .frame(width: Theme.railWidth)
-        .frame(maxHeight: .infinity)
-        .background(alignment: .leading) {
-            // Heavy frost: strong blur sampled from whatever is behind the window,
-            // under a graphite scrim opaque enough to read as material, not photo.
-            Rectangle().fill(.ultraThinMaterial)
-                .overlay(Theme.panel.opacity(0.52))
-                .overlay(alignment: .leading) { Theme.hairline.frame(width: 1) }
-                .ignoresSafeArea()
         }
     }
 
@@ -175,14 +188,9 @@ struct RailView: View {
                     .clickCursor()
             }
         case .ready:
-            ForEach([EditParameter.blurF, .focusDepth, .relight]) { p in
+            ForEach([EditParameter.blurF, .focusDepth, .focusRange, .relight]) { p in
                 AdjustmentRow(parameter: p, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
             }
-            Text("Click the photo to set focus — arm Focus to see the sharp zone")
-                .font(Theme.mono(9))
-                .foregroundStyle(Theme.ink3)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 2)
         }
     }
 

@@ -43,7 +43,8 @@ final class EditViewModel {
     var armed: EditParameter? {
         didSet {
             // Focus peaking overlays only while Focus is armed.
-            guard armed != oldValue, armed == .focusDepth || oldValue == .focusDepth else { return }
+            let peakers: Set<EditParameter?> = [.focusDepth, .focusRange]
+            guard armed != oldValue, peakers.contains(armed) || peakers.contains(oldValue) else { return }
             scheduleRender()
         }
     }
@@ -202,7 +203,7 @@ final class EditViewModel {
         let mask = personMask
         let skipCrop = cropMode
         let url = photo.url
-        let peaking = armed == .focusDepth && edit.depthBlur
+        let peaking = (armed == .focusDepth || armed == .focusRange) && edit.depthBlur
         Task { [weak self] in
             let result = await Offload.on(Offload.render) { () -> (CGImage, HistogramData)? in
                 let depth = edit.depthBlur && (edit.blurF > 0 || peaking)

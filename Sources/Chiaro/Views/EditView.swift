@@ -62,18 +62,9 @@ struct EditView: View {
             }
         }
         .overlay(alignment: .topLeading) {
-            HStack(spacing: 12) {
-                HStack(spacing: 5) {
-                    AppMark(size: 16)
-                    Text("Chiaro")
-                        .font(Theme.serif(16, .semibold))
-                        .kerning(-0.4)
-                        .foregroundStyle(Theme.ink)
-                }
-                backButton
-            }
-            .padding(.top, 10)
-            .padding(.leading, 14) // just below the traffic lights
+            backButton
+                .padding(.top, 10)
+                .padding(.leading, 14) // just below the traffic lights
         }
         .overlay(alignment: .topTrailing) {
             HStack(spacing: 8) {

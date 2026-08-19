@@ -43,6 +43,7 @@ struct EditState: Codable, Equatable {
     var maskReach: Double = 0     // -100...100: grow (+) or shrink (−) the subject mask
     var depthBlur: Bool = false   // blur by scene depth instead of the subject mask
     var focusDepth: Double = 0.5  // 0 = nearest, 1 = farthest — the plane kept sharp
+    var focusRange: Double = 0.25 // width of the sharp zone around the focus plane
     // Tone curve: control points, always including endpoints
     var curve: [CurvePoint] = CurvePoint.identity
     // Geometry
@@ -104,7 +105,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
     case temp, tint, vibrance, saturation
     case clarity, vignette
     case sharpness, noiseReduction
-    case blurF, relight, maskReach, focusDepth
+    case blurF, relight, maskReach, focusDepth, focusRange
     case straighten
 
     var id: String { rawValue }
@@ -117,6 +118,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .relight: "Relight"
         case .maskReach: "Mask"
         case .focusDepth: "Focus"
+        case .focusRange: "Range"
         case .straighten: "Straighten"
         default: rawValue.prefix(1).uppercased() + rawValue.dropFirst()
         }
@@ -127,13 +129,17 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .exposure: -3...3
         case .straighten: -45...45
         case .vignette, .sharpness, .noiseReduction: 0...100
-        case .blurF, .focusDepth: 0...1
+        case .blurF, .focusDepth, .focusRange: 0...1
         default: -100...100
         }
     }
 
     var defaultValue: Double {
-        self == .focusDepth ? 0.5 : 0
+        switch self {
+        case .focusDepth: 0.5
+        case .focusRange: 0.25
+        default: 0
+        }
     }
 
     /// Detent positions for haptic feedback while scrubbing (ADR 0005).
@@ -147,6 +153,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .exposure: [-2, -1, 0, 1, 2]
         case .vignette, .sharpness, .noiseReduction: []
         case .focusDepth: [0.5]
+        case .focusRange: [0.25]
         default: [0]
         }
     }
@@ -179,6 +186,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .relight: \.relight
         case .maskReach: \.maskReach
         case .focusDepth: \.focusDepth
+        case .focusRange: \.focusRange
         case .straighten: \.straighten
         }
     }
@@ -194,6 +202,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
             }()
         case .vignette, .sharpness, .noiseReduction: String(format: "%.0f", v)
         case .focusDepth: v <= 0.02 ? "near" : v >= 0.98 ? "far" : String(format: "%.0f%%", v * 100)
+        case .focusRange: String(format: "%.0f%%", v * 100)
         case .straighten: String(format: "%.1f°", v)
         default: v == 0 ? "0" : String(format: "%+.0f", v)
         }
