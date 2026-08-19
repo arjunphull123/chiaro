@@ -83,30 +83,37 @@ struct HoverLabelButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 11, weight: .semibold))
-                if hovering {
-                    Text(title)
-                        .font(Theme.ui(11, .medium))
-                        .fixedSize()
-                        .transition(.opacity.combined(with: .move(edge: .leading)))
-                }
-            }
-            .foregroundStyle(active ? Theme.amber : Theme.ink2)
-            .frame(height: 14)
-            .padding(.horizontal, hovering ? 12 : 9)
-            .padding(.vertical, 7)
-            .chiaroGlass(cornerRadius: 10)
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(active ? Theme.amber : Theme.ink2)
+                .frame(width: 16, height: 14)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 7)
+                .chiaroGlass(cornerRadius: 10)
         }
         .buttonStyle(.plain)
-        .clickCursor()
         .disabled(disabled)
         .opacity(disabled ? 0.4 : 1)
-        .onHover { inside in
-            withAnimation(.easeOut(duration: 0.14)) { hovering = inside }
+        // The label floats beneath the button — no layout shift on hover.
+        .overlay(alignment: .top) {
+            if hovering {
+                Text(title)
+                    .font(Theme.ui(10, .medium))
+                    .foregroundStyle(Theme.ink)
+                    .fixedSize()
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Color.black.opacity(0.75)))
+                    .overlay(Capsule().stroke(Theme.hairline))
+                    .offset(y: 32)
+                    .transition(.opacity)
+                    .allowsHitTesting(false)
+            }
         }
-        .help(title)
+        .onHover { inside in
+            withAnimation(.easeOut(duration: 0.12)) { hovering = inside }
+            if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
     }
 }
 

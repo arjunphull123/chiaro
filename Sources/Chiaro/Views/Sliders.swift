@@ -91,6 +91,7 @@ struct AdjustmentRow: View {
             : value
         typedText = value == parameter.defaultValue ? "" : String(format: "%.4g", raw)
         typing = true
+        armed = parameter
     }
 
     private func commitTyped() {

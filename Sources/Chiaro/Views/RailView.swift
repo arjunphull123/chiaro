@@ -323,6 +323,9 @@ struct RailView: View {
                     .multilineTextAlignment(.trailing)
                     .frame(width: 44)
                     .focused($typingField, equals: fieldID)
+                    .onAppear {
+                        DispatchQueue.main.async { typingField = fieldID }
+                    }
                     .onSubmit {
                         if let typed = Double(typingValue) {
                             model.edit.hsl[selectedBand][keyPath: keyPath] = typed.clamped(to: -100...100)
@@ -515,6 +518,9 @@ struct RailView: View {
                     .multilineTextAlignment(.trailing)
                     .frame(width: 48)
                     .focused($typingField, equals: fieldID)
+                    .onAppear {
+                        DispatchQueue.main.async { typingField = fieldID }
+                    }
                     .onSubmit {
                         if let typed = Double(typingValue) {
                             model.edit.locals[index][keyPath: keyPath] = typed.clamped(to: range)

@@ -14,6 +14,12 @@ struct EditView: View {
         _model = State(initialValue: EditViewModel(photo: photo))
     }
 
+    /// True while any text field (type-to-set) owns the keyboard — global
+    /// shortcuts must not eat its characters.
+    private var textEditing: Bool {
+        NSApp.keyWindow?.firstResponder is NSTextView
+    }
+
     var body: some View {
         ZStack(alignment: .trailing) {
             CanvasView(model: model)
@@ -27,6 +33,7 @@ struct EditView: View {
         .focused($focused)
         .focusEffectDisabled()
         .onKeyPress(.escape) {
+            guard !textEditing else { return .ignored }
             if model.selectedLocalID != nil { model.selectedLocalID = nil }
             else if model.depthSceneVisible { model.depthSceneCommand = .exit }
             else if model.cropMode { model.cropMode = false }
@@ -38,26 +45,33 @@ struct EditView: View {
             return .handled
         }
         .onKeyPress(.return) {
+            guard !textEditing else { return .ignored }
             guard model.cropMode else { return .ignored }
             model.cropMode = false
             return .handled
         }
         .onKeyPress(keys: ["c"], phases: [.down]) { _ in
+            guard !textEditing else { return .ignored }
             model.cropMode.toggle()
             return .handled
         }
         .onKeyPress(keys: ["\\"], phases: [.down, .up]) { press in
+            guard !textEditing else { return .ignored }
             model.showOriginal = press.phase == .down
             return .handled
         }
         .onKeyPress(keys: [" "], phases: [.down, .up, .repeat]) { press in
+            guard !textEditing else { return .ignored }
             model.spacePan = press.phase != .up
             return .handled
         }
         // Arrows nudge the armed control; with nothing armed they step photos.
-        .onKeyPress(.leftArrow) { nudgeOrStep(-1); return .handled }
-        .onKeyPress(.rightArrow) { nudgeOrStep(1); return .handled }
+        .onKeyPress(.leftArrow) {
+            guard !textEditing else { return .ignored } nudgeOrStep(-1); return .handled }
+        .onKeyPress(.rightArrow) {
+            guard !textEditing else { return .ignored } nudgeOrStep(1); return .handled }
         .onKeyPress(characters: .init(charactersIn: "012345")) { press in
+            guard !textEditing else { return .ignored }
             model.photo.rating = Int(press.characters) ?? 0
             model.saveNow()
             return .handled
