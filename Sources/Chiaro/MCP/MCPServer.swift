@@ -276,6 +276,23 @@ final class MCPServer {
             ],
         ],
         [
+            "name": "list_presets",
+            "description": "Names of the available presets (built-in and user-saved). Presets carry tone and color only — geometry and portrait settings stay put.",
+            "inputSchema": ["type": "object", "properties": [:]],
+        ],
+        [
+            "name": "apply_preset",
+            "description": "Apply a preset to a photo by name (see list_presets). Renders live if the photo is open.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "name": ["type": "string"],
+                    "preset": ["type": "string"],
+                ],
+                "required": ["name", "preset"],
+            ],
+        ],
+        [
             "name": "set_rating",
             "description": "Star-rate a photo (0-5). Ratings persist in the sidecar and show in the library — the culling workflow: review previews, rate the keepers.",
             "inputSchema": [
@@ -368,6 +385,22 @@ final class MCPServer {
             let p = try photo(args)
             let edit = try JSONSerialization.jsonObject(with: JSONEncoder().encode(p.edit))
             return try text(["name": p.name, "rating": p.rating, "edit": edit])
+        case "list_presets":
+            return try text(["presets": PresetStore.shared.all.map(\.name)])
+        case "apply_preset":
+            let p = try photo(args)
+            guard let presetName = args["preset"] as? String,
+                  let preset = PresetStore.shared.all.first(where: { $0.name == presetName }) else {
+                throw ToolError("unknown preset; valid: \(PresetStore.shared.all.map(\.name).joined(separator: ", "))")
+            }
+            if let editor = library.activeEditor, editor.photo.url == p.url {
+                library.noteAgentActivity(intent: "applying \(presetName)")
+                editor.edit = preset.applied(to: editor.edit)
+            } else {
+                p.edit = preset.applied(to: p.edit)
+                Sidecar.write(for: p)
+            }
+            return try text(["applied": presetName, "name": p.name])
         case "set_rating":
             let p = try photo(args)
             guard let rating = args["rating"] as? Int, (0...5).contains(rating) else {
@@ -376,6 +409,22 @@ final class MCPServer {
             p.rating = rating
             Sidecar.write(for: p)
             return try text(["applied": true, "name": p.name, "rating": rating])
+        case "list_presets":
+            return try text(["presets": PresetStore.shared.all.map(\.name)])
+        case "apply_preset":
+            let p = try photo(args)
+            guard let presetName = args["preset"] as? String,
+                  let preset = PresetStore.shared.all.first(where: { $0.name == presetName }) else {
+                throw ToolError("unknown preset; valid: \(PresetStore.shared.all.map(\.name).joined(separator: ", "))")
+            }
+            if let editor = library.activeEditor, editor.photo.url == p.url {
+                library.noteAgentActivity(intent: "applying \(presetName)")
+                editor.edit = preset.applied(to: editor.edit)
+            } else {
+                p.edit = preset.applied(to: p.edit)
+                Sidecar.write(for: p)
+            }
+            return try text(["applied": presetName, "name": p.name])
         case "set_rating":
             let p = try photo(args)
             guard let rating = args["rating"] as? Int, (0...5).contains(rating) else {
@@ -506,6 +555,7 @@ final class MCPServer {
         case "open_photo": text = "opened \(name)"
         case "set_edit": text = (args["intent"] as? String).map { "\(name) — \($0)" } ?? "adjusted \(name)"
         case "set_rating": text = "rated \(name)"
+        case "apply_preset": text = "applied \((args["preset"] as? String) ?? "a preset") to \(name)"
         case "export": text = "exported \(name)"
         default: text = "\(tool) \(name)"
         }

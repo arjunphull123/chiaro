@@ -39,6 +39,7 @@ struct RailView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Group {
                     HistogramView(data: model.histogram)
+                    presetsSection
                     section(
                         "Light", [.exposure, .contrast, .highlights, .shadows, .whites, .blacks],
                         help: "Brightness and tonal balance"
@@ -227,6 +228,51 @@ struct RailView: View {
             AdjustmentRow(parameter: .focusDepth, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
             AdjustmentRow(parameter: .focusRange, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
             AdjustmentRow(parameter: .relight, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
+        }
+    }
+
+    @State private var savingPreset = false
+    @State private var presetName = ""
+
+    private var presetsSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                Text("Presets")
+                    .font(Theme.ui(12, .medium))
+                    .foregroundStyle(Theme.ink2)
+                Rectangle().fill(Theme.hairline).frame(height: 1)
+                Button("Save current") { presetName = ""; savingPreset = true }
+                    .buttonStyle(.plain)
+                    .clickCursor()
+                    .font(Theme.ui(9.5))
+                    .foregroundStyle(Theme.ink3)
+                    .disabled(model.edit.isNeutral)
+            }
+            .padding(.top, 10)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 68), spacing: 5)], alignment: .leading, spacing: 5) {
+                ForEach(PresetStore.shared.all) { preset in
+                    Chip(title: preset.name, selected: preset.matches(model.edit)) {
+                        model.edit = preset.applied(to: model.edit)
+                    }
+                    .contextMenu {
+                        if PresetStore.shared.user.contains(preset) {
+                            Button("Delete preset") { PresetStore.shared.delete(preset) }
+                        }
+                    }
+                }
+            }
+        }
+        .help("Starting points — tone and color only; crop and portrait stay put")
+        .alert("Save preset", isPresented: $savingPreset) {
+            TextField("Name", text: $presetName)
+            Button("Save") {
+                let trimmed = presetName.trimmingCharacters(in: .whitespaces)
+                guard !trimmed.isEmpty else { return }
+                PresetStore.shared.save(Preset.capture(name: trimmed, from: model.edit))
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Keeps the current tone and color as a reusable starting point")
         }
     }
 
