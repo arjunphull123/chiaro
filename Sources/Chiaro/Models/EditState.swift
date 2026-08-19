@@ -24,9 +24,36 @@ struct EditState: Codable, Equatable {
     // Portrait
     var blurF: Double = 0         // 0...1 (0 = off/f16, 1 = f1.4)
     var relight: Double = 0       // -100...100
+    var maskReach: Double = 0     // -100...100: grow (+) or shrink (−) the subject mask
 
     static let neutral = EditState()
     var isNeutral: Bool { self == .neutral }
+
+    // Tolerant decoding: parameters added in later versions default to neutral,
+    // so old sidecars keep working as the schema grows (ADR 0002).
+    init() {}
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        for p in EditParameter.allCases {
+            if let v = try c.decodeIfPresent(Double.self, forKey: CodingKeys(stringValue: p.rawValue)!) {
+                p.set(v, in: &self)
+            }
+        }
+    }
+
+    struct CodingKeys: CodingKey {
+        var stringValue: String
+        var intValue: Int? { nil }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        for p in EditParameter.allCases where p.value(in: self) != p.defaultValue {
+            try c.encode(p.value(in: self), forKey: CodingKeys(stringValue: p.rawValue)!)
+        }
+    }
 }
 
 /// A single adjustable parameter: identity, range, and EditState binding.
@@ -35,7 +62,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
     case temp, tint, vibrance, saturation
     case clarity, vignette
     case sharpness, noiseReduction
-    case blurF, relight
+    case blurF, relight, maskReach
 
     var id: String { rawValue }
 
@@ -45,6 +72,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .blurF: "Blur ƒ"
         case .temp: "Temp"
         case .relight: "Relight"
+        case .maskReach: "Mask"
         default: rawValue.prefix(1).uppercased() + rawValue.dropFirst()
         }
     }
@@ -100,6 +128,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .noiseReduction: \.noiseReduction
         case .blurF: \.blurF
         case .relight: \.relight
+        case .maskReach: \.maskReach
         }
     }
 

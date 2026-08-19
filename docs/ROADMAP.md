@@ -25,8 +25,11 @@ deferred (ADR 0003); personal tool first — no signing/App Store constraints ye
 - [x] Star ratings (keys 0–5) — dedicated culling flow still open
 - [ ] Local adjustments: radial, linear, AI-subject masks
 
-## Tier 3 — AI (deferred, architecture ready per ADR 0003)
+## Tier 3 — AI via MCP (ADR 0008: no embedded agent)
 
-- Agentic editing chat (Claude API tool-use driving EditState)
+- [x] Local MCP server: list_photos, get_edit, set_edit (live in UI), open_photo,
+      get_preview, export · discovery at ~/.chiaro/mcp.json · repo .mcp.json
+- [x] Agent presence pill + soft input lock while an agent edits
+- [x] Portrait mask refinement (Mask slider: grow/shrink subject boundary)
 - Generative remove / inpainting via pluggable provider layer
 - Auto-culling (blink/focus detection, best-of-burst)

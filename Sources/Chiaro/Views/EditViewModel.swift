@@ -27,7 +27,8 @@ final class EditViewModel {
     private var basePreview: CIImage?
     private var personMask: CIImage?
     private var renderGeneration = 0
-    private var saveTask: Task<Void, Never>?
+    private var saveItem: DispatchWorkItem?
+    private var saveActivity: NSObjectProtocol?
 
     init(photo: Photo) {
         self.photo = photo
@@ -91,19 +92,36 @@ final class EditViewModel {
         }
     }
 
+    // Debounced via DispatchWorkItem, holding a latency-critical activity: App Nap
+    // otherwise defers timer wakeups indefinitely while the app is backgrounded
+    // (e.g. edits arriving over MCP), and the save would never land.
     private func scheduleSave() {
-        saveTask?.cancel()
+        saveItem?.cancel()
+        if saveActivity == nil {
+            saveActivity = ProcessInfo.processInfo.beginActivity(
+                options: [.userInitiated, .latencyCritical], reason: "sidecar save"
+            )
+        }
         let photo = photo
-        saveTask = Task {
-            try? await Task.sleep(for: .milliseconds(500))
-            guard !Task.isCancelled else { return }
+        let item = DispatchWorkItem { [weak self] in
             Sidecar.write(for: photo)
+            self?.endSaveActivity()
+        }
+        saveItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: item)
+    }
+
+    private func endSaveActivity() {
+        if let activity = saveActivity {
+            ProcessInfo.processInfo.endActivity(activity)
+            saveActivity = nil
         }
     }
 
     func saveNow() {
-        saveTask?.cancel()
+        saveItem?.cancel()
         Sidecar.write(for: photo)
+        endSaveActivity()
     }
 
     /// Scrub input from the canvas (ADR 0005): 1:1, fixed per-parameter sensitivity.

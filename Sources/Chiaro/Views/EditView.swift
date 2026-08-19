@@ -15,6 +15,12 @@ struct EditView: View {
             CanvasView(model: model)
             RailView(model: model)
                 .ignoresSafeArea()
+                .disabled(library.agentActive)
+        }
+        .overlay(alignment: .top) {
+            if library.agentActive {
+                AgentPill().padding(.top, 14).padding(.trailing, Theme.railWidth)
+            }
         }
         .overlay(alignment: .bottom) {
             FilmstripView(photos: library.photos, current: model.photo) { photo in
@@ -28,7 +34,10 @@ struct EditView: View {
         .focusable()
         .focused($focused)
         .focusEffectDisabled()
-        .onAppear { focused = true }
+        .onAppear {
+            focused = true
+            library.activeEditor = model
+        }
         .onKeyPress(.escape) {
             if model.armed != nil { model.armed = nil } else { close() }
             return .handled
@@ -63,7 +72,31 @@ struct EditView: View {
 
     private func close() {
         model.saveNow()
+        library.activeEditor = nil
         library.editing = nil
+    }
+
+    private struct AgentPill: View {
+        @State private var pulsing = false
+
+        var body: some View {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(Theme.amber)
+                    .frame(width: 7, height: 7)
+                    .opacity(pulsing ? 0.35 : 1)
+                    .animation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true), value: pulsing)
+                Text("AGENT EDITING")
+                    .font(Theme.mono(9, .medium))
+                    .kerning(1.6)
+                    .foregroundStyle(Theme.ink)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .chiaroGlass(cornerRadius: 12)
+            .onAppear { pulsing = true }
+            .transition(.opacity)
+        }
     }
 
     private func step(_ delta: Int) {

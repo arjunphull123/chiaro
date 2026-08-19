@@ -1,13 +1,25 @@
 import SwiftUI
 
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillTerminate(_ notification: Notification) {
+        MainActor.assumeIsolated {
+            MCPServer.shared.library?.activeEditor?.saveNow()
+        }
+        MCPServer.shared.stop()
+    }
+}
+
 @main
 struct ChiaroApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var library = Library()
     @State private var exporting = false
 
     init() {
         Theme.registerFonts()
+        let lib = library
         DispatchQueue.main.async {
+            MCPServer.shared.start(library: lib)
             NSApp.setActivationPolicy(.regular)
             NSApp.activate(ignoringOtherApps: true)
         }
@@ -48,11 +60,12 @@ struct ChiaroApp: App {
                 }
                 if let exportName, let photo = lib.photos.first(where: { $0.name == exportName }) {
                     Task.detached {
-                        var edit = EditState()
-                        edit.exposure = 0.5
-                        edit.vibrance = 25
-                        edit.blurF = 0.6
-                        edit.relight = 20
+                        var testEdit = EditState()
+                        testEdit.exposure = 0.5
+                        testEdit.vibrance = 25
+                        testEdit.blurF = 0.6
+                        testEdit.relight = 20
+                        let edit = testEdit
                         await MainActor.run { photo.edit = edit }
                         do {
                             var options = ExportOptions()
@@ -117,6 +130,7 @@ struct RootView: View {
                 LibraryView(library: library)
             }
         }
+        .containerBackground(.clear, for: .window)
         .sheet(isPresented: $exporting) {
             ExportSheet(
                 photos: library.editing.map { [$0] } ?? library.selectedPhotos,
@@ -130,18 +144,19 @@ struct RootView: View {
 struct WindowBackdrop: NSViewRepresentable {
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
-        view.material = .underWindowBackground
+        view.material = .hudWindow
         view.blendingMode = .behindWindow
         view.state = .active
-        DispatchQueue.main.async {
-            if let window = view.window {
-                window.isOpaque = false
-                window.backgroundColor = .clear
-                window.titlebarAppearsTransparent = true
-            }
-        }
         return view
     }
 
-    func updateNSView(_ view: NSVisualEffectView, context: Context) {}
+    // The window doesn't exist at makeNSView time; configure once attached.
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {
+        DispatchQueue.main.async {
+            guard let window = view.window, window.isOpaque else { return }
+            window.isOpaque = false
+            window.backgroundColor = .clear
+            window.titlebarAppearsTransparent = true
+        }
+    }
 }

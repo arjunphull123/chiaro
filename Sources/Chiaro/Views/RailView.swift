@@ -48,7 +48,7 @@ struct RailView: View {
                     .foregroundStyle(Theme.ink3)
                     .frame(height: 22)
             } else {
-                ForEach([EditParameter.blurF, .relight]) { p in
+                ForEach([EditParameter.blurF, .relight, .maskReach]) { p in
                     AdjustmentRow(
                         parameter: p, edit: $model.edit, armed: $model.armed,
                         disabled: model.hasPerson == nil

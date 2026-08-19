@@ -9,6 +9,23 @@ final class Library {
     var selection: Set<URL> = []
     var editing: Photo?
     var copiedEdit: EditState?
+    /// The live edit session, when the edit view is open — lets external inputs
+    /// (MCP tools) mutate the same EditState the UI is rendering (ADR 0008).
+    weak var activeEditor: EditViewModel?
+
+    /// True while an agent is actively driving edits over MCP; the UI shows a
+    /// presence pill and soft-locks manual input. Clears 3s after the last call.
+    var agentActive = false
+    private var agentClearItem: DispatchWorkItem?
+
+    func noteAgentActivity() {
+        agentActive = true
+        activeEditor?.armed = nil
+        agentClearItem?.cancel()
+        let item = DispatchWorkItem { [weak self] in self?.agentActive = false }
+        agentClearItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: item)
+    }
 
     var folderName: String { folderURL?.lastPathComponent ?? "" }
     var selectedPhotos: [Photo] { photos.filter { selection.contains($0.url) } }

@@ -97,7 +97,13 @@ enum RenderPipeline {
 
     private static func portrait(_ image: CIImage, edit: EditState, mask: CIImage, scale: CGFloat) -> CIImage {
         var result = image
-        let subjectMask = mask.cropped(to: image.extent)
+        var subjectMask = mask.cropped(to: image.extent)
+        if edit.maskReach != 0 {
+            // Gamma on the confidence mask: + grows the protected subject, − shrinks it.
+            subjectMask = subjectMask.applyingFilter("CIGammaAdjust", parameters: [
+                "inputPower": pow(2, -edit.maskReach / 60),
+            ]).cropped(to: image.extent)
+        }
         if edit.blurF > 0 {
             let inverted = subjectMask.applyingFilter("CIColorInvert")
             let blur = CIFilter.maskedVariableBlur()

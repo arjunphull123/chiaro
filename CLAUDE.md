@@ -27,6 +27,17 @@ via Apple's RAW engine.
   lines in commits, PRs, code, or docs. Commits are authored by the repo owner, period.
 - SwiftUI-first; drop to AppKit only where SwiftUI genuinely can't (and note why inline).
 
+## MCP
+
+While Chiaro runs it serves MCP at `http://127.0.0.1:24242/mcp` (ADR 0008; repo
+`.mcp.json` preconfigures Claude Code; discovery at `~/.chiaro/mcp.json`). Tools:
+list_photos, get_edit, set_edit (renders live if the photo is open), open_photo,
+get_preview, export. Prefer driving the running app over spawning new instances.
+
+## Dev harness
+
+`swift run Chiaro -- --open <folder> [--edit <name>] [--snapshot <png>] [--export-test <name>]`
+
 ## Roadmap
 
-See `docs/ROADMAP.md`. Current phase: scaffolding / pre-build.
+See `docs/ROADMAP.md`. Current phase: v0.1 shipped; next: crop, curves, presets, undo.
