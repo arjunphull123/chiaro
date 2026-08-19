@@ -1,14 +1,16 @@
 import CoreImage
 import Vision
 
-/// Person segmentation masks for portrait blur/relight, cached per photo.
+/// Subject masks for portrait blur/relight, cached per photo. Foreground
+/// instance masking first (works for any salient subject — people, pets,
+/// products), person segmentation as fallback.
 final class PortraitEngine {
     static let shared = PortraitEngine()
     private var cache: [URL: CIImage] = [:]
     private var noPerson: Set<URL> = []
     private let lock = NSLock()
 
-    /// Returns a mask (white = person) scaled to `extent`, or nil if no person found.
+    /// Returns a mask (white = subject) scaled to `extent`, or nil if no subject found.
     func mask(for url: URL, image: CIImage) -> CIImage? {
         lock.lock()
         if noPerson.contains(url) { lock.unlock(); return nil }
@@ -18,12 +20,22 @@ final class PortraitEngine {
         }
         lock.unlock()
 
-        let request = VNGeneratePersonSegmentationRequest()
-        request.qualityLevel = .balanced
-        request.outputPixelFormat = kCVPixelFormatType_OneComponent8
         let handler = VNImageRequestHandler(ciImage: image)
-        try? handler.perform([request])
-        guard let buffer = request.results?.first?.pixelBuffer else {
+        var buffer: CVPixelBuffer?
+        let foreground = VNGenerateForegroundInstanceMaskRequest()
+        try? handler.perform([foreground])
+        if let result = foreground.results?.first {
+            buffer = try? result.generateScaledMaskForImage(
+                forInstances: result.allInstances, from: handler)
+        }
+        if buffer == nil {
+            let person = VNGeneratePersonSegmentationRequest()
+            person.qualityLevel = .balanced
+            person.outputPixelFormat = kCVPixelFormatType_OneComponent8
+            try? handler.perform([person])
+            buffer = person.results?.first?.pixelBuffer
+        }
+        guard let buffer else {
             lock.lock(); noPerson.insert(url); lock.unlock()
             return nil
         }

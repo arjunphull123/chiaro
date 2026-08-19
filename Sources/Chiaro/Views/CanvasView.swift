@@ -54,9 +54,9 @@ struct CanvasView: View {
             .gesture(magnifyGesture)
             .onTapGesture(count: 2) { if !model.cropMode { toggleZoom() } }
             .onTapGesture(count: 1, coordinateSpace: .local) { location in
-                guard model.edit.depthBlur, !model.cropMode, !model.spacePan,
-                      model.armed == nil || model.armed == .focusDepth,
+                guard model.focusPicking, !model.cropMode, !model.spacePan,
                       let cg = model.preview else { return }
+                defer { model.focusPicking = false }
                 let imageSize = CGSize(width: cg.width, height: cg.height)
                 let fitScale = min(
                     (fitRegion.width - 48) / imageSize.width,

@@ -27,7 +27,8 @@ struct EditView: View {
         .focused($focused)
         .focusEffectDisabled()
         .onKeyPress(.escape) {
-            if model.cropMode { model.cropMode = false }
+            if model.focusPicking { model.focusPicking = false }
+            else if model.cropMode { model.cropMode = false }
             else if model.armed != nil { model.armed = nil }
             else { close() }
             return .handled

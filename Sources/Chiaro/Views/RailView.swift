@@ -78,6 +78,10 @@ struct RailView: View {
                         .padding(.horizontal, 5).padding(.vertical, 2)
                         .background(RoundedRectangle(cornerRadius: 4).stroke(Theme.amber.opacity(0.5)))
                 }
+                Spacer()
+                // The editor's only brand moment: the mark, on chrome the
+                // photo can never slide behind.
+                AppMark(size: 14).opacity(0.8)
             }
             if let exif = model.photo.exifSummary {
                 Text(exif)
@@ -124,7 +128,7 @@ struct RailView: View {
 
     private var portraitSection: some View {
         VStack(alignment: .leading, spacing: 3) {
-            sectionLabel("Portrait", help: "Background blur — by detected subject or by scene depth — and subject light")
+            sectionLabel("Portrait", help: "Background blur — by lifted subject or by scene depth — and subject light")
             HStack(spacing: 6) {
                 Chip(title: "Subject", selected: !model.edit.depthBlur) { model.edit.depthBlur = false }
                 Chip(title: "Depth", selected: model.edit.depthBlur) { model.enableDepthBlur() }
@@ -145,7 +149,7 @@ struct RailView: View {
                 .font(Theme.mono(10)).foregroundStyle(Theme.ink3)
                 .frame(height: 24)
         case .some(false):
-            Text("no person found in this photo")
+            Text("no subject found in this photo")
                 .font(Theme.mono(10)).foregroundStyle(Theme.ink3)
                 .frame(height: 24)
         case .some(true):
@@ -188,9 +192,27 @@ struct RailView: View {
                     .clickCursor()
             }
         case .ready:
-            ForEach([EditParameter.blurF, .focusDepth, .focusRange, .relight]) { p in
-                AdjustmentRow(parameter: p, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
+            AdjustmentRow(parameter: .blurF, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
+            HStack(spacing: 6) {
+                AdjustmentRow(parameter: .focusDepth, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
+                Button { model.focusPicking.toggle() } label: {
+                    Image(systemName: "scope")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(model.focusPicking ? Theme.amber : Theme.ink2)
+                        .frame(width: 26, height: 26)
+                        .background(
+                            RoundedRectangle(cornerRadius: 7)
+                                .fill(model.focusPicking ? Theme.amber.opacity(0.15) : Color.white.opacity(0.04))
+                        )
+                        .overlay(RoundedRectangle(cornerRadius: 7)
+                            .stroke(model.focusPicking ? Theme.amber.opacity(0.6) : Theme.hairline))
+                }
+                .buttonStyle(.plain)
+                .clickCursor()
+                .help("Pick focus — then click the photo once")
             }
+            AdjustmentRow(parameter: .focusRange, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
+            AdjustmentRow(parameter: .relight, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
         }
     }
 

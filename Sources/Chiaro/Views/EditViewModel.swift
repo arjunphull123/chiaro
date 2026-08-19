@@ -48,6 +48,14 @@ final class EditViewModel {
             scheduleRender()
         }
     }
+    /// One-shot click-to-focus: armed by the scope button next to Focus, the
+    /// next canvas click sets the focus plane, then it disarms itself.
+    var focusPicking = false {
+        didSet {
+            guard focusPicking != oldValue else { return }
+            if focusPicking { NSCursor.crosshair.push() } else { NSCursor.pop() }
+        }
+    }
     /// Held-space pan: drag moves the photo even while a parameter is armed.
     var spacePan = false {
         didSet {
@@ -154,7 +162,9 @@ final class EditViewModel {
     /// where it should be instead of blurring the person (focus defaults mid-scene).
     func enableDepthBlur() {
         edit.depthBlur = true
-        guard let basePreview else { return }
+        // Auto-focus only on first use — switching Subject ↔ Depth must not
+        // stomp a focus the user already set.
+        guard edit.focusDepth == EditParameter.focusDepth.defaultValue, let basePreview else { return }
         let url = photo.url
         let mask = personMask
         Task { [weak self] in
