@@ -127,11 +127,16 @@ struct AgentConnectPopover: View {
     }
 
     var body: some View {
-        if AgentStatus.shared.actions.isEmpty {
-            connectContent
-        } else {
-            historyContent
+        Group {
+            if AgentStatus.shared.actions.isEmpty {
+                connectContent
+            } else {
+                historyContent
+            }
         }
+        // One fixed size for every state: animated popover resizes crash NSPopover.
+        .frame(width: 380, height: 370)
+        .background(Theme.ground)
     }
 
     /// Once an agent has done things, the popover becomes its activity log.
@@ -156,17 +161,15 @@ struct AgentConnectPopover: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(height: 180)
+            .frame(maxHeight: .infinity)
             DisclosureGroup("Connection prompt") {
-                connectContent.padding(.top, 6)
+                promptBlock(scrollHeight: 96).padding(.top, 6)
             }
             .font(Theme.ui(11, .medium))
             .tint(Theme.ink3)
             .foregroundStyle(Theme.ink2)
         }
         .padding(18)
-        .frame(width: 380)
-        .background(Theme.ground)
     }
 
     private var connectContent: some View {
@@ -178,6 +181,13 @@ struct AgentConnectPopover: View {
                 .font(Theme.ui(11.5))
                 .foregroundStyle(Theme.ink2)
                 .fixedSize(horizontal: false, vertical: true)
+            promptBlock(scrollHeight: 150)
+        }
+        .padding(18)
+    }
+
+    private func promptBlock(scrollHeight: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
             ScrollView {
                 Text(prompt)
                     .font(Theme.mono(10))
@@ -185,7 +195,7 @@ struct AgentConnectPopover: View {
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(height: 150)
+            .frame(height: scrollHeight)
             .padding(10)
             .background(RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.3)))
             Button {
@@ -198,9 +208,7 @@ struct AgentConnectPopover: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(AmberButtonStyle())
+            .clickCursor()
         }
-        .padding(18)
-        .frame(width: 380)
-        .background(Theme.ground)
     }
 }

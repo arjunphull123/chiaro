@@ -43,6 +43,26 @@ final class EditViewModel {
     var armed: EditParameter?
     var hovered: EditParameter?
     var showOriginal = false
+    /// Crop mode renders the full straightened frame; the crop rect is an overlay.
+    var cropMode = false {
+        didSet {
+            guard cropMode != oldValue else { return }
+            armed = nil
+            scheduleRender()
+        }
+    }
+    /// Locked pixel aspect (w/h) while cropping; nil = free.
+    var cropAspect: Double?
+
+    func applyCropAspect(_ aspect: Double?) {
+        cropAspect = aspect
+        guard let aspect, let frame = preview else { return }
+        let frameAspect = Double(frame.width) / Double(frame.height)
+        let k = aspect / frameAspect
+        var c = CropRect.full
+        if k <= 1 { c.w = k; c.x = (1 - k) / 2 } else { c.h = 1 / k; c.y = (1 - 1 / k) / 2 }
+        edit.crop = c
+    }
     var preview: CGImage?
     var originalPreview: CGImage?
     var histogram = HistogramData()
@@ -119,9 +139,10 @@ final class EditViewModel {
         let generation = renderGeneration
         let edit = edit
         let mask = personMask
+        let skipCrop = cropMode
         Task { [weak self] in
             let result = await Offload.on(Offload.render) { () -> (CGImage, HistogramData)? in
-                let output = RenderPipeline.render(base: basePreview, edit: edit, personMask: mask)
+                let output = RenderPipeline.render(base: basePreview, edit: edit, personMask: mask, skipCrop: skipCrop)
                 guard let cg = RawEngine.shared.context.createCGImage(output, from: output.extent) else { return nil }
                 return (cg, HistogramSampler.sample(output))
             }

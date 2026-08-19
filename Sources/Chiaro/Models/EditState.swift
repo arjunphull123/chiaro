@@ -7,6 +7,15 @@ struct CurvePoint: Codable, Equatable, Hashable {
     static let identity = [CurvePoint(x: 0, y: 0), CurvePoint(x: 1, y: 1)]
 }
 
+/// Normalized crop rectangle (0…1 in post-straighten image space).
+struct CropRect: Codable, Equatable {
+    var x: Double
+    var y: Double
+    var w: Double
+    var h: Double
+    static let full = CropRect(x: 0, y: 0, w: 1, h: 1)
+}
+
 /// The complete, serializable description of one photo's edit (ADR 0003).
 /// Every UI input path mutates this; the render pipeline is a pure function of it.
 struct EditState: Codable, Equatable {
@@ -34,6 +43,9 @@ struct EditState: Codable, Equatable {
     var maskReach: Double = 0     // -100...100: grow (+) or shrink (−) the subject mask
     // Tone curve: control points, always including endpoints
     var curve: [CurvePoint] = CurvePoint.identity
+    // Geometry
+    var straighten: Double = 0    // -45...45 degrees
+    var crop: CropRect = .full    // normalized, applied after straighten
 
     static let neutral = EditState()
     var isNeutral: Bool { self == .neutral }
@@ -52,6 +64,9 @@ struct EditState: Codable, Equatable {
            pts.count >= 2 {
             curve = pts.sorted { $0.x < $1.x }
         }
+        if let rect = try c.decodeIfPresent(CropRect.self, forKey: CodingKeys(stringValue: "crop")!) {
+            crop = rect
+        }
     }
 
     struct CodingKeys: CodingKey {
@@ -69,6 +84,9 @@ struct EditState: Codable, Equatable {
         if curve != CurvePoint.identity {
             try c.encode(curve, forKey: CodingKeys(stringValue: "curve")!)
         }
+        if crop != .full {
+            try c.encode(crop, forKey: CodingKeys(stringValue: "crop")!)
+        }
     }
 }
 
@@ -79,6 +97,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
     case clarity, vignette
     case sharpness, noiseReduction
     case blurF, relight, maskReach
+    case straighten
 
     var id: String { rawValue }
 
@@ -89,6 +108,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .temp: "Temp"
         case .relight: "Relight"
         case .maskReach: "Mask"
+        case .straighten: "Straighten"
         default: rawValue.prefix(1).uppercased() + rawValue.dropFirst()
         }
     }
@@ -96,6 +116,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
     var range: ClosedRange<Double> {
         switch self {
         case .exposure: -3...3
+        case .straighten: -45...45
         case .vignette, .sharpness, .noiseReduction: 0...100
         case .blurF: 0...1
         default: -100...100
@@ -145,6 +166,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .blurF: \.blurF
         case .relight: \.relight
         case .maskReach: \.maskReach
+        case .straighten: \.straighten
         }
     }
 
@@ -158,6 +180,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
                 return f < 10 ? String(format: "ƒ%.1f", f) : String(format: "ƒ%.0f", f)
             }()
         case .vignette, .sharpness, .noiseReduction: String(format: "%.0f", v)
+        case .straighten: String(format: "%.1f°", v)
         default: v == 0 ? "0" : String(format: "%+.0f", v)
         }
     }

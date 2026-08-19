@@ -20,12 +20,28 @@ struct EditView: View {
                 .ignoresSafeArea()
                 .disabled(library.agentActive)
         }
-        .overlay(alignment: .bottom) { navPill.padding(.bottom, 16).padding(.trailing, Theme.railWidth) }
+        .overlay(alignment: .bottom) {
+            if !model.cropMode {
+                navPill.padding(.bottom, 16).padding(.trailing, Theme.railWidth)
+            }
+        }
         .overlay(alignment: .topLeading) {
             backButton.padding(.top, 10).padding(.leading, 14) // just below the traffic lights
         }
         .overlay(alignment: .topTrailing) {
             HStack(spacing: 8) {
+                Button {
+                    model.cropMode.toggle()
+                } label: {
+                    Image(systemName: "crop")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(model.cropMode ? Theme.amber : Theme.ink2)
+                        .frame(width: 30, height: 28)
+                        .chiaroGlass(cornerRadius: 10)
+                }
+                .buttonStyle(.plain)
+                .clickCursor()
+                .help("Crop & straighten (C)")
                 glassIcon("arrow.uturn.backward", disabled: !model.canUndo, help: "Undo (⌘Z)") { model.undo() }
                 glassIcon("arrow.uturn.forward", disabled: !model.canRedo, help: "Redo (⇧⌘Z)") { model.redo() }
                 glassAction("Copy Edits", icon: "doc.on.doc", disabled: model.edit.isNeutral) {
@@ -50,7 +66,18 @@ struct EditView: View {
             installScrollMonitor()
         }
         .onKeyPress(.escape) {
-            if model.armed != nil { model.armed = nil } else { close() }
+            if model.cropMode { model.cropMode = false }
+            else if model.armed != nil { model.armed = nil }
+            else { close() }
+            return .handled
+        }
+        .onKeyPress(.return) {
+            guard model.cropMode else { return .ignored }
+            model.cropMode = false
+            return .handled
+        }
+        .onKeyPress(keys: ["c"], phases: [.down]) { _ in
+            model.cropMode.toggle()
             return .handled
         }
         .onKeyPress(keys: ["\\"], phases: [.down, .up]) { press in

@@ -6,8 +6,16 @@ import Observation
 @Observable @MainActor
 final class AgentStatus {
     static let shared = AgentStatus()
-    var clientName: String?
+    /// Persisted: agents don't re-initialize when the app restarts mid-session,
+    /// so a fresh launch would otherwise show "Agent" instead of "Claude".
+    var clientName: String? {
+        didSet { UserDefaults.standard.set(clientName, forKey: "lastAgentClient") }
+    }
     var lastSeen: Date?
+
+    init() {
+        clientName = UserDefaults.standard.string(forKey: "lastAgentClient")
+    }
 
     struct Action: Identifiable {
         let id = UUID()

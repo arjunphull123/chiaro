@@ -24,14 +24,24 @@ struct CanvasView: View {
                         (fitRegion.width - 48) / imageSize.width,
                         (fitRegion.height - 48) / imageSize.height
                     )
+                    let fitSize = CGSize(width: imageSize.width * fitScale, height: imageSize.height * fitScale)
                     Image(cg, scale: 1, label: Text(model.photo.name))
                         .resizable()
                         .interpolation(.high)
-                        .frame(width: imageSize.width * fitScale, height: imageSize.height * fitScale)
+                        .frame(width: fitSize.width, height: fitSize.height)
                         .scaleEffect(zoom * gestureZoom)
                         .offset(x: pan.width + gesturePan.width, y: pan.height + gesturePan.height)
                         .position(x: fitRegion.width / 2, y: fitRegion.height / 2)
                         .shadow(color: .black.opacity(0.45), radius: 24, y: 8)
+                    if model.cropMode {
+                        CropOverlayView(
+                            edit: $model.edit,
+                            frameAspect: Double(cg.width) / Double(cg.height),
+                            lockedAspect: model.cropAspect
+                        )
+                        .frame(width: fitSize.width, height: fitSize.height)
+                        .position(x: fitRegion.width / 2, y: fitRegion.height / 2)
+                    }
                 } else {
                     ProgressView()
                         .controlSize(.small)
@@ -41,9 +51,16 @@ struct CanvasView: View {
             .contentShape(Rectangle())
             .gesture(dragGesture)
             .gesture(magnifyGesture)
-            .onTapGesture(count: 2) { toggleZoom() }
-            .overlay(alignment: .bottom) { readout.padding(.bottom, 78).padding(.trailing, Theme.railWidth) }
+            .onTapGesture(count: 2) { if !model.cropMode { toggleZoom() } }
+            .overlay(alignment: .bottom) {
+                Group {
+                    if model.cropMode { cropPanel } else { readout }
+                }
+                .padding(.bottom, 78)
+                .padding(.trailing, Theme.railWidth)
+            }
             .onChange(of: model.photo.url) { resetView() }
+            .onChange(of: model.cropMode) { resetView() }
         }
     }
 
@@ -85,6 +102,82 @@ struct CanvasView: View {
         zoom = 1
         pan = .zero
         gesturePan = .zero
+    }
+
+    /// Crop mode controls: aspect presets, straighten, reset, done.
+    private var cropPanel: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 5) {
+                aspectChip("Free", nil)
+                aspectChip("Original", originalAspect)
+                aspectChip("1:1", 1)
+                aspectChip("4:5", 0.8)
+                aspectChip("3:2", 1.5)
+                aspectChip("16:9", 16.0 / 9)
+            }
+            HStack(spacing: 10) {
+                Text("STRAIGHTEN")
+                    .font(Theme.mono(8.5)).kerning(1.4)
+                    .foregroundStyle(Theme.ink3)
+                Slider(value: straightenBinding, in: -45...45)
+                    .tint(Theme.amber)
+                    .controlSize(.small)
+                    .frame(width: 180)
+                Text(EditParameter.straighten.format(model.edit.straighten))
+                    .font(Theme.mono(10))
+                    .foregroundStyle(model.edit.straighten == 0 ? Theme.ink3 : Theme.amber)
+                    .frame(width: 42, alignment: .trailing)
+                    .monospacedDigit()
+            }
+            HStack(spacing: 8) {
+                Button("Reset") {
+                    model.edit.crop = .full
+                    model.edit.straighten = 0
+                    model.cropAspect = nil
+                }
+                .buttonStyle(.plain)
+                .font(Theme.ui(11))
+                .foregroundStyle(Theme.ink2)
+                .clickCursor()
+                Button("Done") { model.cropMode = false }
+                    .buttonStyle(AmberButtonStyle())
+                    .clickCursor()
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 13)
+        .chiaroGlass(cornerRadius: 15)
+    }
+
+    private var originalAspect: Double? {
+        model.photo.pixelSize.map { Double($0.width) / Double($0.height) }
+    }
+
+    private var straightenBinding: Binding<Double> {
+        Binding(
+            get: { model.edit.straighten },
+            set: { newValue in
+                let old = model.edit.straighten
+                model.edit.straighten = newValue
+                HapticDetents.tickIfCrossed(parameter: .straighten, from: old, to: newValue)
+            }
+        )
+    }
+
+    private func aspectChip(_ title: String, _ aspect: Double?) -> some View {
+        let selected = model.cropAspect == aspect
+        return Button {
+            model.applyCropAspect(aspect)
+        } label: {
+            Text(title)
+                .font(Theme.ui(10.5, selected ? .medium : .regular))
+                .foregroundStyle(selected ? Theme.amber : Theme.ink2)
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .background(Capsule().fill(Color.white.opacity(selected ? 0.08 : 0.03)))
+                .overlay(Capsule().stroke(selected ? Theme.amber.opacity(0.5) : Theme.hairline))
+        }
+        .buttonStyle(.plain)
+        .clickCursor()
     }
 
     /// The one slider in the app: a floating glass dial for the armed parameter

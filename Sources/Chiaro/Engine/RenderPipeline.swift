@@ -4,8 +4,11 @@ import CoreImage.CIFilterBuiltins
 /// Pure function (base image, edit, optional person mask) -> adjusted image.
 /// Order is fixed by SPEC.md; every node reads only EditState values.
 enum RenderPipeline {
-    static func render(base: CIImage, edit: EditState, personMask: CIImage?) -> CIImage {
-        var image = base
+    static func render(base: CIImage, edit: EditState, personMask: CIImage?, skipCrop: Bool = false) -> CIImage {
+        var image = applyGeometry(base, edit: edit, skipCrop: skipCrop)
+        // The person mask is aligned to the un-transformed base, so it gets the
+        // same geometry before use.
+        let personMask = personMask.map { applyGeometry($0, edit: edit, skipCrop: skipCrop) }
         let scale = max(base.extent.width, base.extent.height) / RawEngine.previewMaxDimension
 
         if edit.temp != 0 || edit.tint != 0 {
@@ -79,7 +82,54 @@ enum RenderPipeline {
             f.radius = Float(1.6)
             image = f.outputImage ?? image
         }
-        return image.cropped(to: base.extent)
+        return image
+    }
+
+    // MARK: - Geometry (straighten + crop, first stage)
+
+    /// Straighten rotates about the center and auto-insets to the largest
+    /// same-aspect rectangle (no empty corners); crop is normalized within that
+    /// frame, y measured from the top. `skipCrop` keeps the full straightened
+    /// frame visible for the crop-mode canvas.
+    static func applyGeometry(_ image: CIImage, edit: EditState, skipCrop: Bool = false) -> CIImage {
+        var result = image
+        if edit.straighten != 0 {
+            let extent = result.extent
+            let radians = -edit.straighten * .pi / 180
+            let center = CGPoint(x: extent.midX, y: extent.midY)
+            let transform = CGAffineTransform(translationX: center.x, y: center.y)
+                .rotated(by: radians)
+                .translatedBy(x: -center.x, y: -center.y)
+            result = result.transformed(by: transform)
+            let inset = Self.largestInscribed(size: extent.size, angle: abs(radians))
+            result = result.cropped(to: CGRect(
+                x: result.extent.midX - inset.width / 2,
+                y: result.extent.midY - inset.height / 2,
+                width: inset.width, height: inset.height
+            ))
+        }
+        if edit.crop != .full && !skipCrop {
+            let e = result.extent
+            let rect = CGRect(
+                x: e.origin.x + edit.crop.x * e.width,
+                y: e.origin.y + (1 - edit.crop.y - edit.crop.h) * e.height,
+                width: edit.crop.w * e.width,
+                height: edit.crop.h * e.height
+            )
+            result = result.cropped(to: rect.intersection(e))
+        }
+        // Zero the origin so downstream extent math stays simple.
+        return result.transformed(by: .init(
+            translationX: -result.extent.origin.x, y: -result.extent.origin.y
+        ))
+    }
+
+    /// Largest same-aspect axis-aligned rectangle inside a rotated rectangle.
+    private static func largestInscribed(size: CGSize, angle: Double) -> CGSize {
+        let w = Double(size.width), h = Double(size.height)
+        let sinA = abs(sin(angle)), cosA = abs(cos(angle))
+        let scale = min(w / (w * cosA + h * sinA), h / (w * sinA + h * cosA))
+        return CGSize(width: w * scale, height: h * scale)
     }
 
     private static func toneCurve(_ image: CIImage, edit: EditState) -> CIImage {

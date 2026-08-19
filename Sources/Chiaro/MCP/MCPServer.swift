@@ -218,6 +218,12 @@ final class MCPServer {
                 ] as [String: Any])
             }
         )
+        props["crop"] = [
+            "type": "object",
+            "properties": ["x": ["type": "number"], "y": ["type": "number"],
+                           "w": ["type": "number"], "h": ["type": "number"]],
+            "description": "normalized crop {x,y,w,h}, 0-1, y from top, applied after straighten",
+        ] as [String: Any]
         props["curve"] = [
             "type": "array",
             "items": ["type": "array", "items": ["type": "number"]],
@@ -327,6 +333,18 @@ final class MCPServer {
             guard let params = args["edit"] as? [String: Any] else { throw ToolError("missing edit object") }
             var edit = (args["reset"] as? Bool == true) ? EditState.neutral : p.edit
             for (key, value) in params {
+                if key == "crop" {
+                    guard let dict = value as? [String: Any],
+                          let x = dict["x"] as? Double, let y = dict["y"] as? Double,
+                          let w = dict["w"] as? Double, let h = dict["h"] as? Double,
+                          w > 0.05, h > 0.05
+                    else { throw ToolError("crop must be {x,y,w,h} normalized 0-1") }
+                    edit.crop = CropRect(
+                        x: x.clamped(to: 0...0.95), y: y.clamped(to: 0...0.95),
+                        w: w.clamped(to: 0.05...1), h: h.clamped(to: 0.05...1)
+                    )
+                    continue
+                }
                 if key == "curve" {
                     guard let raw = value as? [[Any]] else { throw ToolError("curve must be [[x,y],...]") }
                     let pts = raw.compactMap { pair -> CurvePoint? in
