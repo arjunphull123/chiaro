@@ -6,7 +6,30 @@ struct LibraryView: View {
     @Bindable var library: Library
     let onExport: () -> Void
 
+    @State private var searchText = ""
+    @FocusState private var searchFocused: Bool
+
+    enum ListSortKey: String { case name, rating, time }
+    @AppStorage("listSortKey") private var listSortRaw = ListSortKey.name.rawValue
+    @AppStorage("listSortAscending") private var listSortAscending = true
+    private var listSort: ListSortKey { ListSortKey(rawValue: listSortRaw) ?? .name }
+
+    private func sortedForList(_ photos: [Photo]) -> [Photo] {
+        let sorted: [Photo] = switch listSort {
+        case .name: photos.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        case .rating: photos.sorted { $0.rating < $1.rating }
+        case .time: photos.sorted { ($0.captureDate ?? .distantPast) < ($1.captureDate ?? .distantPast) }
+        }
+        return listSortAscending ? sorted : sorted.reversed()
+    }
+
     private let gap: CGFloat = 8
+
+    private var visiblePhotos: [Photo] {
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return library.photos }
+        return library.photos.filter { $0.name.localizedCaseInsensitiveContains(query) }
+    }
 
     private var targetRowHeight: CGFloat {
         64 + CGFloat(library.zoomLevel) * 190
@@ -26,14 +49,72 @@ struct LibraryView: View {
     private var gallery: some View {
         VStack(spacing: 0) {
             header
+            if library.viewMode == .list {
+                listColumnHeader
+            }
             galleryScroll
         }
+    }
+
+    /// Finder-style sortable column titles for list mode.
+    private var listColumnHeader: some View {
+        HStack(spacing: 9) {
+            Color.clear.frame(width: 30, height: 1)
+            columnTitle("Name", key: .name, width: nil, alignment: .leading)
+            Spacer(minLength: 12)
+            columnTitle("★", key: .rating, width: nil, alignment: .trailing)
+            Text("Exposure")
+                .font(Theme.ui(10, .medium))
+                .foregroundStyle(Theme.ink3)
+                .frame(width: 190, alignment: .trailing)
+            columnTitle("Time", key: .time, width: 60, alignment: .trailing)
+        }
+        .padding(.horizontal, 25)
+        .padding(.vertical, 5)
+        .background(
+            Rectangle().fill(Theme.panel.opacity(0.35))
+                .overlay(alignment: .bottom) { Theme.hairline.frame(height: 1) }
+        )
+    }
+
+    private func columnTitle(_ title: String, key: ListSortKey, width: CGFloat?, alignment: Alignment) -> some View {
+        Button {
+            if listSort == key {
+                listSortAscending.toggle()
+            } else {
+                listSortRaw = key.rawValue
+                listSortAscending = true
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Text(title)
+                    .font(Theme.ui(10, .medium))
+                    .foregroundStyle(listSort == key ? Theme.ink : Theme.ink3)
+                if listSort == key {
+                    Image(systemName: listSortAscending ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 7, weight: .semibold))
+                        .foregroundStyle(Theme.amber)
+                }
+            }
+            .frame(width: width, alignment: alignment)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .clickCursor()
+        .help("Sort by \(title == "★" ? "rating" : title.lowercased())")
     }
 
     private var galleryScroll: some View {
         GeometryReader { geo in
             let width = geo.size.width - 32
             ScrollView {
+                if sections.isEmpty && !searchText.isEmpty {
+                    Text("No photos match \u{201C}\(searchText)\u{201D}")
+                        .font(Theme.ui(12))
+                        .foregroundStyle(Theme.ink3)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 80)
+                }
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(sections) { section in
                         VStack(alignment: .leading, spacing: gap) {
@@ -64,7 +145,7 @@ struct LibraryView: View {
                                 }
                             case .list:
                                 VStack(spacing: 0) {
-                                    ForEach(Array(section.photos.enumerated()), id: \.element.id) { index, photo in
+                                    ForEach(Array(sortedForList(section.photos).enumerated()), id: \.element.id) { index, photo in
                                         listRow(photo, alternate: index.isMultiple(of: 2))
                                     }
                                 }
@@ -124,24 +205,25 @@ struct LibraryView: View {
                     .clickCursor()
                     .help(mode.help)
                 }
-                if library.viewMode != .list {
-                    Button { library.showFilenames.toggle() } label: {
-                        Image(systemName: "textformat")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(library.showFilenames ? Theme.amber : Theme.ink3)
-                            .frame(width: 26, height: 22)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(library.showFilenames ? Color.white.opacity(0.08) : .clear)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .clickCursor()
-                    .help("Show filenames and shooting info on every photo")
+                Button { library.showFilenames.toggle() } label: {
+                    Image(systemName: "textformat")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(library.showFilenames ? Theme.amber : Theme.ink3)
+                        .frame(width: 26, height: 22)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(library.showFilenames ? Color.white.opacity(0.08) : .clear)
+                        )
+                        .opacity(library.viewMode == .list ? 0.35 : 1)
                 }
+                .buttonStyle(.plain)
+                .clickCursor()
+                .disabled(library.viewMode == .list)
+                .help("Show filenames and shooting info on every photo")
             }
             .padding(3)
             .background(RoundedRectangle(cornerRadius: 8).stroke(Theme.hairline))
+            searchField
             if library.viewMode != .list {
                 zoomSlider
             }
@@ -164,6 +246,53 @@ struct LibraryView: View {
                 .overlay(alignment: .bottom) { Theme.hairline.frame(height: 1) }
                 .ignoresSafeArea()
         )
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(Theme.ink3)
+            TextField("Search", text: $searchText)
+                .textFieldStyle(.plain)
+                .font(Theme.ui(11.5))
+                .foregroundStyle(Theme.ink)
+                .focused($searchFocused)
+                .onExitCommand {
+                    searchText = ""
+                    searchFocused = false
+                }
+                .frame(width: 108)
+            if !searchText.isEmpty {
+                Text("\(visiblePhotos.count)")
+                    .font(Theme.mono(9))
+                    .foregroundStyle(Theme.ink3)
+                Button {
+                    searchText = ""
+                    searchFocused = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.ink3)
+                }
+                .buttonStyle(.plain)
+                .clickCursor()
+            }
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 28)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(searchFocused ? Color.white.opacity(0.06) : .clear)
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(searchFocused ? Theme.amber.opacity(0.5) : Theme.hairline))
+        )
+        .background(
+            Button("") { searchFocused = true }
+                .keyboardShortcut("f")
+                .opacity(0)
+                .frame(width: 0, height: 0)
+        )
+        .help("Filter by filename (⌘F)")
     }
 
     // MARK: - Zoom: one continuous value, slider + pinch (days ↔ months ↔ years)
@@ -219,7 +348,7 @@ struct LibraryView: View {
         let calendar = Calendar.current
         var byPeriod: [Date: [Photo]] = [:]
         var undated: [Photo] = []
-        for photo in library.photos {
+        for photo in visiblePhotos {
             if let date = photo.captureDate {
                 let key = switch library.zoom {
                 case .days: calendar.startOfDay(for: date)
