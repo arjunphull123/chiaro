@@ -70,6 +70,8 @@ Open a folder of RAW files and Chiaro lays them out as a justified gallery —
 or a grid, or a sortable Finder-style list. Star the keepers, filter to them,
 and press Return to edit.
 
+![The library, grouped by day](docs/screenshots/library.jpg)
+
 - **Light and color** — exposure, contrast, highlights, shadows, whites, blacks,
   temperature, tint, vibrance, saturation, plus a tone curve and an eight-band
   color mixer
@@ -85,6 +87,8 @@ and press Return to edit.
   the image statistics, weighted toward faces when it finds them
 - **Presets** — six built in, plus anything you save
 - **Export** — full-resolution JPEG, HEIF, or 16-bit TIFF
+
+![Depth-plane blur on a landscape](docs/screenshots/blur.jpg)
 
 Adjustments are scrubbed directly on the photo: click a value, drag across the
 image, and feel the detent when you cross neutral. Hold `\` to see the original.
