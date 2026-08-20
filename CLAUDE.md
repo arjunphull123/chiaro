@@ -44,7 +44,8 @@ get_preview, export. Prefer driving the running app over spawning new instances.
 ## Dev harness
 
 `swift run Chiaro -- --open <folder> [--edit <name>] [--snapshot <png>] [--export-test <name>]
-[--quiet (no focus steal)] [--click <x> <y-from-top> [n]] [--show-tips] [--download-depth] [--render-icon <png>]`
+[--quiet (no focus steal)] [--click <x> <y-from-top> [n]] [--show-tips] [--download-depth] [--render-icon <png>]
+[--greeting <text> (pins the clock-derived start-screen salutation)]`
 `scripts/bundle.sh` builds dist/Chiaro.app (icns + Info.plist + ad-hoc signing).
 
 ## Roadmap
