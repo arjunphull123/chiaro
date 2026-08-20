@@ -23,8 +23,9 @@ via Apple's RAW engine.
   programmatically settable. This is a hard rule: it keeps sidecar persistence, copy/paste
   edits, undo, and future agentic (Claude-driven) editing all trivial.
 - Prefer Apple frameworks over dependencies. Justify any third-party package in an ADR.
-- **No AI attribution anywhere.** No `Co-Authored-By` trailers, no "Generated with"
-  lines in commits, PRs, code, or docs. Commits are authored by the repo owner, period.
+- **Commits are authored by the repo owner.** No `Co-Authored-By` trailers and no
+  "Generated with" boilerplate in commits, PRs, code, or docs — an editor or an
+  agent is a tool in the chain, and tools don't sign the work.
 - SwiftUI-first; drop to AppKit only where SwiftUI genuinely can't (and note why inline).
 - **Typography roles:** Fraunces = headers/wordmark (sentence case, never uppercase);
   Geist = all UI text; Geist Mono = data only (values, EXIF, counts, timestamps).
@@ -50,4 +51,4 @@ get_preview, export. Prefer driving the running app over spawning new instances.
 
 ## Roadmap
 
-See `docs/ROADMAP.md`. Current phase: v0.1 shipped; next: crop, curves, presets, undo.
+See `docs/ROADMAP.md`. Feature phase complete; current phase is release — screenshots, publishing, distribution.

@@ -1,24 +1,12 @@
 # Roadmap
 
-## Ship list (v1.0, beyond features — owner's list, 2026-08-19)
+## Status
 
-Feature phase declared complete 2026-08-19 (owner).
-Done: bug sweep (2026-08-19: 20 findings fixed, including sidecar hsl/locals
-decode data loss) · ADRs current through 0014 · open-source decision (GPL-3.0,
-2026-08-19) · repo polish (LICENSE, README with screenshots) · distribution
-decided and built (ADR 0014: ad-hoc signing + personal Homebrew tap + GitHub
-Releases update check; no Sparkle) · dist rebuilt at 1.0.0 with the new icon.
-Remaining: screenshot shoot (owner captures; window 1080x887) → ship Claude
-skills for Chiaro (repo `.claude/skills/` for cloners, and an in-app installer
-for app-only users — the installer needs an ADR: it writes into another tool's
-config dir and favours one agent, which cuts against ADR 0008's agent-agnostic
-stance) → publish arjunphull123/chiaro + tag v1.0.0 + create the tap repo →
-landing page (chiaro.arjunphull.dev) → LinkedIn launch post ("agent-native"
-framing) → competitive positioning check.
-Culling flow: cut from the feature queue by owner decision.
+Feature phase complete (2026-08-19). Tiers 1 and 2 shipped; Tier 3 is the MCP
+surface, which is built. ADRs current through 0014.
 
-Decisions (2026-08-18): first build spans Tiers 1+2; AI features are designed-for but
-deferred (ADR 0003); personal tool first — no signing/App Store constraints yet.
+Everything below is the record of what got built and — as usefully — what got
+cut and why.
 
 ## Tier 1 — Core editor
 
