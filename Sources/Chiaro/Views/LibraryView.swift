@@ -560,7 +560,9 @@ struct LibraryView: View {
     private func tile(_ photo: Photo, height: CGFloat) -> some View {
         let selected = library.selection.contains(photo.url)
         let width = height * photo.aspect
-        return ZStack(alignment: .topTrailing) {
+        // .bottomLeading, and no greedy frame on the caption: a caption that
+        // expands to infinity inflates the ZStack and shoves the photo sideways.
+        return ZStack(alignment: .bottomLeading) {
             Group {
                 if let cg = photo.thumbnail {
                     Image(cg, scale: 1, label: Text(photo.name))
@@ -607,7 +609,6 @@ struct LibraryView: View {
                 .frame(width: width, alignment: .leading)
                 .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 7, bottomTrailingRadius: 7))
                 .allowsHitTesting(false)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             }
 
         }

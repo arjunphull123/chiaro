@@ -240,12 +240,22 @@ final class Library {
     nonisolated static func scan(_ url: URL) -> ScanResult {
         var result = ScanResult()
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return result }
-        let options: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
+        let base: [CFString: Any] = [
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceThumbnailMaxPixelSize: 480,
         ]
-        result.image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+        var options = base
+        options[kCGImageSourceCreateThumbnailFromImageIfAbsent] = true
+        var image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+        // Camera JPEGs embed a 160×120 EXIF thumbnail with letterbox bars baked in
+        // to pad 3:2 into 4:3 — unusable, and it reports the wrong aspect ratio.
+        // RAW previews are big, so this second pass only fires on the small ones.
+        if let embedded = image, max(embedded.width, embedded.height) < 320 {
+            var force = base
+            force[kCGImageSourceCreateThumbnailFromImageAlways] = true
+            image = CGImageSourceCreateThumbnailAtIndex(source, 0, force as CFDictionary) ?? embedded
+        }
+        result.image = image
 
         guard let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else {
             return result
