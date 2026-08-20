@@ -33,6 +33,24 @@ struct CropOverlayView: View {
                 }
                 .fill(Color.black.opacity(0.55), style: FillStyle(eoFill: true))
 
+                // Fine reference grid: thirds tell you about composition, but a
+                // level horizon needs a line close to it. Subtle at rest, firmer
+                // once the photo is actually being straightened.
+                Path { p in
+                    let step = max(26, min(rect.width, rect.height) / 12)
+                    var x = rect.minX + step
+                    while x < rect.maxX - 1 {
+                        p.move(to: CGPoint(x: x, y: rect.minY)); p.addLine(to: CGPoint(x: x, y: rect.maxY))
+                        x += step
+                    }
+                    var y = rect.minY + step
+                    while y < rect.maxY - 1 {
+                        p.move(to: CGPoint(x: rect.minX, y: y)); p.addLine(to: CGPoint(x: rect.maxX, y: y))
+                        y += step
+                    }
+                }
+                .stroke(Color.white.opacity(edit.straighten == 0 ? 0.13 : 0.3), lineWidth: 0.5)
+
                 // Border + thirds.
                 Path { p in
                     p.addRect(rect)

@@ -13,16 +13,17 @@ struct AgentRailStatus: View {
     @State private var showing = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .trailing, spacing: 6) {
             if AgentTip.isEligible { TipView(agentTip) }
             timeline
         }
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
     private var timeline: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             let editing = library.agentActive
-            let connected = AgentStatus.shared.isConnected(now: context.date)
+            let connected = AgentStatus.shared.isConnected
             let brand = AgentStatus.shared.brand
             let active = editing || connected
             Button {
@@ -34,7 +35,6 @@ struct AgentRailStatus: View {
                         if active {
                             brand.icon.frame(width: 13, height: 13)
                         } else {
-                            Spacer(minLength: 0)
                             Image(systemName: "sparkles")
                                 .font(.system(size: 11))
                                 .foregroundStyle(Theme.ink3)
@@ -45,7 +45,7 @@ struct AgentRailStatus: View {
                             .font(Theme.ui(11.5, .medium))
                             .foregroundStyle(active ? Theme.ink : Theme.ink2)
                             .lineLimit(1)
-                        Spacer(minLength: 0)
+                            .fixedSize()
                         if editing {
                             Image(systemName: "lock.fill")
                                 .font(.system(size: 9, weight: .semibold))
@@ -61,7 +61,6 @@ struct AgentRailStatus: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
                     RoundedRectangle(cornerRadius: 9)
                         .fill(editing ? brand.color.opacity(0.12) : Color.clear)
@@ -84,7 +83,7 @@ struct ConnectAgentButton: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
-            let connected = AgentStatus.shared.isConnected(now: context.date)
+            let connected = AgentStatus.shared.isConnected
             let brand = AgentStatus.shared.brand
             Button {
                 showing.toggle()

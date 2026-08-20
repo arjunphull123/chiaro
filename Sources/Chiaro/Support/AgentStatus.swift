@@ -33,9 +33,14 @@ final class AgentStatus {
     var brand: AgentBrand { AgentBrand.match(clientName) }
     var displayName: String { brand.name == "Agent" ? (clientName ?? "Agent") : brand.name }
 
-    /// HTTP transport is stateless — "connected" means requests arrived recently.
-    /// Window is generous because agents legitimately go quiet while thinking.
-    func isConnected(now: Date = Date()) -> Bool {
+    /// HTTP transport is stateless: there is no disconnect signal, so any
+    /// recency window produces false negatives. For a "do I still need to set
+    /// this up?" affordance that's the costly error — it tells you to redo work
+    /// you already did — so having been seen at all is what counts.
+    var isConnected: Bool { lastSeen != nil }
+
+    /// Recency, for anything that should reflect current activity.
+    func isActive(now: Date = Date()) -> Bool {
         guard let lastSeen else { return false }
         return now.timeIntervalSince(lastSeen) < 600
     }
