@@ -230,6 +230,13 @@ struct LibraryView: View {
         .help(help)
     }
 
+    /// The RAW tally only earns its place when it isn't simply all of them.
+    private var countLabel: String {
+        let total = library.photos.count
+        let raws = library.photos.filter(\.isRAW).count
+        return raws == total ? "\(total) photos" : "\(total) photos · \(raws) RAW"
+    }
+
     /// Pinned frosted header: title, zoom slider, and the real actions.
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -254,15 +261,17 @@ struct LibraryView: View {
             .buttonStyle(.plain)
             .clickCursor()
             .help("Back to the start screen (⌘W)")
-            Text(library.folderName)
-                .font(Theme.ui(18, .semibold))
-                .foregroundStyle(Theme.ink)
-                .lineLimit(1) // truncates on a long name; never wraps
-            Text("\(library.photos.count) photos · \(library.photos.filter(\.isRAW).count) RAW")
-                .font(Theme.mono(10))
-                .foregroundStyle(Theme.ink3)
-                .lineLimit(1)
-                .layoutPriority(-1) // the count yields before the folder name does
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(library.folderName)
+                    .font(Theme.ui(18, .semibold))
+                    .foregroundStyle(Theme.ink)
+                    .lineLimit(1) // truncates on a long name; never wraps
+                Text(countLabel)
+                    .font(Theme.mono(10))
+                    .foregroundStyle(Theme.ink3)
+                    .lineLimit(1)
+                    .layoutPriority(-1) // the count yields before the folder name does
+            }
             Spacer()
             HStack(spacing: 3) {
                 allChip()
