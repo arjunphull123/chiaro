@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 OUT="${1:-dist}"
 APP="$OUT/Chiaro.app"
-VERSION="0.1.0"
+VERSION="1.0.0"
 
 swift build -c release
 
