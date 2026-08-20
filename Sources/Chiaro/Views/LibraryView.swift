@@ -239,6 +239,7 @@ struct LibraryView: View {
                     .font(Theme.serif(19, .semibold))
                     .kerning(-0.5)
                     .foregroundStyle(Theme.ink)
+                    .fixedSize() // the wordmark never wraps
             }
             Rectangle().fill(Theme.hairline).frame(width: 1, height: 18)
             Button {
@@ -256,9 +257,12 @@ struct LibraryView: View {
             Text(library.folderName)
                 .font(Theme.ui(18, .semibold))
                 .foregroundStyle(Theme.ink)
+                .lineLimit(1) // truncates on a long name; never wraps
             Text("\(library.photos.count) photos · \(library.photos.filter(\.isRAW).count) RAW")
                 .font(Theme.mono(10))
                 .foregroundStyle(Theme.ink3)
+                .lineLimit(1)
+                .fixedSize()
             Spacer()
             HStack(spacing: 3) {
                 allChip()
@@ -699,6 +703,7 @@ struct LibraryView: View {
                         .font(Theme.serif(26, .semibold))
                         .kerning(-0.8)
                         .foregroundStyle(Theme.ink)
+                        .fixedSize()
                     Spacer()
                     ConnectAgentButton()
                 }
