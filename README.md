@@ -121,12 +121,15 @@ same slider.
 | `get_preview` | The photo rendered with its current edit, as a JPEG the agent can see |
 | `export` | Write the finished file |
 
-**Claude Code** — this repo ships a `.mcp.json`, so agents launched from a clone
-find Chiaro automatically. Anywhere else:
+**Claude Code** — add Chiaro once, from anywhere:
 
 ```
-claude mcp add --transport http chiaro http://127.0.0.1:24242/mcp
+claude mcp add --transport http --scope user chiaro http://127.0.0.1:24242/mcp
 ```
+
+Then `claude` in whatever directory you keep your photos in can drive the app.
+(This repo also ships a `.mcp.json` for anyone hacking on Chiaro itself, but you
+don't need a clone to use it.)
 
 **Codex CLI** — add the same HTTP server to your Codex MCP configuration. Codex
 signs in with a ChatGPT account, including a free one, so this path costs
