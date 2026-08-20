@@ -230,11 +230,13 @@ struct LibraryView: View {
         .help(help)
     }
 
-    /// The RAW tally only earns its place when it isn't simply all of them.
+    /// The RAW tally only earns its place in a genuinely mixed folder — "22 RAW"
+    /// out of 22, or "0 RAW" out of 6, is just the photo count restated.
     private var countLabel: String {
         let total = library.photos.count
         let raws = library.photos.filter(\.isRAW).count
-        return raws == total ? "\(total) photos" : "\(total) photos · \(raws) RAW"
+        guard raws > 0, raws < total else { return "\(total) photos" }
+        return "\(total) photos · \(raws) RAW"
     }
 
     /// Pinned frosted header: title, zoom slider, and the real actions.
