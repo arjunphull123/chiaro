@@ -4,9 +4,11 @@
 
 Feature phase declared complete 2026-08-19 (owner).
 Done: bug sweep (2026-08-19: 20 findings fixed, including sidecar hsl/locals
-decode data loss) · ADRs current through 0013.
-Remaining: open-source decision + monetization framing → repo polish →
-distribution (Sparkle/Homebrew/notarization; rebuild dist for the new icon) →
+decode data loss) · ADRs current through 0014 · open-source decision (GPL-3.0,
+2026-08-19) · repo polish (LICENSE, README with screenshots) · distribution
+decided and built (ADR 0014: ad-hoc signing + personal Homebrew tap + GitHub
+Releases update check; no Sparkle) · dist rebuilt at 1.0.0 with the new icon.
+Remaining: publish arjunphull123/chiaro + tag v1.0.0 + create the tap repo →
 landing page (chiaro.arjunphull.dev) → LinkedIn launch post ("agent-native"
 framing) → competitive positioning check.
 Culling flow: cut from the feature queue by owner decision.
