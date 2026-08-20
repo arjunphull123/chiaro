@@ -262,7 +262,7 @@ struct LibraryView: View {
                 .font(Theme.mono(10))
                 .foregroundStyle(Theme.ink3)
                 .lineLimit(1)
-                .fixedSize()
+                .layoutPriority(-1) // the count yields before the folder name does
             Spacer()
             HStack(spacing: 3) {
                 allChip()
@@ -320,15 +320,18 @@ struct LibraryView: View {
             if let folderURL = library.folderURL, Library.isRemovable(folderURL) {
                 importControl
             }
+            // Actions never wrap; the zoom slider gives up width instead.
             Button("Open folder…") { openFolder() }
                 .buttonStyle(OutlineButtonStyle())
                 .clickCursor()
+                .fixedSize()
                 .help("⌘O")
             Button("Open in editor") { openSelectedInEditor() }
                 .buttonStyle(AmberButtonStyle())
                 .clickCursor()
                 .keyboardShortcut(.defaultAction)
                 .disabled(library.selection.isEmpty)
+                .fixedSize()
                 .help("Edit the selected photo (⏎)")
         }
         .padding(.horizontal, 16)
@@ -425,7 +428,7 @@ struct LibraryView: View {
             Image(systemName: "square.grid.4x3.fill")
                 .font(.system(size: 9)).foregroundStyle(Theme.ink3)
             Slider(value: zoomBinding, in: 0...1)
-                .frame(width: 130)
+                .frame(minWidth: 44, idealWidth: 130, maxWidth: 130)
                 .tint(Theme.amber)
                 .controlSize(.mini)
             Image(systemName: "square.fill")
