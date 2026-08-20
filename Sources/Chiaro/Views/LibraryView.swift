@@ -560,6 +560,10 @@ struct LibraryView: View {
     private func tile(_ photo: Photo, height: CGFloat) -> some View {
         let selected = library.selection.contains(photo.url)
         let width = height * photo.aspect
+        // Fixed-size type in a tile that shrinks with the zoom slider: below
+        // these sizes the caption outgrows its tile and drags the row apart.
+        let showCaption = (hoveredTile == photo.url || library.showFilenames)
+            && height >= 92 && width >= 104
         // .bottomLeading, and no greedy frame on the caption: a caption that
         // expands to infinity inflates the ZStack and shoves the photo sideways.
         return ZStack(alignment: .bottomLeading) {
@@ -580,19 +584,23 @@ struct LibraryView: View {
                 RoundedRectangle(cornerRadius: 7)
                     .stroke(selected ? Theme.amber : .clear, lineWidth: 2)
             )
-            .overlay(alignment: .bottomTrailing) {
-                badgePair(photo)
-            }
-            if hoveredTile == photo.url || library.showFilenames {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(photo.filename)
-                        .font(Theme.ui(10.5, .semibold))
-                        .foregroundStyle(.white)
-                    if let exif = photo.exifSummary {
-                        Text(exif)
-                            .font(Theme.mono(8.5))
-                            .foregroundStyle(.white.opacity(0.65))
+            if showCaption {
+                // One row, so the badges can never land on top of the metadata.
+                HStack(alignment: .bottom, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(photo.filename)
+                            .font(Theme.ui(10.5, .semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                        if let exif = photo.exifSummary, height >= 124 {
+                            Text(exif)
+                                .font(Theme.mono(8.5))
+                                .foregroundStyle(.white.opacity(0.65))
+                                .lineLimit(1)
+                        }
                     }
+                    Spacer(minLength: 4)
+                    badgePair(photo)
                 }
                 .padding(.horizontal, 9)
                 .padding(.top, 46)
@@ -610,14 +618,19 @@ struct LibraryView: View {
                 .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 7, bottomTrailingRadius: 7))
                 .allowsHitTesting(false)
             }
-
         }
+        // Only when the caption isn't already carrying them.
+        .overlay(alignment: .bottomTrailing) { if !showCaption { badgePair(photo) } }
         .modifier(PhotoInteractions(photo: photo, library: library, hoveredTile: $hoveredTile, onExport: onExport))
     }
 
     /// Square grid cell: crop-filled, one-line caption, shared interactions.
     private func gridTile(_ photo: Photo) -> some View {
         let selected = library.selection.contains(photo.url)
+        // Mirrors the cell size galleryScroll computes, so the caption can bow
+        // out before it collides with the badges.
+        let cell = 80 + CGFloat(library.zoomLevel) * 140
+        let showCaption = (hoveredTile == photo.url || library.showFilenames) && cell >= 132
         return Color.clear
             .aspectRatio(1, contentMode: .fit)
             .overlay {
@@ -631,11 +644,16 @@ struct LibraryView: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: 7))
             .overlay(alignment: .bottom) {
-                if hoveredTile == photo.url || library.showFilenames {
-                    Text(photo.filename)
-                        .font(Theme.ui(9.5, .medium))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
+                if showCaption {
+                    // Same single row as the justified tile: name left, badges right.
+                    HStack(alignment: .bottom, spacing: 6) {
+                        Text(photo.filename)
+                            .font(Theme.ui(9.5, .medium))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                        Spacer(minLength: 4)
+                        badgePair(photo)
+                    }
                         .padding(.horizontal, 7)
                         .padding(.top, 24)
                         .padding(.bottom, 6)
@@ -648,7 +666,7 @@ struct LibraryView: View {
                 }
             }
             .overlay(alignment: .bottomTrailing) {
-                badgePair(photo)
+                if !showCaption { badgePair(photo) }
             }
             .overlay(
                 RoundedRectangle(cornerRadius: 7)
