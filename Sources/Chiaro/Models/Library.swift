@@ -241,12 +241,15 @@ final class Library {
 
     /// Fast thumbnail + shooting metadata from the file's embedded preview —
     /// never a full RAW decode.
-    nonisolated static func scan(_ url: URL) -> ScanResult {
+    /// `maxPixelSize` is the caller's display need: gallery tiles are happy at 480,
+    /// but the start screen's hero draws at 1240px on a Retina panel and upscaling
+    /// a 480px thumbnail into it looks visibly soft.
+    nonisolated static func scan(_ url: URL, maxPixelSize: Int = 480) -> ScanResult {
         var result = ScanResult()
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return result }
         let base: [CFString: Any] = [
             kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: 480,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
         ]
         var options = base
         options[kCGImageSourceCreateThumbnailFromImageIfAbsent] = true
@@ -254,7 +257,7 @@ final class Library {
         // Camera JPEGs embed a 160×120 EXIF thumbnail with letterbox bars baked in
         // to pad 3:2 into 4:3 — unusable, and it reports the wrong aspect ratio.
         // RAW previews are big, so this second pass only fires on the small ones.
-        if let embedded = image, max(embedded.width, embedded.height) < 320 {
+        if let embedded = image, max(embedded.width, embedded.height) < min(320, maxPixelSize) {
             var force = base
             force[kCGImageSourceCreateThumbnailFromImageAlways] = true
             image = CGImageSourceCreateThumbnailAtIndex(source, 0, force as CFDictionary) ?? embedded

@@ -744,9 +744,11 @@ struct LibraryView: View {
     private func refreshRecentEdits() {
         let urls = Array(Library.recentEdits().prefix(7))
         recentEdits = urls.map { RecentEditItem(id: $0, image: nil, editDate: Sidecar.lastEditDate(for: $0)) }
-        for url in urls {
+        for (position, url) in urls.enumerated() {
+            // The first one is the hero card; the rest are 74pt strip thumbnails.
+            let size = position == 0 ? 1600 : 480
             Task {
-                let image = await Offload.on(Offload.render) { Library.scan(url).image }
+                let image = await Offload.on(Offload.render) { Library.scan(url, maxPixelSize: size).image }
                 if let index = recentEdits.firstIndex(where: { $0.id == url }) {
                     recentEdits[index].image = image
                 }
