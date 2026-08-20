@@ -4,7 +4,7 @@ A native macOS RAW photo editor. Dark, glassy, fast — full-quality RAW editing
 with no subscription, and an MCP server built in so the coding agent you already
 run can edit alongside you.
 
-![Chiaro's edit view](docs/screenshots/edit.jpg)
+![Chiaro's edit view](docs/screenshots/edit.png)
 
 Named for the light half of *chiaroscuro* — composing with light against dark.
 
@@ -70,7 +70,7 @@ Open a folder of RAW files and Chiaro lays them out as a justified gallery —
 or a grid, or a sortable Finder-style list. Star the keepers, filter to them,
 and press Return to edit.
 
-![The library, grouped by day](docs/screenshots/library.jpg)
+![The library, grouped by day](docs/screenshots/library.png)
 
 - **Light and color** — exposure, contrast, highlights, shadows, whites, blacks,
   temperature, tint, vibrance, saturation, plus a tone curve and an eight-band
@@ -88,14 +88,19 @@ and press Return to edit.
 - **Presets** — six built in, plus anything you save
 - **Export** — full-resolution JPEG, HEIF, or 16-bit TIFF
 
-![Depth-plane blur on a landscape](docs/screenshots/blur.jpg)
+![Background blur lifting a portrait off the room behind it](docs/screenshots/portrait.png)
+
+The depth map isn't a black box — open it as a 3D scene, orbit it, and drag the
+focus plane through the point cloud to see exactly what's sharp and what isn't.
+
+![The focus plane in Chiaro's 3D scene](docs/screenshots/scene.png)
 
 Adjustments are scrubbed directly on the photo: click a value, drag across the
 image, and feel the detent when you cross neutral. Hold `\` to see the original.
 
 ## Your agent can edit too
 
-![Claude editing a photo in Chiaro](docs/screenshots/agent.jpg)
+![Claude editing a photo in Chiaro](docs/screenshots/agent.png)
 
 Chiaro has no chat box and ships no API keys. Instead it serves
 [MCP](https://modelcontextprotocol.io) over HTTP at `http://127.0.0.1:24242/mcp`
