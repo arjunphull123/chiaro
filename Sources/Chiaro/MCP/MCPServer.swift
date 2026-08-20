@@ -307,6 +307,17 @@ final class MCPServer {
         parameters you send and accepts an `intent` string that is shown to the user live. \
         open_photo displays a photo in the editor so the user can watch. export writes the \
         finished file. All edits are non-destructive and render live.
+
+        How to edit well:
+        1. Diagnose before reaching for sliders. Call get_preview and name what is actually \
+        wrong. "Flat" is usually no true black rather than missing saturation, and the fix is \
+        blacks, not vibrance.
+        2. Work in small passes, one set_edit each: tone first, look, then colour. If you send \
+        nine values at once you cannot tell which one did the damage.
+        3. Few modest moves beat many large ones. Contrast, clarity, vibrance and saturation all \
+        push in the same direction — stack them and the photo comes out looking like a preset.
+        4. The photographer's taste decides. Offer a direction, show the result, and let them \
+        redirect; do not apply a look you were not asked for.
         """
     }
 
