@@ -562,8 +562,10 @@ struct LibraryView: View {
         let width = height * photo.aspect
         // Fixed-size type in a tile that shrinks with the zoom slider: below
         // these sizes the caption outgrows its tile and drags the row apart.
+        // 150pt is what the filename, a gap, and the badge cluster actually need;
+        // below it the name truncates to "DSC039…" and reads worse than nothing.
         let showCaption = (hoveredTile == photo.url || library.showFilenames)
-            && height >= 92 && width >= 104
+            && height >= 92 && width >= 150
         // .bottomLeading, and no greedy frame on the caption: a caption that
         // expands to infinity inflates the ZStack and shoves the photo sideways.
         return ZStack(alignment: .bottomLeading) {
