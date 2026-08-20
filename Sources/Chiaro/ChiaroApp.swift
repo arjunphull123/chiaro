@@ -3,6 +3,12 @@ import TipKit
 import SceneKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // One library, one window: tabbing only adds a dozen dead menu items.
+        NSWindow.allowsAutomaticWindowTabbing = false
+        Updater.checkInBackground()
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         MainActor.assumeIsolated {
             MCPServer.shared.library?.activeEditor?.saveNow()
@@ -256,6 +262,9 @@ struct ChiaroApp: App {
         .commands {
             CommandGroup(after: .appInfo) {
                 Button("Check for updates…") { Updater.checkForUpdates() }
+            }
+            CommandGroup(replacing: .help) {
+                Button("Chiaro on GitHub") { NSWorkspace.shared.open(Updater.repoPage) }
             }
             CommandGroup(replacing: .newItem) {
                 Button("Open folder…") {

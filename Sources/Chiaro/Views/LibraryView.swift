@@ -320,6 +320,14 @@ struct LibraryView: View {
             if let folderURL = library.folderURL, Library.isRemovable(folderURL) {
                 importControl
             }
+            if let latest = Updater.shared.available {
+                Button("Update to \(latest)") { Updater.shared.openReleases() }
+                    .buttonStyle(OutlineButtonStyle()) // "Open in editor" is this surface's one primary
+                    .clickCursor()
+                    .fixedSize()
+                    .contextMenu { Button("Dismiss") { Updater.shared.dismiss() } }
+                    .help("Opens the releases page — Chiaro doesn't update itself")
+            }
             // Actions never wrap; the zoom slider gives up width instead.
             Button("Open folder…") { openFolder() }
                 .buttonStyle(OutlineButtonStyle())
