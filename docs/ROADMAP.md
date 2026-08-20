@@ -8,7 +8,11 @@ decode data loss) · ADRs current through 0014 · open-source decision (GPL-3.0,
 2026-08-19) · repo polish (LICENSE, README with screenshots) · distribution
 decided and built (ADR 0014: ad-hoc signing + personal Homebrew tap + GitHub
 Releases update check; no Sparkle) · dist rebuilt at 1.0.0 with the new icon.
-Remaining: publish arjunphull123/chiaro + tag v1.0.0 + create the tap repo →
+Remaining: screenshot shoot (owner captures; window 1080x887) → ship Claude
+skills for Chiaro (repo `.claude/skills/` for cloners, and an in-app installer
+for app-only users — the installer needs an ADR: it writes into another tool's
+config dir and favours one agent, which cuts against ADR 0008's agent-agnostic
+stance) → publish arjunphull123/chiaro + tag v1.0.0 + create the tap repo →
 landing page (chiaro.arjunphull.dev) → LinkedIn launch post ("agent-native"
 framing) → competitive positioning check.
 Culling flow: cut from the feature queue by owner decision.
