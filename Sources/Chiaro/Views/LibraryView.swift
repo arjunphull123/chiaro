@@ -194,6 +194,13 @@ struct LibraryView: View {
                 .padding(16)
             }
             .simultaneousGesture(zoomGesture)
+            // Clicking the gallery ground gives up the search field, the way Esc
+            // already did. Behind the tiles, so their own taps still win.
+            .background(
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { searchFocused = false }
+            )
         }
     }
 
@@ -703,13 +710,18 @@ struct LibraryView: View {
     /// Card/recent discovery stats folders (slow over USB) — computed once, not per frame.
     private func refreshSources() {
         var items: [SourceItem] = Library.cameraCardFolders().map { folder in
-            SourceItem(
+            let volume = (folder.lastPathComponent == "DCIM" ? folder : folder.deletingLastPathComponent())
+                .deletingLastPathComponent().lastPathComponent
+            return SourceItem(
                 id: folder, icon: "camera.fill", tint: Theme.amber,
-                title: "\(folder.lastPathComponent) — camera card",
+                title: volume.isEmpty ? "Camera card" : volume,
                 subtitle: cardSummary(folder)
             )
         }
-        items += Library.recentFolders().filter { recent in !items.contains { $0.id == recent } }.map { folder in
+        // A folder inside a card is already represented by the card's own row.
+        items += Library.recentFolders().filter { recent in
+            !items.contains { $0.id == recent || recent.path.hasPrefix($0.id.path + "/") }
+        }.map { folder in
             SourceItem(
                 id: folder, icon: "folder", tint: Theme.ink2,
                 title: folder.lastPathComponent,
@@ -751,6 +763,10 @@ struct LibraryView: View {
 
     /// "Good evening, Arjun" — hour-aware, first name from the macOS account.
     private var greeting: String {
+        // --greeting "Good afternoon, Arjun": the salutation is clock-derived, so
+        // capturing the start screen at 2am otherwise reads "Up late".
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--greeting"), i + 1 < args.count { return args[i + 1] }
         let hour = Calendar.current.component(.hour, from: Date())
         let salutation = hour < 5 ? "Up late" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"
         let first = NSFullUserName().split(separator: " ").first.map(String.init) ?? ""
@@ -883,10 +899,10 @@ struct LibraryView: View {
     }
 
     private func heroSubtitle(_ item: RecentEditItem) -> String {
-        guard let date = item.editDate else { return "Continue editing · ⏎" }
+        guard let date = item.editDate else { return "Continue editing" }
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full
-        return "Edited \(formatter.localizedString(for: date, relativeTo: Date())) · ⏎"
+        return "Edited \(formatter.localizedString(for: date, relativeTo: Date()))"
     }
 
     private func recentThumb(_ item: RecentEditItem) -> some View {
@@ -937,10 +953,18 @@ struct LibraryView: View {
     }
 
     private func cardSummary(_ folder: URL) -> String {
-        let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+        let fm = FileManager.default
+        // The row may point at DCIM itself when a card holds several subfolders.
+        var files = (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+        if folder.lastPathComponent == "DCIM" {
+            files = files.flatMap { (try? fm.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)) ?? [] }
+        }
         let photos = files.filter { Photo.imageExtensions.contains($0.pathExtension.lowercased()) }
         let raws = photos.filter { Photo.rawExtensions.contains($0.pathExtension.lowercased()) }
-        return "\(raws.isEmpty ? photos.count : raws.count) photos · \(folder.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent)"
+        let count = raws.isEmpty ? photos.count : raws.count
+        return folder.lastPathComponent == "DCIM"
+            ? "\(count) photos"
+            : "\(count) photos · \(folder.lastPathComponent)"
     }
 
     /// Finder-style row: 26pt, zebra striping, full-row selection, columns.

@@ -130,14 +130,18 @@ final class Library {
     }
 
     /// DCIM folders on mounted camera cards — the "camera just plugged in" path.
+    /// One entry per card, not per DCIM subfolder — a card with 100MSDCF and
+    /// 101MSDCF is still one card, and folder chips break it out once opened.
     static func cameraCardFolders() -> [URL] {
         let fm = FileManager.default
         let volumes = (try? fm.contentsOfDirectory(at: URL(fileURLWithPath: "/Volumes"), includingPropertiesForKeys: nil)) ?? []
-        return volumes.flatMap { volume -> [URL] in
+        return volumes.compactMap { volume -> URL? in
             let dcim = volume.appendingPathComponent("DCIM")
-            guard fm.fileExists(atPath: dcim.path) else { return [] }
+            guard fm.fileExists(atPath: dcim.path) else { return nil }
             let subs = (try? fm.contentsOfDirectory(at: dcim, includingPropertiesForKeys: nil)) ?? []
-            return subs.filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
+            let dirs = subs.filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
+            guard !dirs.isEmpty else { return nil }
+            return dirs.count == 1 ? dirs[0] : dcim
         }
     }
 
