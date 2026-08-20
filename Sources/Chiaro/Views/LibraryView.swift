@@ -239,6 +239,23 @@ struct LibraryView: View {
         return "\(total) photos · \(raws) RAW"
     }
 
+    /// Sheds the RAW tally, then itself, rather than truncating to "96 photo…".
+    private var photoCount: some View {
+        ViewThatFits {
+            countText(countLabel)
+            countText("\(library.photos.count) photos")
+            EmptyView()
+        }
+    }
+
+    private func countText(_ string: String) -> some View {
+        Text(string)
+            .font(Theme.mono(10))
+            .foregroundStyle(Theme.ink3)
+            .lineLimit(1)
+            .fixedSize()
+    }
+
     /// Pinned frosted header: title, zoom slider, and the real actions.
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -268,10 +285,7 @@ struct LibraryView: View {
                     .font(Theme.ui(18, .semibold))
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1) // truncates on a long name; never wraps
-                Text(countLabel)
-                    .font(Theme.mono(10))
-                    .foregroundStyle(Theme.ink3)
-                    .lineLimit(1)
+                photoCount
                     .layoutPriority(-1) // the count yields before the folder name does
             }
             Spacer()
