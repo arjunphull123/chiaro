@@ -111,18 +111,18 @@ struct EditView: View {
                 navPill.padding(.bottom, 16).padding(.trailing, Theme.railWidth)
             }
         }
-        .overlay(alignment: .topLeading) {
+        // One row, not two overlays: at narrow widths independent leading and
+        // trailing overlays overlapped each other.
+        .overlay(alignment: .top) {
             HStack(spacing: 8) {
                 backButton
                 zoomControls
+                Spacer(minLength: 12)
+                toolbar.layoutPriority(1) // actions keep their labels; the zoom slider yields first
             }
-            .padding(.top, 10)
+            .padding(.top, 12)
             .padding(.leading, 14) // just below the traffic lights
-        }
-        .overlay(alignment: .topTrailing) {
-            toolbar
-            .padding(14)
-            .padding(.trailing, Theme.railWidth)
+            .padding(.trailing, 14 + Theme.railWidth)
         }
         .onAppear {
             focused = true
@@ -321,17 +321,26 @@ struct EditView: View {
         HoverLabelButton(title: title, icon: icon, active: active, disabled: disabled, tint: tint, action: action)
     }
 
+    /// Drops its label rather than compressing when the toolbar runs out of room.
     private var exportButton: some View {
+        ViewThatFits(in: .horizontal) {
+            exportButtonBody(labeled: true)
+            exportButtonBody(labeled: false)
+        }
+    }
+
+    private func exportButtonBody(labeled: Bool) -> some View {
         Button(action: onExport) {
             HStack(spacing: 6) {
                 Image(systemName: "square.and.arrow.up").font(.system(size: 10, weight: .semibold))
-                Text("Export")
+                if labeled { Text("Export") }
             }
         }
         .buttonStyle(GlassButtonStyle(tint: Theme.amber))
         .clickCursor()
         .keyboardShortcut("e")
         .help("Full-resolution JPEG, HEIF, or 16-bit TIFF (⌘E)")
+        .fixedSize()
     }
 
     /// Fit / 1:1 / zoom multiplier — pixel-checking without the trackpad.
@@ -358,21 +367,38 @@ struct EditView: View {
             .foregroundStyle(model.canvasZoom > 1 ? Theme.amber : Theme.ink2)
             .clickCursor()
             .help("Actual pixels — check sharpness (Z toggles)")
-            Slider(value: Binding(
-                get: { Double(model.canvasZoom) },
-                set: { model.canvasZoom = CGFloat($0) }
-            ), in: 1...8)
-                .tint(Theme.amber)
-                .controlSize(.mini)
-                .frame(width: 76)
-            Text(String(format: "×%.1f", model.canvasZoom))
-                .font(Theme.mono(9))
-                .foregroundStyle(Theme.ink3)
-                .monospacedDigit()
+            // The slider is the first thing to go when the window is too narrow
+            // for the toolbar; Fit / 1:1 / readout still fit.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    zoomSlider
+                    zoomReadout
+                }
+                zoomReadout
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .chiaroGlass(cornerRadius: 10)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var zoomSlider: some View {
+        Slider(value: Binding(
+            get: { Double(model.canvasZoom) },
+            set: { model.canvasZoom = CGFloat($0) }
+        ), in: 1...8)
+            .tint(Theme.amber)
+            .controlSize(.mini)
+            .frame(width: 76)
+    }
+
+    private var zoomReadout: some View {
+        Text(String(format: "×%.1f", model.canvasZoom))
+            .font(Theme.mono(9))
+            .foregroundStyle(Theme.ink3)
+            .monospacedDigit()
+            .fixedSize()
     }
 
     private var backButton: some View {
