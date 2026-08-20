@@ -16,6 +16,8 @@ final class Photo: Identifiable {
 
     var id: URL { url }
     var name: String { url.deletingPathExtension().lastPathComponent }
+    /// For display only — `name` stays the identity sidecars and MCP address.
+    var filename: String { url.lastPathComponent }
     var hasEdits: Bool { !edit.isNeutral }
 
     init(url: URL) {

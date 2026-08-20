@@ -530,10 +530,18 @@ struct LibraryView: View {
 
     @State private var hoveredTile: URL?
 
-    /// Star + Chiaro mark, bottom-right, sitting in the caption scrim.
+    /// RAW chip + star + Chiaro mark, bottom-right, sitting in the caption scrim.
+    /// The chip carries the format when filenames are toggled off.
     @ViewBuilder private func badgePair(_ photo: Photo) -> some View {
-        if photo.starred || photo.hasEdits {
+        if photo.starred || photo.hasEdits || photo.isRAW {
             HStack(spacing: 6) {
+                if photo.isRAW {
+                    Text("RAW")
+                        .font(Theme.mono(7, .medium)).kerning(0.8)
+                        .foregroundStyle(Theme.amber)
+                        .padding(.horizontal, 4).padding(.vertical, 1.5)
+                        .background(RoundedRectangle(cornerRadius: 3).stroke(Theme.amber.opacity(0.5)))
+                }
                 if photo.starred {
                     Image(systemName: "star.fill")
                         .font(.system(size: 12))
@@ -560,7 +568,7 @@ struct LibraryView: View {
                         .aspectRatio(contentMode: .fill)
                 } else {
                     Theme.panel.overlay(
-                        Text(photo.name).font(Theme.mono(9)).foregroundStyle(Theme.ink3)
+                        Text(photo.filename).font(Theme.mono(9)).foregroundStyle(Theme.ink3)
                     )
                 }
             }
@@ -575,7 +583,7 @@ struct LibraryView: View {
             }
             if hoveredTile == photo.url || library.showFilenames {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(photo.name)
+                    Text(photo.filename)
                         .font(Theme.ui(10.5, .semibold))
                         .foregroundStyle(.white)
                     if let exif = photo.exifSummary {
@@ -623,7 +631,7 @@ struct LibraryView: View {
             .clipShape(RoundedRectangle(cornerRadius: 7))
             .overlay(alignment: .bottom) {
                 if hoveredTile == photo.url || library.showFilenames {
-                    Text(photo.name)
+                    Text(photo.filename)
                         .font(Theme.ui(9.5, .medium))
                         .foregroundStyle(.white)
                         .lineLimit(1)
@@ -915,7 +923,7 @@ struct LibraryView: View {
             }
             .frame(width: 30, height: 20)
             .clipShape(RoundedRectangle(cornerRadius: 3))
-            Text(photo.name)
+            Text(photo.filename)
                 .font(Theme.ui(11.5, selected ? .medium : .regular))
                 .foregroundStyle(Theme.ink)
                 .lineLimit(1)
