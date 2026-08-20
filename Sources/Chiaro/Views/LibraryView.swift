@@ -745,10 +745,20 @@ struct LibraryView: View {
         let urls = Array(Library.recentEdits().prefix(7))
         recentEdits = urls.map { RecentEditItem(id: $0, image: nil, editDate: Sidecar.lastEditDate(for: $0)) }
         for (position, url) in urls.enumerated() {
-            // The first one is the hero card; the rest are 74pt strip thumbnails.
-            let size = position == 0 ? 1600 : 480
+            let isHero = position == 0
             Task {
-                let image = await Offload.on(Offload.render) { Library.scan(url, maxPixelSize: size).image }
+                let image = await Offload.on(Offload.render) {
+                    // The hero says "Edited 2 minutes ago", so it should show the
+                    // edit — a file thumbnail would show the untouched original.
+                    // Strip thumbnails stay cheap.
+                    guard isHero, let base = RawEngine.shared.preview(for: url) else {
+                        return Library.scan(url, maxPixelSize: isHero ? 1600 : 480).image
+                    }
+                    let edit = Sidecar.read(for: url)?.edit ?? .neutral
+                    let rendered = RenderPipeline.render(base: base, edit: edit, personMask: nil)
+                    return RawEngine.shared.context.createCGImage(rendered, from: rendered.extent)
+                        ?? Library.scan(url, maxPixelSize: 1600).image
+                }
                 if let index = recentEdits.firstIndex(where: { $0.id == url }) {
                     recentEdits[index].image = image
                 }
