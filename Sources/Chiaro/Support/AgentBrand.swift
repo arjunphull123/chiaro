@@ -24,16 +24,14 @@ struct AgentBrand {
 
     private static var imageCache: [String: NSImage] = [:]
 
-    /// The brand mark, template-tinted to the brand color; handshake for unknowns.
+    /// The brand mark in the brand color; sparkles for unknowns. The marks are
+    /// solid-black SVGs, so they're masked rather than template-tinted — NSImage
+    /// drops the template flag on SVG reps and they'd render black on black.
     @ViewBuilder var icon: some View {
         if let iconFile, let image = Self.image(named: iconFile) {
-            Image(nsImage: image)
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .foregroundStyle(color)
+            color.mask { Image(nsImage: image).resizable().scaledToFit() }
         } else {
-            Image(systemName: "handshake")
+            Image(systemName: "sparkles")
                 .resizable()
                 .scaledToFit()
                 .foregroundStyle(color)
@@ -44,7 +42,6 @@ struct AgentBrand {
         if let cached = imageCache[name] { return cached }
         guard let url = Bundle.module.url(forResource: name, withExtension: "svg", subdirectory: "AgentIcons"),
               let image = NSImage(contentsOf: url) else { return nil }
-        image.isTemplate = true
         imageCache[name] = image
         return image
     }
