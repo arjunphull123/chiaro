@@ -33,6 +33,31 @@ tint alone on RAW.
    by an automated test whose blur findings proved unreliable, so treat as
    unconfirmed until checked by eye with the depth model downloaded.
 
+## Agreed design change: the agent status bar (not yet built)
+
+Owner's call, 2026-08-21, after seeing the overlay for the first time.
+
+- The status pill spans the FULL WIDTH of the right rail, minus the usual
+  padding, instead of sizing to its content. This is the real fix for the
+  overflow that has recurred three times: a fixed geometry cannot be pushed
+  around by an agent-supplied string.
+- Inside it, two columns: state on the left ("Claude is editing…"), left
+  aligned as now, and activity on the right.
+- On the right, put the RELATIVE TIME ("now", "2 min ago"), not the last
+  activity line. It is bounded, and it answers the question you actually have
+  when you glance up, which is whether this is live or stale. The last activity
+  line is unbounded text, which is what caused the overflow, and it already has
+  a home in the popover.
+- The intent overlay beneath is capped to the SAME width as the pill and WRAPS
+  to two or three lines instead of truncating on one.
+- Also fix while there: the overlay currently covers the rail's aperture mark
+  and crowds the photo name, and its text is left aligned while the pill is
+  right aligned, so they share no edge. Full-rail width resolves the alignment;
+  decide where the overlay sits so it stops covering the photo identity.
+- Note the library has no rail. Use the same fixed width there so the element
+  is identical across views, which was the original point of putting it at
+  window level.
+
 ## Not yet seen by the owner
 
 The agent activity overlay (the floating glass chip showing live intent beneath
@@ -65,6 +90,32 @@ conventions, cache keys or persistence, needs code reading.
 Judge colour at 1400px or larger. A 700px preview hid crushed shadows once and
 a colourless highlight recovery read as warmth on a photo whose stone was
 already warm.
+
+## Resuming after a compaction
+
+Read this file first; it is the source of truth for what is left.
+
+In flight when this was written: one Sonnet agent reading code to fix the
+highlight grading zone and negative clarity. Its prime suspect for the
+highlight bug is that `highlightStrength` and `highlightHue` are missing from
+the `NSCache` key in `ColorGradeCube`, so the cube is never rebuilt when they
+change. When it reports, rebuild, relaunch and have the OWNER confirm by eye,
+because measurement has misled twice on visible things.
+
+How to work from here, in order: build the agent status bar described above,
+then cap the client name in the pill, then luminance-range masking, then grain.
+Then the ground-truth captures and the shoot.
+
+Process rules that were learned the hard way: one actor on the live app at a
+time, since agents and I clobbered each other's photo state. Sonnet does
+implementation and testing; judgment, specs and verdicts stay with the lead
+model. Always rebuild and relaunch immediately before asking the owner to hand
+test, and tell him exactly what to click. Launch the app by running
+`.build/debug/Chiaro --open <folder>` directly; `swift run` and
+`open dist/Chiaro.app` leave a windowless process. `get_stats` is not in this
+session's cached MCP tool list, so call it over HTTP against
+`http://127.0.0.1:24242/mcp`. Never touch DSC02712, DSC03055 or DSC03115: they
+carry the owner's real edits.
 
 ## Shoot dependencies
 
