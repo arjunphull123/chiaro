@@ -5,11 +5,14 @@ import TipKit
 /// "Connect agent": copyable orientation prompt pointing any coding agent at the
 /// local MCP server (ADR 0008). The server self-describes via tools/list schemas;
 /// this prompt is just the address and etiquette.
-/// The window's one agent-status line, cycling through the agent lifecycle:
-/// "Connect agent" → "<client> connected" → "🔒 Agent is editing…" (+ intent).
-/// Lives in the title strip (see RootView) — one line, so state and intent are
-/// a single truncating Text rather than the two stacked lines a rail pill could
-/// afford.
+/// The window's agent-status pill, cycling through the agent lifecycle:
+/// "Connect agent" → "<client> connected" → "🔒 <client> is editing…". State
+/// only — every string here is one of a handful of known phrases, so the pill's
+/// width is bounded and it can never overhang the canvas. The live intent is
+/// deliberately NOT part of this view: it's unbounded (whatever text the
+/// driving agent sends), so it renders as its own floating line — see
+/// `AgentIntentBadge` below, composed as an independent sibling in RootView
+/// rather than nested in here, so it can never resize or shift this pill.
 struct AgentStatusStrip: View {
     private let agentTip = AgentTip()
     let library: Library
@@ -33,7 +36,8 @@ struct AgentStatusStrip: View {
                             .font(.system(size: 10))
                             .foregroundStyle(Theme.ink3)
                     }
-                    Text(line(editing: editing, connected: connected))
+                    Text(state(editing: editing, connected: connected))
+                        .font(Theme.ui(11.5, .medium))
                         .foregroundStyle(active ? Theme.ink : Theme.ink2)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -57,36 +61,48 @@ struct AgentStatusStrip: View {
             .buttonStyle(.plain)
             .clickCursor()
             .animation(.easeOut(duration: 0.2), value: editing)
-            // Anchored to the pill, inside the 440pt frame below: attached
-            // outside it, the popover points at the frame's centre instead.
             .popoverTip(AgentTip.isEligible ? agentTip : nil, arrowEdge: .bottom)
             .popover(isPresented: $showing, arrowEdge: .bottom) { AgentConnectPopover() }
         }
-        // Caps growth so a long intent truncates instead of pushing the strip
-        // toward the traffic lights or the window edge; short states just size
-        // to fit under this. Trailing-aligned so the pill's own trailing edge
-        // stays pinned to the window edge at any width — it grows leftward
-        // rather than floating centred in the 440pt ceiling.
-        .frame(maxWidth: 440, alignment: .trailing)
     }
 
-    /// State phrase, plus the intent appended in a dimmer run when editing —
-    /// one Text so the whole line truncates together (mirrors the mixed-style
-    /// runs LibraryView's footer count builds).
-    private func line(editing: Bool, connected: Bool) -> AttributedString {
-        var text = AttributedString(
-            editing ? "\(AgentStatus.shared.displayName) is editing…"
-            : connected ? "\(AgentStatus.shared.displayName) is connected"
-            : "Connect your agent"
-        )
-        text.font = Theme.ui(11.5, .medium)
-        if editing, let intent = library.agentIntent {
-            var suffix = AttributedString("  " + intent)
-            suffix.font = Theme.ui(10.5)
-            suffix.foregroundColor = Theme.ink2
-            text += suffix
+    /// One of three known phrases — never runtime text, so this never needs
+    /// a width cap the way the intent does.
+    private func state(editing: Bool, connected: Bool) -> String {
+        editing ? "\(AgentStatus.shared.displayName) is editing…"
+        : connected ? "\(AgentStatus.shared.displayName) is connected"
+        : "Connect your agent"
+    }
+}
+
+/// The agent's live, unbounded intent string, as its own floating glass label —
+/// the same transient-surface treatment as the filmstrip nav pill and the
+/// scrub-dial HUD (ADR 0004), not a rail element. Composed as an independent
+/// sibling of `AgentStatusStrip` in RootView, positioned by absolute padding
+/// rather than sharing a layout container with the pill, so nothing it does —
+/// growing, truncating, appearing, disappearing — can ever displace or resize
+/// the pill above it. Shows only while an agent is actually working, and
+/// clears with the same 3s timer that clears `Library.agentIntent`.
+struct AgentIntentBadge: View {
+    let library: Library
+
+    var body: some View {
+        if library.agentActive, let intent = library.agentIntent {
+            Text(intent)
+                .font(Theme.ui(10, .medium))
+                .foregroundStyle(Theme.ink2)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .chiaroGlass(cornerRadius: 7)
+                // Same 16pt trailing inset as the pill above, so a maxed-out
+                // line's leading edge lands exactly on the rail's own leading
+                // edge — it can share the pill's trailing edge without ever
+                // reaching past the rail into the canvas.
+                .frame(maxWidth: Theme.railWidth - 16, alignment: .trailing)
+                .transition(.opacity)
         }
-        return text
     }
 }
 
