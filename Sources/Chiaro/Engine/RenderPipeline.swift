@@ -55,6 +55,9 @@ enum RenderPipeline {
         if edit.hsl.contains(where: { !$0.isNeutral }) {
             image = HSLCube.apply(image, bands: edit.hsl)
         }
+        // Grading (ADR 0015): after the mixer, before localisation — correction,
+        // then grading, then locals.
+        image = ColorGradeKernel.apply(image, edit: edit)
         for local in edit.locals where !local.isNeutral {
             image = applyLocal(local, to: image, personMask: personMask, scale: scale)
         }

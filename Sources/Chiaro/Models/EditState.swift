@@ -108,6 +108,15 @@ struct EditState: Codable, Equatable {
     var tint: Double = 0          // -100...100
     var vibrance: Double = 0      // -100...100
     var saturation: Double = 0    // -100...100
+    // Grading: colour by tonal zone (ADR 0015). Hue is clamped, not wrapped —
+    // wraparound is a later UI nicety, not a rendering requirement.
+    var shadowStrength: Double = 0    // 0...100
+    var shadowHue: Double = 0         // 0...360
+    var midStrength: Double = 0       // 0...100
+    var midHue: Double = 0            // 0...360
+    var highlightStrength: Double = 0 // 0...100
+    var highlightHue: Double = 0      // 0...360
+    var gradeBalance: Double = 0      // -100...100: shifts the shadow/highlight crossover
     // Effects
     var clarity: Double = 0       // -100...100
     var vignette: Double = 0      // 0...100
@@ -136,6 +145,9 @@ struct EditState: Codable, Equatable {
     var locals: [LocalAdjustment] = []
     // Color mixer: 8 hue bands (see HSLBand.names)
     var hsl: [HSLBand] = Array(repeating: HSLBand(), count: 8)
+    // Black & white: converts to grey after the tone curve, using the mixer's
+    // l values as channel weights, then skips saturation/vibrance/the cube.
+    var monochrome = false
     // Tone curve: control points, always including endpoints
     var curve: [CurvePoint] = CurvePoint.identity
     // Geometry
@@ -182,6 +194,7 @@ struct EditState: Codable, Equatable {
         }
         flipH = try c.decodeIfPresent(Bool.self, forKey: CodingKeys(stringValue: "flipH")!) ?? false
         flipV = try c.decodeIfPresent(Bool.self, forKey: CodingKeys(stringValue: "flipV")!) ?? false
+        monochrome = try c.decodeIfPresent(Bool.self, forKey: CodingKeys(stringValue: "monochrome")!) ?? false
         if let raw = try c.decodeIfPresent(String.self, forKey: CodingKeys(stringValue: "blurMode")!),
            let mode = BlurMode(rawValue: raw) {
             blurMode = mode
@@ -219,6 +232,7 @@ struct EditState: Codable, Equatable {
         }
         if flipH { try c.encode(true, forKey: CodingKeys(stringValue: "flipH")!) }
         if flipV { try c.encode(true, forKey: CodingKeys(stringValue: "flipV")!) }
+        if monochrome { try c.encode(true, forKey: CodingKeys(stringValue: "monochrome")!) }
         if blurMode != .subject {
             try c.encode(blurMode.rawValue, forKey: CodingKeys(stringValue: "blurMode")!)
         }
@@ -233,6 +247,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
     case sharpness, noiseReduction
     case blurF, relight, maskReach, focusDepth
     case straighten, skewV, skewH
+    case shadowStrength, shadowHue, midStrength, midHue, highlightStrength, highlightHue, gradeBalance
 
     var id: String { rawValue }
 
@@ -247,6 +262,13 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .straighten: "Straighten"
         case .skewV: "Skew V"
         case .skewH: "Skew H"
+        case .shadowStrength: "Shadow strength"
+        case .shadowHue: "Shadow hue"
+        case .midStrength: "Mid strength"
+        case .midHue: "Mid hue"
+        case .highlightStrength: "Highlight strength"
+        case .highlightHue: "Highlight hue"
+        case .gradeBalance: "Balance"
         default: rawValue.prefix(1).uppercased() + rawValue.dropFirst()
         }
     }
@@ -258,6 +280,8 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .skewV, .skewH: -30...30
         case .vignette, .sharpness, .noiseReduction: 0...100
         case .blurF, .focusDepth: 0...1
+        case .shadowStrength, .midStrength, .highlightStrength: 0...100
+        case .shadowHue, .midHue, .highlightHue: 0...360
         default: -100...100
         }
     }
@@ -310,6 +334,13 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .straighten: \.straighten
         case .skewV: \.skewV
         case .skewH: \.skewH
+        case .shadowStrength: \.shadowStrength
+        case .shadowHue: \.shadowHue
+        case .midStrength: \.midStrength
+        case .midHue: \.midHue
+        case .highlightStrength: \.highlightStrength
+        case .highlightHue: \.highlightHue
+        case .gradeBalance: \.gradeBalance
         }
     }
 
@@ -326,6 +357,8 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .focusDepth: v <= 0.02 ? "near" : v >= 0.98 ? "far" : String(format: "%.0f%%", v * 100)
         case .straighten: String(format: "%.1f°", v)
         case .skewV, .skewH: v == 0 ? "0" : String(format: "%+.0f", v)
+        case .shadowStrength, .midStrength, .highlightStrength: String(format: "%.0f", v)
+        case .shadowHue, .midHue, .highlightHue: String(format: "%.0f°", v)
         default: v == 0 ? "0" : String(format: "%+.0f", v)
         }
     }

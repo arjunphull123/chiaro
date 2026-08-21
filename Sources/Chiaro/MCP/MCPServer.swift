@@ -228,6 +228,10 @@ final class MCPServer {
             "focusDepth": "Background blur",
             "blurMode": "Background blur", "depthBlur": "Background blur",
             "locals": "Masking",
+            "shadowStrength": "Grading", "shadowHue": "Grading",
+            "midStrength": "Grading", "midHue": "Grading",
+            "highlightStrength": "Grading", "highlightHue": "Grading",
+            "gradeBalance": "Grading",
         ]
         let sections = Set(keys.compactMap { map[$0] })
         guard !sections.isEmpty else { return }

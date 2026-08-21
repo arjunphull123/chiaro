@@ -57,6 +57,12 @@ struct RailView: View {
                     presetsSection
                     colorMixSection
                     section(
+                        "Grading",
+                        [.shadowStrength, .shadowHue, .midStrength, .midHue,
+                         .highlightStrength, .highlightHue, .gradeBalance],
+                        help: "Colour by tonal zone — a hue for shadows, midtones, and highlights"
+                    )
+                    section(
                         "Light", [.exposure, .contrast, .highlights, .shadows, .whites, .blacks],
                         help: "Brightness and tonal balance"
                     )
@@ -667,7 +673,7 @@ struct RailView: View {
         }
     }
 
-    static let allSections = ["Presets", "Color mix", "Light", "Background blur", "Curve", "Color", "Masking", "Effects", "Detail"]
+    static let allSections = ["Presets", "Color mix", "Grading", "Light", "Background blur", "Curve", "Color", "Masking", "Effects", "Detail"]
     @AppStorage("collapsedSections") private var collapsedRaw = RailView.allSections.joined(separator: ",")
 
     private func isCollapsed(_ title: String) -> Bool {
