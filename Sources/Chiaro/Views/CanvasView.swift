@@ -96,24 +96,24 @@ struct CanvasView: View {
                 .padding(.bottom, 78)
                 .padding(.trailing, Theme.railWidth)
             }
-            // Bottom left, beside the nav pill rather than over the photo's top
-            // corner where it crowded the toolbar. A bare TipView draws no
-            // surface of its own, so it needs the same glass treatment as every
-            // other transient here (ADR 0004) or it is illegible over a bright
-            // frame.
+            // Only the fine-tune tip floats here, and only while something is
+            // armed, so it always has a referent: the dial it describes is on
+            // screen beside it. The scrub tip that used to sit here said what
+            // the rail's own permanent hint already says, in a place with
+            // nothing to point at.
+            //
+            // A bare TipView draws no surface of its own, so it needs the same
+            // glass treatment as every other transient here (ADR 0004) or it is
+            // illegible over a bright frame.
             .overlay(alignment: .bottomLeading) {
-                VStack(alignment: .leading, spacing: 8) {
-                    TipView(ScrubTip())
+                if model.armed != nil || model.armedLocal != nil {
+                    TipView(FineTuneTip())
                         .chiaroGlass(cornerRadius: 12)
-                    if model.armed != nil || model.armedLocal != nil {
-                        TipView(FineTuneTip())
-                            .chiaroGlass(cornerRadius: 12)
-                    }
+                        .frame(maxWidth: 320)
+                        .padding(.bottom, 16)
+                        .padding(.leading, 16)
+                        .padding(.trailing, Theme.railWidth)
                 }
-                .frame(maxWidth: 320)
-                .padding(.bottom, 16)
-                .padding(.leading, 16)
-                .padding(.trailing, Theme.railWidth)
             }
             .onChange(of: model.pixelZoomRequested) {
                 guard model.pixelZoomRequested else { return }

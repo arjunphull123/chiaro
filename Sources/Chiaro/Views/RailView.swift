@@ -783,7 +783,7 @@ struct RailView: View {
     }
 
     private var scrubHint: some View {
-        Text("Click a control, then drag on the photo or the dial — hold \\ to compare with the original")
+        Text("Click a control, then drag on the photo or the dial. Hold \\ to compare with the original")
             .font(Theme.ui(10))
             .foregroundStyle(Theme.ink3)
             .fixedSize(horizontal: false, vertical: true)

@@ -2,14 +2,9 @@ import TipKit
 
 /// Once-only onboarding tips (configured in ChiaroApp.init).
 
-/// First editor open: the scrub gesture is the app's core interaction and
-/// invisible without a hint.
-struct ScrubTip: Tip {
-    var title: Text { Text("Scrub to edit") }
-    var message: Text? { Text("Click a value in the rail to arm it, then drag across the photo to adjust") }
-    var image: Image? { Image(systemName: "hand.draw") }
-    var options: [any TipOption] { MaxDisplayCount(1) }
-}
+// The scrub gesture is the app's core interaction, but it is taught by the
+// rail's own always-present hint rather than by a tip: a floating card on the
+// canvas had nothing to point at and repeated the same sentence.
 
 /// First time a parameter is armed: the dial responds to sideways scroll.
 struct FineTuneTip: Tip {
@@ -33,7 +28,7 @@ struct AgentTip: Tip {
     }
 
     var title: Text { Text("Bring your agent") }
-    var message: Text? { Text("Claude or any MCP agent can edit alongside you — click to connect") }
+    var message: Text? { Text("Claude or any MCP agent can edit alongside you. Click to connect") }
     var image: Image? { Image(systemName: "sparkles") }
     var options: [any TipOption] { MaxDisplayCount(1) }
 }
