@@ -175,6 +175,8 @@ struct RailView: View {
                 modePill("Depth", .depth)
             }
             .padding(.bottom, 4)
+            depthSceneAccess
+                .padding(.bottom, 6)
             if model.edit.blurMode == .depth {
                 depthContent
             } else {
@@ -202,8 +204,11 @@ struct RailView: View {
         }
     }
 
-    /// Depth-map blur: the model is an opt-in 50 MB download on first use.
-    @ViewBuilder private var depthContent: some View {
+    /// Viewing the depth composition is inspection, available in any blur
+    /// mode — it never touches the edit on its own (only grabbing the focus
+    /// plane inside it, or picking Depth above, commits to depth-mode blur).
+    /// The model itself is an opt-in 50 MB download on first use.
+    @ViewBuilder private var depthSceneAccess: some View {
         switch DepthModelStore.shared.availability {
         case .missing:
             Button("Download depth model (50 MB)") {
@@ -211,7 +216,7 @@ struct RailView: View {
             }
             .buttonStyle(OutlineButtonStyle())
             .clickCursor()
-            .help("Apple's Depth Anything V2, run on-device — enables focus-plane blur")
+            .help("Apple's Depth Anything V2, run on-device — enables focus-plane blur and the 3D scene")
         case .downloading(let progress):
             HStack(spacing: 7) {
                 ProgressView(value: progress)
@@ -263,8 +268,13 @@ struct RailView: View {
             }
             .buttonStyle(.plain)
             .clickCursor()
-            .padding(.bottom, 6)
             .help("See the scene in 3D — drag to orbit, grab a handle to move a focus plane")
+        }
+    }
+
+    /// Depth-map blur controls, once the model is ready and Depth is selected.
+    @ViewBuilder private var depthContent: some View {
+        if case .ready = DepthModelStore.shared.availability {
             AdjustmentRow(parameter: .blurF, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
             AdjustmentRow(parameter: .focusDepth, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)
             AdjustmentRow(parameter: .relight, edit: $model.edit, armed: $model.armed, hovered: $model.hovered)

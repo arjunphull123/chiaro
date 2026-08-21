@@ -26,7 +26,7 @@ struct CanvasView: View {
             let fitRegion = CGSize(width: geo.size.width - Theme.railWidth, height: geo.size.height)
             ZStack {
                 Color.black.opacity(0.001) // hit target for gestures on empty canvas
-                if model.depthSceneVisible && model.edit.blurMode == .depth {
+                if model.depthSceneVisible {
                     DepthSceneView(
                         model: model, fitFraction: fitFraction(in: fitRegion),
                         yaw: model.sceneYaw, pitch: model.scenePitch,

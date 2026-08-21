@@ -444,7 +444,12 @@ struct DepthSceneView: NSViewRepresentable {
                     .ignoreHiddenNodes: false,
                 ])
                 let names = hits.compactMap(\.node.name)
-                dragTarget = names.contains(where: { $0.hasPrefix("edge-handle") }) ? .plane : .orbit
+                let grabbedHandle = names.contains(where: { $0.hasPrefix("edge-handle") })
+                dragTarget = grabbedHandle ? .plane : .orbit
+                // Orbiting is inspection; grabbing the plane is a real focus
+                // edit, so it's what commits to depth-mode blur (bug: merely
+                // viewing the scene must never do that).
+                if grabbedHandle { model.setBlurMode(.depth) }
             case .changed:
                 switch dragTarget {
                 case .orbit:
