@@ -7,6 +7,13 @@ struct LibraryView: View {
     let onExport: () -> Void
 
     @FocusState private var searchFocused: Bool
+    /// Whether the field is open independent of focus: sets true the moment
+    /// focus lands (any path) and false once focus is given up on an empty
+    /// query. Kept separate from `searchFocused` itself — gating the field's
+    /// own presence on the very focus state it owns is what let a click-away
+    /// race focus and disappearance in the same update; this settles one
+    /// tick after focus actually changes instead.
+    @State private var searchOpen = false
     /// Measured header width, so the search field can expand past its
     /// icon-only default once there's comfortable room for it — Finder's
     /// own toolbar search behaviour.
@@ -448,10 +455,11 @@ struct LibraryView: View {
 
     /// Finder collapses its toolbar search to a plain icon and only expands
     /// it into a field on click, or once the window is wide enough to spare
-    /// the room. Focus or live query text always wins, so releasing focus on
-    /// an empty query collapses it back on its own.
+    /// the room. Live query text always wins, and `searchOpen` mirrors focus
+    /// once the field exists — so releasing focus on an empty query collapses
+    /// it back on its own.
     private var searchExpanded: Bool {
-        searchFocused || !library.searchText.isEmpty || headerWidth > Self.searchExpansionWidth
+        searchOpen || !library.searchText.isEmpty || headerWidth > Self.searchExpansionWidth
     }
 
     @ViewBuilder private var searchField: some View {
@@ -464,7 +472,9 @@ struct LibraryView: View {
 
     private var collapsedSearchButton: some View {
         Button {
-            searchFocused = true
+            // Open first, focus once the field actually exists — asking a
+            // not-yet-rendered TextField to focus is a request SwiftUI drops.
+            searchOpen = true
         } label: {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 11, weight: .medium))
@@ -487,6 +497,16 @@ struct LibraryView: View {
                 .font(Theme.ui(11.5))
                 .foregroundStyle(Theme.ink)
                 .focused($searchFocused)
+                .onAppear {
+                    if searchOpen { searchFocused = true }
+                }
+                .onChange(of: searchFocused) { _, focused in
+                    if focused {
+                        searchOpen = true
+                    } else if library.searchText.isEmpty {
+                        searchOpen = false
+                    }
+                }
                 .onKeyPress(.escape) {
                     library.searchText = ""
                     searchFocused = false
