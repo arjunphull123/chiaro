@@ -237,21 +237,27 @@ struct LibraryView: View {
         .help(help)
     }
 
+    /// A single selection is already shown by the tile's border — the count
+    /// only earns its place once there's a set worth naming.
+    private var selectionSuffix: String {
+        library.selection.count >= 2 ? " · \(library.selection.count) selected" : ""
+    }
+
     /// The RAW tally only earns its place in a genuinely mixed folder — "22 RAW"
     /// out of 22, or "0 RAW" out of 6, is just the photo count restated.
     private var countLabel: String {
-        if library.filterRAW { return "\(visiblePhotos.count) photos" }
+        if library.filterRAW { return "\(visiblePhotos.count) photos\(selectionSuffix)" }
         let total = library.photos.count
         let raws = library.photos.filter(\.isRAW).count
-        guard raws > 0, raws < total else { return "\(total) photos" }
-        return "\(total) photos · \(raws) RAW"
+        guard raws > 0, raws < total else { return "\(total) photos\(selectionSuffix)" }
+        return "\(total) photos · \(raws) RAW\(selectionSuffix)"
     }
 
     /// Sheds the RAW tally, then itself, rather than truncating to "96 photo…".
     private var photoCount: some View {
         ViewThatFits {
             countText(countLabel)
-            countText("\(library.photos.count) photos")
+            countText("\(library.photos.count) photos\(selectionSuffix)")
             EmptyView()
         }
     }
