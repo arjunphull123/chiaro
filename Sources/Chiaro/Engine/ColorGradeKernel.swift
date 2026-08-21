@@ -19,7 +19,13 @@ enum ColorGradeKernel {
         ]) ?? image
     }
 
-    private static let kernel = CIColorKernel(source: source)
+    /// A nil kernel means the CIKL source failed to compile, which would make
+    /// grading a silent no-op forever. Trip loudly in debug instead.
+    private static let kernel: CIColorKernel? = {
+        let k = CIColorKernel(source: source)
+        assert(k != nil, "ColorGradeKernel source failed to compile")
+        return k
+    }()
 
     private static let source = """
     vec3 hueColor(float h) {
@@ -33,13 +39,23 @@ enum ColorGradeKernel {
         return vec3(1.0, 0.0, x);
     }
 
-    kernel vec4 grade(sample s, float shadowAmt, float shadowHue, float midAmt, float midHue, float highlightAmt, float highlightHue, float balance) {
+    /// A hue as a zero-luminance chroma vector: adding it shifts colour without
+    /// touching brightness, and without overwriting the pixel's own hue the way
+    /// blending toward a full-chroma colour would.
+    vec3 chromaOf(float degrees, vec3 lumaWeights) {
+        vec3 h = hueColor(degrees / 360.0);
+        return h - vec3(dot(h, lumaWeights));
+    }
+
+    kernel vec4 grade(__sample s, float shadowAmt, float shadowHue, float midAmt, float midHue, float highlightAmt, float highlightHue, float balance) {
         vec3 c = s.rgb;
         vec3 lumaWeights = vec3(0.2126, 0.7152, 0.0722);
         float L = dot(c, lumaWeights);
 
         float shift = balance * 0.2;
-        float sigma = 0.4;
+        // Narrow enough that a shadow grade leaves highlights alone: at 0.4 the
+        // bells overlap so far that midtones take a quarter of the shadow tint.
+        float sigma = 0.18;
         float dS = L - shift;
         float dM = L - 0.5;
         float dH = L - 1.0 - shift;
@@ -51,20 +67,11 @@ enum ColorGradeKernel {
         wM = wM / wSum;
         wH = wH / wSum;
 
-        float aS = wS * shadowAmt;
-        float aM = wM * midAmt;
-        float aH = wH * highlightAmt;
-        float tintTotal = aS + aM + aH;
-        float total = clamp(tintTotal, 0.0, 1.0);
+        vec3 chroma = chromaOf(shadowHue, lumaWeights) * (wS * shadowAmt)
+                    + chromaOf(midHue, lumaWeights) * (wM * midAmt)
+                    + chromaOf(highlightHue, lumaWeights) * (wH * highlightAmt);
 
-        vec3 tint = c;
-        if (tintTotal > 0.0001) {
-            tint = (hueColor(shadowHue / 360.0) * aS + hueColor(midHue / 360.0) * aM + hueColor(highlightHue / 360.0) * aH) / tintTotal;
-        }
-
-        vec3 blended = mix(c, tint, total);
-        float newL = dot(blended, lumaWeights);
-        vec3 result = clamp(blended + vec3(L - newL), 0.0, 1.0);
+        vec3 result = clamp(c + chroma * 0.6, 0.0, 1.0);
         return vec4(result, s.a);
     }
     """
