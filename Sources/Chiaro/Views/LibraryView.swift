@@ -64,6 +64,7 @@ struct LibraryView: View {
                 listColumnHeader
             }
             galleryScroll
+            footer
         }
         // Clicking any part of the library that isn't itself a control gives
         // up the search field's focus, the way Esc already does. Behind
@@ -239,37 +240,48 @@ struct LibraryView: View {
         .help(help)
     }
 
-    /// A single selection is already shown by the tile's border — the count
-    /// only earns its place once there's a set worth naming.
-    private var selectionSuffix: String {
-        library.selection.count >= 2 ? " · \(library.selection.count) selected" : ""
+    private func footerRun(_ s: String, mono: Bool) -> AttributedString {
+        var run = AttributedString(s)
+        run.font = mono ? Theme.mono(10) : Theme.ui(10.5)
+        run.foregroundColor = Theme.ink3
+        return run
     }
 
-    /// The RAW tally only earns its place in a genuinely mixed folder — "22 RAW"
-    /// out of 22, or "0 RAW" out of 6, is just the photo count restated.
-    private var countLabel: String {
-        if library.filterRAW { return "\(visiblePhotos.count) photos\(selectionSuffix)" }
+    /// Finder puts the item count in a status bar, not the toolbar — the
+    /// counts are data (Geist Mono), the words around them aren't. The RAW
+    /// tally only earns its place in a genuinely mixed folder — "22 RAW" out
+    /// of 22, or "0 RAW" out of 6, is just the photo count restated. A single
+    /// selection is already shown by the tile's border — the count only
+    /// earns its place once there's a set worth naming.
+    private var footerCount: Text {
+        let filtering = library.filterRAW
         let total = library.photos.count
-        let raws = library.photos.filter(\.isRAW).count
-        guard raws > 0, raws < total else { return "\(total) photos\(selectionSuffix)" }
-        return "\(total) photos · \(raws) RAW\(selectionSuffix)"
-    }
-
-    /// Sheds the RAW tally, then itself, rather than truncating to "96 photo…".
-    private var photoCount: some View {
-        ViewThatFits {
-            countText(countLabel)
-            countText("\(library.photos.count) photos\(selectionSuffix)")
-            EmptyView()
+        var text = footerRun("\(filtering ? visiblePhotos.count : total)", mono: true) + footerRun(" photos", mono: false)
+        if !filtering {
+            let raws = library.photos.filter(\.isRAW).count
+            if raws > 0, raws < total {
+                text += footerRun(" · ", mono: false) + footerRun("\(raws)", mono: true) + footerRun(" RAW", mono: false)
+            }
         }
+        if library.selection.count >= 2 {
+            text += footerRun(" · ", mono: false) + footerRun("\(library.selection.count)", mono: true) + footerRun(" selected", mono: false)
+        }
+        return Text(text)
     }
 
-    private func countText(_ string: String) -> some View {
-        Text(string)
-            .font(Theme.mono(10))
-            .foregroundStyle(Theme.ink3)
-            .lineLimit(1)
-            .fixedSize()
+    /// Slim status bar, Finder-style: the photo count lives here, not in the
+    /// already-full header.
+    private var footer: some View {
+        HStack {
+            footerCount.lineLimit(1)
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 24)
+        .background(
+            Rectangle().fill(Theme.panel.opacity(0.4))
+                .overlay(alignment: .top) { Theme.hairline.frame(height: 1) }
+        )
     }
 
     /// Pinned frosted header: title, zoom slider, and the real actions.
@@ -296,14 +308,10 @@ struct LibraryView: View {
             .buttonStyle(.plain)
             .clickCursor()
             .help("Back to the start screen (⌘W)")
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(library.folderName)
-                    .font(Theme.ui(18, .semibold))
-                    .foregroundStyle(Theme.ink)
-                    .lineLimit(1) // truncates on a long name; never wraps
-                photoCount
-                    .layoutPriority(-1) // the count yields before the folder name does
-            }
+            Text(library.folderName)
+                .font(Theme.ui(18, .semibold))
+                .foregroundStyle(Theme.ink)
+                .lineLimit(1) // truncates on a long name; never wraps
             Spacer()
             // Same presence pill and live intent as the edit rail (ADR 0008) —
             // a folder-wide pass happens with the library open, not the editor.
