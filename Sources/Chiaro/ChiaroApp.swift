@@ -259,6 +259,10 @@ struct ChiaroApp: App {
                 .frame(minWidth: 1080, minHeight: 700)
         }
         .windowStyle(.hiddenTitleBar)
+        // Without this the window resizes past the content's minWidth and the
+        // layout overflows instead of reflowing: the rail is a fixed 268 and the
+        // toolbar cannot compress, so both edges get clipped.
+        .windowResizability(.contentMinSize)
         .commands {
             CommandGroup(after: .appInfo) {
                 Button("Check for updates…") { Updater.checkForUpdates() }
