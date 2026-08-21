@@ -19,9 +19,20 @@ enum ColorGradeCube {
     static func apply(_ image: CIImage, edit: EditState) -> CIImage {
         guard edit.shadowStrength != 0 || edit.midStrength != 0 || edit.highlightStrength != 0
         else { return image }
-        return image.applyingFilter("CIColorCube", parameters: [
+        // WithColorSpace, matching HSLCube and the tone curve: the cube is
+        // authored against gamma-encoded values, and the CIContext works in
+        // extended-linear P3 (RawEngine), so the space has to be declared or
+        // Core Image feeds it linear light. This file was the one LUT in the
+        // pipeline that omitted it. Untagged, the zone bells classified by
+        // linear luminance (highlights only engaged above ~91% display), the
+        // additive chroma landed with wildly different force per zone, and
+        // `protect` measured saturation in linear too, discarding around half
+        // the tint on a warm highlight. Highlight grading was ~15x weaker than
+        // mid at the same strength.
+        return image.applyingFilter("CIColorCubeWithColorSpace", parameters: [
             "inputCubeDimension": dimension,
             "inputCubeData": data(for: edit),
+            "inputColorSpace": CGColorSpace(name: CGColorSpace.displayP3)!,
         ])
     }
 
@@ -96,11 +107,12 @@ enum ColorGradeCube {
         balance: Double, chromaS: (Double, Double, Double), chromaM: (Double, Double, Double),
         chromaH: (Double, Double, Double)
     ) -> (Double, Double, Double) {
+        // `c` is gamma-encoded here, per the colour space declared in apply().
         let l = dot(c, lumaWeights)
 
         let shift = balance * 0.2
-        // Narrow enough that a shadow grade leaves highlights alone: at 0.4 the
-        // bells overlap so far that midtones take a quarter of the shadow tint.
+        // Puts the crossovers at 0.25 and 0.75, so each zone owns about a
+        // third of the range and peaks at its own name.
         let sigma = 0.18
         let dS = l - shift, dM = l - 0.5, dH = l - 1.0 - shift
         var wS = exp(-(dS * dS) / (2.0 * sigma * sigma))

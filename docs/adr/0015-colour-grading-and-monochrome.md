@@ -47,6 +47,18 @@ CIKL has been deprecated since macOS 10.14, and its C-like source silently
 failed to compile from a one-character typo, doing nothing for as long as it
 shipped. One pass, Metal-backed, no new dependency.
 
+The cube must be applied with `CIColorCubeWithColorSpace` and an explicit
+`displayP3`, as `HSLCube` and the tone curve already do. The context works in
+extended-linear P3, so an untagged cube is fed linear light while its contents
+were authored against gamma-encoded values. That shipped, and it broke the
+feature three ways at once rather than one: the zone bells classified by linear
+luminance, so highlights only engaged above roughly 91% display; the additive
+chroma landed far harder on dark pixels than bright ones, so equal strengths
+meant unequal force; and the saturation-protection term measured colour in
+linear too, discarding about half the tint on a warm highlight. Both of this
+feature's defects were a declaration the code failed to make and the compiler
+had no reason to check. Prefer measuring a LUT's actual output over reading it.
+
 **Monochrome as an explicit mode, not a pipeline reorder.** Add
 `monochrome: Bool`. When true, the pipeline converts to grey *using the HSL
 luminance values as channel weights*, before global saturation applies. The
