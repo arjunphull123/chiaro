@@ -29,6 +29,7 @@ enum StatsSampler {
         var lumaSum = 0.0
         var saturationSum = 0.0, saturationCount = 0.0
         var castR = 0.0, castG = 0.0, castB = 0.0, castCount = 0.0
+        var grayR = 0.0, grayG = 0.0, grayB = 0.0, grayCount = 0.0
         let total = Double(w * h)
 
         for i in 0..<(w * h) {
@@ -55,9 +56,20 @@ enum StatsSampler {
             if luma > 0.02 { saturationSum += saturation; saturationCount += 1 }
             // Gray-world sample, same pool AutoEnhance uses for white balance:
             // low-saturation midtones should be neutral, so their average reveals
-            // a cast and its direction.
-            if saturation < 0.15, luma > 0.25, luma < 0.75 {
+            // a cast and its direction. Threshold is 0.30, not tighter: a strong
+            // cast pushes formerly-neutral pixels past a tight threshold, leaving
+            // only pixels that are low-saturation *because of* the shift — the
+            // sample gets more confident exactly as the reading gets more wrong.
+            let midLuma = luma > 0.25 && luma < 0.75
+            if saturation < 0.30, midLuma {
                 castR += r; castG += g; castB += b; castCount += 1
+            }
+            // Unfiltered companion: same midtone window, no saturation gate, so
+            // it can't self-select away under a strong cast. Trade-off is the
+            // opposite one: a genuinely saturated scene (red wall, foliage) reads
+            // as cast when it isn't.
+            if midLuma {
+                grayR += r; grayG += g; grayB += b; grayCount += 1
             }
         }
 
@@ -96,6 +108,12 @@ enum StatsSampler {
                 "g": frac(castCount > 0 ? castG / castCount : 0),
                 "b": frac(castCount > 0 ? castB / castCount : 0),
                 "pixelCount": Int(castCount),
+            ],
+            "grayWorld": [
+                "r": frac(grayCount > 0 ? grayR / grayCount : 0),
+                "g": frac(grayCount > 0 ? grayG / grayCount : 0),
+                "b": frac(grayCount > 0 ? grayB / grayCount : 0),
+                "pixelCount": Int(grayCount),
             ],
             "histogram": histogram,
         ]
