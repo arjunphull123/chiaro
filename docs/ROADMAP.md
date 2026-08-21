@@ -49,3 +49,44 @@ cut and why.
   Positioning stands: AI-driven editing, not generative content
 - Auto-culling: not an in-app feature — an agent workflow over MCP
   (get_preview + set_starred; agent picks the keepers)
+
+## Tier 4 — Grading (in progress, ADR 0015)
+
+Both were found by auditing the render pipeline while writing the editing
+skill, not by feature comparison.
+
+- [ ] Colour grading by tonal zone: shadow/mid/highlight hue and strength plus
+      balance, as scalar rail rows rather than wheels, since a wheel is a
+      two-dimensional control and ADR 0005 committed to one value at a time
+- [ ] Monochrome mixer: converts using the colour mixer's per-band luminance as
+      channel weights, which the old pipeline order made unreachable
+- [ ] RAW decode parameters: `CIRAWFilter` already exposes `detailAmount`,
+      `moireReductionAmount` and split luminance/colour noise reduction, and we
+      set none of them. Decode-time detail and noise handling beats the
+      post-demosaic filters we ship today, and moiré is unfixable afterwards
+
+## Backlog (post-1.0)
+
+Ranked, with the reasoning that put them here rather than in a tier.
+
+- **Luminance-range masking on existing locals.** Two scalars added to a local,
+  so "only the shadows inside this radial" becomes expressible. Composes with
+  the masks already built instead of adding a concept, and stays agent-drivable.
+  The highest-value item left.
+- **Grain.** One or two values in Effects. The missing piece for a film look;
+  the skill currently has to admit it cannot deliver one.
+- **Healing and clone.** Wanted by every photographer, and a real gap. Note
+  ADR 0012 already cut generative inpainting on quality evidence, so this means
+  classical patch-based healing, not a model.
+
+Considered and deliberately not planned:
+
+- **Freehand brush masks.** A painted mask is a raster, so it either bloats the
+  sidecar with base64 or breaks ADR 0002's one-readable-file model. It is also
+  the least agent-authorable control in photography, which cuts directly
+  against what this app is for. Would need an ADR overturning 0002.
+- **Per-channel RGB curves.** Duplicates Tier 4's zone grading with a
+  two-dimensional control per channel, and would mean maintaining two grading
+  systems.
+- **Camera calibration profiles.** Apple's RAW engine exposes no colour-matrix
+  override, so there is nothing to build against.
