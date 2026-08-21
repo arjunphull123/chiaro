@@ -1,7 +1,7 @@
 # 0015 — Colour grading by tonal zone, and a real monochrome mixer
 
 ## Status
-Proposed
+Accepted
 
 ## Context
 Two gaps surfaced while writing the editing skill (`.claude/skills/chiaro/`),
