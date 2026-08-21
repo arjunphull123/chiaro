@@ -300,6 +300,13 @@ struct RailView: View {
         VStack(alignment: .leading, spacing: 6) {
             sectionLabel("Color mix", help: "Per-hue adjustments — pick a band, then shift its hue, saturation, and luminance")
             if !isCollapsed("Color mix") {
+            // Mode chip first, like Background blur's Subject/Person/Depth: it
+            // governs the section, and sitting below the swatches split them
+            // from the rows they drive.
+            Chip(title: "Monochrome", selected: model.edit.monochrome) {
+                model.edit.monochrome.toggle()
+            }
+            .padding(.bottom, 4)
             HStack(spacing: 8) {
                 Spacer(minLength: 0)
                 ForEach(0..<8, id: \.self) { i in
@@ -323,10 +330,6 @@ struct RailView: View {
                     .help(HSLBand.names[i].prefix(1).uppercased() + HSLBand.names[i].dropFirst())
                 }
                 Spacer(minLength: 0)
-            }
-            .padding(.bottom, 2)
-            Chip(title: "Monochrome", selected: model.edit.monochrome) {
-                model.edit.monochrome.toggle()
             }
             .padding(.bottom, 2)
             if !model.edit.monochrome {
