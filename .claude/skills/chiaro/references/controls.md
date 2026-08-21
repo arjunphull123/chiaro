@@ -89,6 +89,10 @@ shapes contrast, not colour.
   the low end down as hard as a negative `blacks`. When you inherit a curve and
   the shadows are heavy, look here.
 
+You send curve points as `[[x, y], ...]`, but `get_edit` returns them as
+`[{"x": …, "y": …}, ...]`, which is also how the sidecar stores them. Same
+data, two shapes; do not treat the difference as a mistake.
+
 ## The colour mixer
 
 `hsl` takes a partial map of band names to `{h, s, l}`, each -100 to 100:

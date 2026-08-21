@@ -53,6 +53,12 @@ work. Write it as a photographer would: "lifting the shadows off the floor",
 **Stop after one refinement.** Two passes is a finished photo. Four passes is
 mush, and you will not be able to tell which move did the damage.
 
+Two things do not count against that budget. A recipe with a documented tone
+phase and grade phase spends two calls by design, so the refinement comes after
+both. And correcting a result that is genuinely wrong, not merely improvable,
+is always allowed: shipping a visible fault to respect a counting rule is the
+wrong trade. What the budget forbids is polishing.
+
 ## Verify the diagnosis, obey the intent
 
 A request usually contains both. "DSC03055 is flat and gray, give it a cinematic
@@ -90,6 +96,14 @@ fix is vibrance. Reaching for saturation on a flat photo is the single most
 common way to produce something that looks like a preset. A photo can be both,
 and then it needs both, in that order.
 
+**One apparent contradiction, resolved.** Fixing flatness means establishing a
+black point, and `blacks` goes down to do it. Several looks then *lift* blacks
+on purpose, for a matte film floor. Both are right, and the order settles it:
+set the floor first while correcting, then let the look lift it if that is the
+look. On a photo that is flat and being graded, do not do both with `blacks`;
+correct with contrast and the curve, and let the recipe's curve carry the matte
+lift.
+
 ## The order of moves
 
 Work in this order. It matches the order Chiaro's render pipeline applies
@@ -110,8 +124,10 @@ on a lie.
 
 Each of these has produced a bad photo in practice.
 
-- **Never send more than four values in one `set_edit`.** You cannot attribute
-  the damage.
+- **Never improvise more than four values in one `set_edit`.** You cannot
+  attribute the damage. A named recipe from `references/looks.md` is one
+  coherent unit and may be sent whole; the cap governs values you are guessing
+  at, not a recipe you are following.
 - **Never set `contrast`, `clarity`, `vibrance` and `saturation` in the same
   pass.** All four increase apparent saturation. Choose one, occasionally two.
 - **When shadows are too heavy, check three controls, not one.** `blacks`,

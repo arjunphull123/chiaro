@@ -42,31 +42,70 @@ object, use the mixer.
 Teal in the shadows, warmth in the highlights, over a lifted matte black point
 and a gentle S-curve. Two passes: tone, look, then the grade.
 
-Tone first:
+Tone first. The curve's lifted toe is the matte floor, so `blacks` stays out of
+this: on a flat photo the contrast and curve set the floor, and adding a
+`blacks` lift here fights that.
 
 ```json
 {
   "contrast": 11,
   "shadows": 20,
-  "blacks": 6,
   "highlights": -12,
   "curve": [[0, 0.02], [0.22, 0.25], [0.78, 0.82], [1, 1]]
 }
 ```
 
-Then the grade:
+Then the grade. `gradeBalance` is part of the recipe, not an optional refinement:
 
 ```json
 {
-  "shadowHue": 195, "shadowStrength": 30,
-  "highlightHue": 35, "highlightStrength": 22
+  "shadowHue": 195, "shadowStrength": 28,
+  "highlightHue": 35, "highlightStrength": 20,
+  "gradeBalance": -25
 }
 ```
 
-Strength is where taste lives. Around 20 to 35 reads as a quality of light.
+**Set `gradeBalance` from the subject, before you look.** Start at -25 whenever
+broad evenly-lit mid-tone surfaces dominate the frame: architecture, overcast
+scenes, snow, a pale wall behind a subject. Those frames have a lot of pixels
+sitting in the middle of the range, and at 0 the shadow tint reaches them and
+casts the whole photograph. Leave it at 0 only for genuinely high-contrast
+frames with real darkness in them, such as a night street or a lit subject in a
+dark room.
+
+Strength is where taste lives. Around 15 to 30 reads as a quality of light.
 Past about 50 the shadows read as cartoon teal and the viewer sees technique
-instead of mood. Move `gradeBalance` negative to pull the crossover down so
-only the deepest tones take the cool cast.
+instead of mood.
+
+**When this look is wrong.** Teal and orange exists to separate a warm subject
+from a cool surround, which is why it flatters skin at dusk. On a flat overcast
+scene with no warm subject there is nothing for the warmth to land on, and all
+the grade can do is cool the greys. Say so and offer the alternative below
+rather than delivering a joyless teal version of a grey day.
+
+## Overcast
+
+For a grey day: give it the light it lacked instead of a mood it never had.
+Warmth goes in the highlights only, the shadows stay honest, and the colour
+already in the frame does the work. This is usually the right answer for
+European streets, architecture under cloud, and anything shot in flat light.
+
+Tone first, establishing a real floor since these frames are almost always
+flat rather than dull:
+
+```json
+{"contrast": 12, "blacks": -8, "shadows": 15, "highlights": -10, "vibrance": 16}
+```
+
+Then warmth in the light, with the shadows left alone:
+
+```json
+{"highlightHue": 40, "highlightStrength": 18, "shadowStrength": 0}
+```
+
+If the frame has strong local colour, awnings, doors, foliage, bring those up
+with the mixer rather than raising global saturation, which would also push the
+grey.
 
 ## Film
 
