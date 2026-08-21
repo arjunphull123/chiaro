@@ -356,7 +356,7 @@ final class MCPServer {
         ],
         [
             "name": "apply_preset",
-            "description": "Apply a preset to a photo by name (see list_presets). Renders live if the photo is open.",
+            "description": "Apply a preset to a photo by name (see list_presets). Opens the photo in the editor (without bringing the app forward) and renders live.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -380,7 +380,7 @@ final class MCPServer {
         ],
         [
             "name": "set_edit",
-            "description": "Set adjustment values on a photo. Only supplied parameters change. If the photo is open in the editor, the change renders live. Values outside a parameter's range are clamped.",
+            "description": "Set adjustment values on a photo. Only supplied parameters change. Opens the photo in the editor (without bringing the app forward) and renders live. Values outside a parameter's range are clamped.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -498,14 +498,17 @@ final class MCPServer {
                   let preset = PresetStore.shared.all.first(where: { $0.name == presetName }) else {
                 throw ToolError("unknown preset; valid: \(PresetStore.shared.all.map(\.name).joined(separator: ", "))")
             }
-            library.noteAgentActivity(intent: "applying \(presetName)", photo: p.url)
+            let target: Photo
             if let editor = library.activeEditor, editor.photo.url == p.url {
                 editor.edit = preset.applied(to: editor.edit)
+                target = p
             } else {
                 p.edit = preset.applied(to: p.edit)
-                Sidecar.write(for: p)
+                target = library.edit(p) // shows the photo in the editor, without activating the app
+                Sidecar.write(for: target)
             }
-            return try text(["applied": presetName, "name": p.name])
+            library.noteAgentActivity(intent: "applying \(presetName)", photo: target.url)
+            return try text(["applied": presetName, "name": target.name])
         case "set_starred":
             let p = try photo(args)
             guard let starred = args["starred"] as? Bool else {
@@ -613,21 +616,24 @@ final class MCPServer {
                 }
                 parameter.set(number, in: &edit)
             }
-            library.noteAgentActivity(intent: args["intent"] as? String, photo: p.url)
+            Self.revealSections(for: Array(params.keys))
+            let target: Photo
             if let editor = library.activeEditor, editor.photo.url == p.url {
-                Self.revealSections(for: Array(params.keys))
                 editor.edit = edit // renders live in the UI
+                target = p
             } else {
                 p.edit = edit
-                Sidecar.write(for: p)
+                target = library.edit(p) // shows the photo in the editor, without activating the app
+                Sidecar.write(for: target)
             }
-            return try text(["applied": true, "name": p.name])
+            library.noteAgentActivity(intent: args["intent"] as? String, photo: target.url)
+            return try text(["applied": true, "name": target.name])
         case "open_photo":
             let p = try photo(args)
-            library.edit(p)
-            library.noteAgentActivity(intent: args["intent"] as? String, photo: p.url)
+            let target = library.edit(p)
+            library.noteAgentActivity(intent: args["intent"] as? String, photo: target.url)
             NSApp.activate(ignoringOtherApps: true)
-            return try text(["opened": p.name])
+            return try text(["opened": target.name])
         case "get_preview":
             let p = try photo(args)
             let maxDim = args["maxDimension"] as? Double ?? 768

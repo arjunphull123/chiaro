@@ -344,11 +344,15 @@ final class Library {
     }
 
     /// The one entry point for opening the editor — always localizes first.
-    func edit(_ photo: Photo) {
+    /// Returns the (possibly localized) photo now showing, since a card photo
+    /// gets copied into the library under the same name but a new URL.
+    @discardableResult
+    func edit(_ photo: Photo) -> Photo {
         let target = localized(photo)
         selection = [target.url]
         lastSelected = target.url
         if let activeEditor { activeEditor.switchTo(target) } else { editing = target }
+        return target
     }
 
     static func isRemovable(_ url: URL) -> Bool {
