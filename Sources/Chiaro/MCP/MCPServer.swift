@@ -267,7 +267,7 @@ final class MCPServer {
         props["blurMode"] = [
             "type": "string",
             "enum": ["subject", "person", "depth"],
-            "description": "what stays sharp: subject (any lifted foreground), person (people only), or depth (a focus plane — focusDepth 0 near…1 far; everything nearer stays sharp; needs the depth model downloaded in the app)",
+            "description": "what stays sharp: subject (any lifted foreground), person (people only), or depth (a focus plane — focusDepth 0 near…1 far; everything nearer stays sharp; needs the depth model downloaded in the app). Not literal: choosing a mode while blur is off also turns blur on at a default amount, same as the UI. blurF: 0 still means off",
         ]
         props["hsl"] = [
             "type": "object",
@@ -534,9 +534,9 @@ final class MCPServer {
                 }
                 if key == "blurMode" || key == "depthBlur" {
                     if let raw = value as? String, let mode = BlurMode(rawValue: raw) {
-                        edit.blurMode = mode
+                        edit.selectBlurMode(mode)
                     } else if let flag = value as? Bool {
-                        edit.blurMode = flag ? .depth : .subject
+                        edit.selectBlurMode(flag ? .depth : .subject)
                     } else {
                         throw ToolError("blurMode must be one of subject, person, depth")
                     }
