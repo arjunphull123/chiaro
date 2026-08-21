@@ -10,11 +10,15 @@ import TipKit
 struct AgentRailStatus: View {
     private let agentTip = AgentTip()
     let library: Library
+    /// The library header's transient pill: no onboarding tip, intent held to
+    /// one line. The edit rail is tall enough to let intent wrap and keeps
+    /// this false.
+    var compact: Bool = false
     @State private var showing = false
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 6) {
-            if AgentTip.isEligible { TipView(agentTip) }
+            if !compact && AgentTip.isEligible { TipView(agentTip) }
             timeline
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
@@ -45,7 +49,8 @@ struct AgentRailStatus: View {
                             .font(Theme.ui(11.5, .medium))
                             .foregroundStyle(active ? Theme.ink : Theme.ink2)
                             .lineLimit(1)
-                            .fixedSize()
+                            .fixedSize(horizontal: !compact, vertical: true)
+                            .truncationMode(.tail)
                         if editing {
                             Image(systemName: "lock.fill")
                                 .font(.system(size: 9, weight: .semibold))
@@ -56,7 +61,8 @@ struct AgentRailStatus: View {
                         Text(intent)
                             .font(Theme.ui(10.5))
                             .foregroundStyle(Theme.ink2)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .lineLimit(compact ? 1 : nil)
+                            .fixedSize(horizontal: false, vertical: compact ? false : true)
                     }
                 }
                 .padding(.horizontal, 12)

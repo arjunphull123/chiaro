@@ -320,8 +320,8 @@ struct LibraryView: View {
             // edit rail. The library stays mounted under the editor (see
             // RootView), so width taken here clips both views.
             if library.agentActive || AgentStatus.shared.isConnected {
-                AgentRailStatus(library: library)
-                    .frame(maxWidth: 190)
+                AgentRailStatus(library: library, compact: true)
+                    .frame(maxWidth: 170)
                     .layoutPriority(-2)
             }
             HStack(spacing: 3) {
