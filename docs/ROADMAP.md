@@ -63,7 +63,16 @@ skill, not by feature comparison.
 - [ ] RAW decode parameters: `CIRAWFilter` already exposes `detailAmount`,
       `moireReductionAmount` and split luminance/colour noise reduction, and we
       set none of them. Decode-time detail and noise handling beats the
-      post-demosaic filters we ship today, and moiré is unfixable afterwards
+      post-demosaic filters we ship today, and moiré is unfixable afterwards.
+      Design: `sharpness` and `noiseReduction` stay the only controls a user
+      sees and route to the decode-time parameters for RAW files, rather than
+      adding a parallel set — one set of controls implemented at the right point
+      is what Lightroom and Capture One do. Colour noise reduction and moiré
+      reduction are added as RAW-only rows, hidden for JPEGs. Accepted cost: an
+      existing sidecar's `sharpness` on a RAW file renders slightly differently
+      afterwards, since decode-time detail is a different operation and not
+      merely a better one. Taken deliberately while pre-1.0, because the
+      alternative is six overlapping detail controls forever
 
 ## Backlog (post-1.0)
 
