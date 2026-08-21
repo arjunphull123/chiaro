@@ -7,6 +7,11 @@ struct LibraryView: View {
     let onExport: () -> Void
 
     @FocusState private var searchFocused: Bool
+    /// Measured header width, so the search field can expand past its
+    /// icon-only default once there's comfortable room for it — Finder's
+    /// own toolbar search behaviour.
+    @State private var headerWidth: CGFloat = 0
+    private static let searchExpansionWidth: CGFloat = 1300
 
     enum ListSortKey: String { case name, starred, time, folder }
     @AppStorage("listSortKey") private var listSortRaw = ListSortKey.name.rawValue
@@ -417,6 +422,7 @@ struct LibraryView: View {
                 .overlay(alignment: .bottom) { Theme.hairline.frame(height: 1) }
                 .ignoresSafeArea()
         )
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { headerWidth = $0 }
     }
 
     /// Card offload: copies the shoot into ~/Pictures/Chiaro Library.
@@ -447,7 +453,38 @@ struct LibraryView: View {
         }
     }
 
-    private var searchField: some View {
+    /// Finder collapses its toolbar search to a plain icon and only expands
+    /// it into a field on click, or once the window is wide enough to spare
+    /// the room. Focus or live query text always wins, so releasing focus on
+    /// an empty query collapses it back on its own.
+    private var searchExpanded: Bool {
+        searchFocused || !library.searchText.isEmpty || headerWidth > Self.searchExpansionWidth
+    }
+
+    @ViewBuilder private var searchField: some View {
+        if searchExpanded {
+            expandedSearchField
+        } else {
+            collapsedSearchButton
+        }
+    }
+
+    private var collapsedSearchButton: some View {
+        Button {
+            searchFocused = true
+        } label: {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.ink3)
+                .frame(width: 26, height: 22)
+        }
+        .buttonStyle(.plain)
+        .clickCursor()
+        .keyboardShortcut("f")
+        .help("Filter by filename (⌘F)")
+    }
+
+    private var expandedSearchField: some View {
         HStack(spacing: 5) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 10, weight: .medium))
