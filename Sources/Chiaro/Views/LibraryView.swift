@@ -345,6 +345,7 @@ struct LibraryView: View {
                     Text("RAW")
                         .font(Theme.ui(9.5, .medium))
                         .foregroundStyle(library.filterRAW ? Theme.amber : Theme.ink3)
+                        .fixedSize() // a filter truncated to "R…" tells the user nothing
                 }
             }
             .padding(3)

@@ -43,14 +43,20 @@ struct AgentRailStatus: View {
                                 .font(.system(size: 11))
                                 .foregroundStyle(Theme.ink3)
                         }
-                        Text(editing
-                            ? "\(AgentStatus.shared.displayName) is editing…"
-                            : connected ? "\(AgentStatus.shared.displayName) is connected" : "Connect your agent")
-                            .font(Theme.ui(11.5, .medium))
-                            .foregroundStyle(active ? Theme.ink : Theme.ink2)
-                            .lineLimit(1)
-                            .fixedSize(horizontal: !compact, vertical: true)
-                            .truncationMode(.tail)
+                        // Compact is for the library header, where width is scarce.
+                        // There, "connected" is worth only a mark, since the label
+                        // truncated to "Claude…" and said nothing; while an agent is
+                        // actually editing the text earns its room.
+                        if !(compact && !editing) {
+                            Text(editing
+                                ? "\(AgentStatus.shared.displayName) is editing…"
+                                : connected ? "\(AgentStatus.shared.displayName) is connected" : "Connect your agent")
+                                .font(Theme.ui(11.5, .medium))
+                                .foregroundStyle(active ? Theme.ink : Theme.ink2)
+                                .lineLimit(1)
+                                .fixedSize(horizontal: !compact, vertical: true)
+                                .truncationMode(.tail)
+                        }
                         if editing {
                             Image(systemName: "lock.fill")
                                 .font(.system(size: 9, weight: .semibold))
