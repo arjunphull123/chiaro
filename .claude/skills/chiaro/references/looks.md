@@ -16,25 +16,33 @@ Apply, look at a preview of 1400px or more, then adjust to the photograph.
 - [Black and white](#black-and-white)
 - [Signs you went too far](#signs-you-went-too-far)
 
-## What Chiaro can and cannot grade
+## How Chiaro grades
 
-Chiaro selects colour **by hue band** through the colour mixer, and shapes
-contrast through one curve that applies to all channels.
+Two independent systems, and choosing the right one is most of the skill:
 
-It has no split toning and no per-zone colour wheels, so you cannot tint the
-shadows one colour and the highlights another. The canonical cinematic grade,
-teal in the shadows and orange in the highlights, is defined by exactly that
-move, so it can only be approximated here: push the hues that happen to live in
-the dark parts of the frame, which at night and under overcast skies are
-usually the blues and aquas, and warm the frame globally with `temp`.
+**By tonal zone**, which is the grading section: `shadowHue` and
+`shadowStrength`, `midHue` and `midStrength`, `highlightHue` and
+`highlightStrength`, plus `gradeBalance` to move where shadows end and
+highlights begin. Hues are degrees, 0 to 360. Strengths are 0 to 100 and
+default to 0, so grading is inert until you ask for it.
 
-Say this plainly when a user asks for a split-toned grade rather than pretending
-the result is the same thing.
+This is real split toning: it adds a chroma shift at the luminance you target
+while preserving both brightness and the pixel's own hue, so tinting the
+shadows teal does not flatten a red awning into grey. Use it for mood.
+
+**By hue band**, which is the colour mixer (`hsl`): eight bands, each with hue,
+saturation and luminance. Use it when the target is a *thing* rather than a
+tonal range, such as foliage, skin, or a sky.
+
+A useful rule: if the request names a mood, grade by zone. If it names an
+object, use the mixer.
 
 ## Cinematic
 
-The achievable version rests on three moves: a lifted matte black point, a
-gentle S-curve, and hue separation between the warm and cool parts of the frame.
+Teal in the shadows, warmth in the highlights, over a lifted matte black point
+and a gentle S-curve. Two passes: tone, look, then the grade.
+
+Tone first:
 
 ```json
 {
@@ -42,19 +50,23 @@ gentle S-curve, and hue separation between the warm and cool parts of the frame.
   "shadows": 20,
   "blacks": 6,
   "highlights": -12,
-  "temp": 4,
-  "vibrance": 18,
-  "curve": [[0, 0.02], [0.22, 0.25], [0.78, 0.82], [1, 1]],
-  "hsl": {"blue": {"s": 12, "l": -8}, "aqua": {"s": 10}, "orange": {"s": 8}}
+  "curve": [[0, 0.02], [0.22, 0.25], [0.78, 0.82], [1, 1]]
 }
 ```
 
-Send it in two passes, tone then colour, and look in between.
+Then the grade:
 
-The difference between tasteful and cliché is entirely restraint in the colour
-mixer. Keep band saturation under about 30. Once shadows read as cartoon teal
-or skin reads orange, it has become a filter, and viewers see technique instead
-of mood.
+```json
+{
+  "shadowHue": 195, "shadowStrength": 30,
+  "highlightHue": 35, "highlightStrength": 22
+}
+```
+
+Strength is where taste lives. Around 20 to 35 reads as a quality of light.
+Past about 50 the shadows read as cartoon teal and the viewer sees technique
+instead of mood. Move `gradeBalance` negative to pull the crossover down so
+only the deepest tones take the cool cast.
 
 ## Film
 
@@ -156,21 +168,32 @@ sunlight from turning into orange mush.
 
 ## Black and white
 
-Use `saturation: -100`, then do all the work in tone.
+Set `monochrome: true`. Do NOT use `saturation: -100`, which throws away the
+colour information the conversion needs.
+
+Monochrome converts using the colour mixer's per-band **luminance** values as
+channel weights, which is the darkroom control that matters: each original hue
+becomes the grey value you choose for it. A blue sky darkens without touching
+skin.
 
 ```json
-{"saturation": -100, "contrast": 20, "whites": 10, "blacks": -8, "clarity": 10}
+{
+  "monochrome": true,
+  "contrast": 20,
+  "whites": 10,
+  "blacks": -8,
+  "hsl": {"blue": {"l": -45}, "aqua": {"l": -35}, "orange": {"l": 15}}
+}
 ```
 
 Black and white tolerates harder contrast than colour, since there is no
-saturation to blow out, so be more aggressive here than you would be otherwise.
+saturation to blow out, so push further than you otherwise would.
 
-One honest limitation: the classic darkroom control, mapping each original hue
-to its own grey value so a blue sky darkens independently of skin, is not
-available. Global desaturation happens before the colour mixer in the pipeline,
-so per-hue luminance mapping has nothing left to select. If a user wants a dark
-sky in a monochrome frame, a linear local adjustment across the horizon is the
-route.
+Two things worth knowing. A neutral overcast sky has no chroma, so no band
+selects it; darkening a white sky needs a linear local adjustment across the
+horizon, not the mixer. And grading still applies in monochrome, so adding a
+warm highlight tint or a cool shadow tint gives you toned black and white:
+sepia and selenium are a grade away, not a separate feature.
 
 ## Signs you went too far
 

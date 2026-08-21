@@ -138,10 +138,15 @@ of these as a base when it fits the request, because the user recognises the
 name from the UI, then refine from there.
 
 For anything else, read `references/looks.md`, which has each look as a starting
-point in Chiaro's actual controls, and is honest about the one thing this editor
-cannot do: it grades by hue band and tone curve, not by tonal zone, so a
-split-toned cinematic grade with teal shadows and orange highlights can only be
-approximated.
+point in Chiaro's actual controls.
+
+Two systems do colour, and picking the right one matters. Grade **by tonal
+zone** (`shadowHue`/`shadowStrength`, `midHue`/`midStrength`,
+`highlightHue`/`highlightStrength`, `gradeBalance`) when the request names a
+mood, since that is real split toning and preserves the colours already in the
+frame. Use the **colour mixer** (`hsl`) when the request names an object, such
+as foliage, skin, or a sky. Black and white is `monochrome: true`, never
+`saturation: -100`.
 
 Recipes are starting points keyed to a diagnosis, never destinations. Apply,
 look, adjust to the photograph in front of you.
