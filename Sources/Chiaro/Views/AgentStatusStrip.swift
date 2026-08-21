@@ -5,27 +5,18 @@ import TipKit
 /// "Connect agent": copyable orientation prompt pointing any coding agent at the
 /// local MCP server (ADR 0008). The server self-describes via tools/list schemas;
 /// this prompt is just the address and etiquette.
-/// One pill at the top of the edit rail, cycling through the agent lifecycle:
+/// The window's one agent-status line, cycling through the agent lifecycle:
 /// "Connect agent" → "<client> connected" → "🔒 Agent is editing…" (+ intent).
-struct AgentRailStatus: View {
+/// Lives in the title strip (see RootView) — one line, so state and intent are
+/// a single truncating Text rather than the two stacked lines a rail pill could
+/// afford.
+struct AgentStatusStrip: View {
     private let agentTip = AgentTip()
     let library: Library
-    /// The library header's transient pill: no onboarding tip, intent held to
-    /// one line. The edit rail is tall enough to let intent wrap and keeps
-    /// this false.
-    var compact: Bool = false
     @State private var showing = false
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 6) {
-            if !compact && AgentTip.isEligible { TipView(agentTip) }
-            timeline
-        }
-        .frame(maxWidth: .infinity, alignment: .trailing)
-    }
-
-    private var timeline: some View {
-        TimelineView(.periodic(from: .now, by: 30)) { context in
+        TimelineView(.periodic(from: .now, by: 30)) { _ in
             let editing = library.agentActive
             let connected = AgentStatus.shared.isConnected
             let brand = AgentStatus.shared.brand
@@ -34,51 +25,32 @@ struct AgentRailStatus: View {
                 agentTip.invalidate(reason: .actionPerformed)
                 showing.toggle()
             } label: {
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: 8) {
-                        if active {
-                            brand.icon.frame(width: 13, height: 13)
-                        } else {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 11))
-                                .foregroundStyle(Theme.ink3)
-                        }
-                        // Compact is for the library header, where width is scarce.
-                        // There, "connected" is worth only a mark, since the label
-                        // truncated to "Claude…" and said nothing; while an agent is
-                        // actually editing the text earns its room.
-                        if !(compact && !editing) {
-                            Text(editing
-                                ? "\(AgentStatus.shared.displayName) is editing…"
-                                : connected ? "\(AgentStatus.shared.displayName) is connected" : "Connect your agent")
-                                .font(Theme.ui(11.5, .medium))
-                                .foregroundStyle(active ? Theme.ink : Theme.ink2)
-                                .lineLimit(1)
-                                .fixedSize(horizontal: !compact, vertical: true)
-                                .truncationMode(.tail)
-                        }
-                        if editing {
-                            Image(systemName: "lock.fill")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(brand.color)
-                        }
+                HStack(spacing: 7) {
+                    if active {
+                        brand.icon.frame(width: 12, height: 12)
+                    } else {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Theme.ink3)
                     }
-                    if editing, let intent = library.agentIntent {
-                        Text(intent)
-                            .font(Theme.ui(10.5))
-                            .foregroundStyle(Theme.ink2)
-                            .lineLimit(compact ? 1 : nil)
-                            .fixedSize(horizontal: false, vertical: compact ? false : true)
+                    Text(line(editing: editing, connected: connected))
+                        .foregroundStyle(active ? Theme.ink : Theme.ink2)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    if editing {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundStyle(brand.color)
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 5)
                 .background(
-                    RoundedRectangle(cornerRadius: 9)
+                    RoundedRectangle(cornerRadius: 8)
                         .fill(editing ? brand.color.opacity(0.12) : Color.clear)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 9)
+                    RoundedRectangle(cornerRadius: 8)
                         .stroke(active ? brand.color.opacity(0.45) : Theme.hairline)
                 )
             }
@@ -86,35 +58,31 @@ struct AgentRailStatus: View {
             .clickCursor()
             .animation(.easeOut(duration: 0.2), value: editing)
         }
+        // Caps growth so a long intent truncates instead of pushing the strip
+        // toward the traffic lights or the window edge; short states just size
+        // to fit under this.
+        .frame(maxWidth: 440)
+        .popoverTip(AgentTip.isEligible ? agentTip : nil, arrowEdge: .bottom)
         .popover(isPresented: $showing, arrowEdge: .bottom) { AgentConnectPopover() }
     }
-}
 
-struct ConnectAgentButton: View {
-    @State private var showing = false
-
-    var body: some View {
-        TimelineView(.periodic(from: .now, by: 30)) { context in
-            let connected = AgentStatus.shared.isConnected
-            let brand = AgentStatus.shared.brand
-            Button {
-                showing.toggle()
-            } label: {
-                HStack(spacing: 7) {
-                    if connected {
-                        brand.icon.frame(width: 12, height: 12)
-                    } else {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 10))
-                            .foregroundStyle(Theme.ink3)
-                    }
-                    Text(connected ? AgentStatus.shared.displayName + " is connected" : "Connect your agent")
-                }
-            }
-            .buttonStyle(OutlineButtonStyle())
-            .clickCursor()
+    /// State phrase, plus the intent appended in a dimmer run when editing —
+    /// one Text so the whole line truncates together (mirrors the mixed-style
+    /// runs LibraryView's footer count builds).
+    private func line(editing: Bool, connected: Bool) -> AttributedString {
+        var text = AttributedString(
+            editing ? "\(AgentStatus.shared.displayName) is editing…"
+            : connected ? "\(AgentStatus.shared.displayName) is connected"
+            : "Connect your agent"
+        )
+        text.font = Theme.ui(11.5, .medium)
+        if editing, let intent = library.agentIntent {
+            var suffix = AttributedString("  " + intent)
+            suffix.font = Theme.ui(10.5)
+            suffix.foregroundColor = Theme.ink2
+            text += suffix
         }
-        .popover(isPresented: $showing, arrowEdge: .bottom) { AgentConnectPopover() }
+        return text
     }
 }
 

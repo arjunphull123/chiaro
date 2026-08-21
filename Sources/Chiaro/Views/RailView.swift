@@ -8,12 +8,11 @@ struct RailView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Pinned above the fold: agent presence and the photo's identity.
+            // Pinned above the fold: the app mark and the photo's identity.
+            // Agent presence lives in the window's title strip now (RootView),
+            // not here — this dims along with the rest while an agent edits.
             VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 10) {
-                    AppMark(size: 30)
-                    AgentRailStatus(library: library)
-                }
+                AppMark(size: 30)
                 photoHeader
                     .opacity(library.agentActive ? 0.4 : 1)
             }

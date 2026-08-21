@@ -344,6 +344,17 @@ struct RootView: View {
             }
         }
         .containerBackground(.clear, for: .window)
+        // The title strip is WINDOW-level chrome, drawn here rather than inside
+        // any of the views above, so it's identical in position for the
+        // library, the editor, and the start screen. It holds only
+        // window-level state — agent status today, an available-update notice
+        // or export progress later. View controls (filters, view mode, zoom,
+        // search) belong in their own view's header, not here.
+        .overlay(alignment: .top) {
+            AgentStatusStrip(library: library)
+                .padding(.top, 5)
+                .ignoresSafeArea()
+        }
         .sheet(isPresented: $exporting) {
             ExportSheet(
                 photos: library.editing.map { [$0] } ?? library.selectedPhotos,
