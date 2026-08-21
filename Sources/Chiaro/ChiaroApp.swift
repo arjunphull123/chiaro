@@ -350,9 +350,14 @@ struct RootView: View {
         // window-level state — agent status today, an available-update notice
         // or export progress later. View controls (filters, view mode, zoom,
         // search) belong in their own view's header, not here.
-        .overlay(alignment: .top) {
+        // Trailing, not centred: centre is the document-title slot on macOS, and
+        // a status pill sitting there reads as the window's identity. Trailing is
+        // where window accessories belong, and in the editor it lands above the
+        // rail, where agent state already belongs.
+        .overlay(alignment: .topTrailing) {
             AgentStatusStrip(library: library)
-                .padding(.top, 5)
+                .padding(.trailing, 16)
+                .padding(.top, 9) // centres it on the traffic lights
                 .ignoresSafeArea()
         }
         .sheet(isPresented: $exporting) {
