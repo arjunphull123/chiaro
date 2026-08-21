@@ -56,6 +56,11 @@ struct LocalAdjustment: Codable, Equatable, Identifiable {
     var tint = 0.0
     var saturation = 0.0
     var clarity = 0.0
+    // Luminance range mask: narrows the geometric mask to a tone band inside
+    // it, e.g. "shadows only" within a radial. 0...100, fully open by
+    // default so the feature is inert until asked for.
+    var lumaLow = 0.0
+    var lumaHigh = 100.0
 
     var isNeutral: Bool {
         exposure == 0 && contrast == 0 && highlights == 0 && shadows == 0
@@ -67,6 +72,7 @@ struct LocalAdjustment: Codable, Equatable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case kind, ax, ay, bx, by, feather, invert
         case exposure, contrast, highlights, shadows, temp, tint, saturation, clarity
+        case lumaLow, lumaHigh
     }
 
     init(kind: Kind) {
@@ -90,6 +96,8 @@ struct LocalAdjustment: Codable, Equatable, Identifiable {
         tint = try c.decodeIfPresent(Double.self, forKey: .tint) ?? 0
         saturation = try c.decodeIfPresent(Double.self, forKey: .saturation) ?? 0
         clarity = try c.decodeIfPresent(Double.self, forKey: .clarity) ?? 0
+        lumaLow = try c.decodeIfPresent(Double.self, forKey: .lumaLow) ?? 0
+        lumaHigh = try c.decodeIfPresent(Double.self, forKey: .lumaHigh) ?? 100
     }
 }
 

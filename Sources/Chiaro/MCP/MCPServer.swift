@@ -275,7 +275,7 @@ final class MCPServer {
         ]
         props["locals"] = [
             "type": "array",
-            "description": "local adjustments: [{kind: radial|linear|subject, ax, ay, bx, by (normalized, y from top; radial: a=center b=radii, linear: gradient a→b), feather 0-100, invert, exposure -3..3, contrast/highlights/shadows/temp/tint/saturation/clarity -100..100}]. Empty array clears",
+            "description": "local adjustments: [{kind: radial|linear|subject, ax, ay, bx, by (normalized, y from top; radial: a=center b=radii, linear: gradient a→b), feather 0-100, invert, exposure -3..3, contrast/highlights/shadows/temp/tint/saturation/clarity -100..100, lumaLow/lumaHigh 0-100 (default 0/100 = fully open; narrows the mask to a tone band, e.g. lumaHigh 40 confines the adjustment to shadows, lumaLow 60 to highlights — edges feather smoothly, no hard cutoff)}]. Empty array clears",
         ]
         props["rotation"] = [
             "type": "integer",

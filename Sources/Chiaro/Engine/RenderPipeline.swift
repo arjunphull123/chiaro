@@ -293,6 +293,13 @@ enum RenderPipeline {
         if local.invert {
             mask = mask.applyingFilter("CIColorInvert").cropped(to: image.extent)
         }
+        // Measured on `image` as it enters, before this local's own
+        // adjustments run, so the tone selection doesn't chase its own effect.
+        if local.lumaLow != 0 || local.lumaHigh != 100 {
+            let window = LumaRangeMask.apply(image, low: local.lumaLow, high: local.lumaHigh)
+            mask = mask.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: window])
+                .cropped(to: image.extent)
+        }
         var adjusted = image
         if local.temp != 0 || local.tint != 0 {
             let f = CIFilter.temperatureAndTint()

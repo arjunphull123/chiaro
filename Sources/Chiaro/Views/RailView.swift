@@ -517,6 +517,8 @@ struct RailView: View {
                 localRow("Tint", index: index, keyPath: \.tint, range: -100...100)
                 localRow("Saturation", index: index, keyPath: \.saturation, range: -100...100)
                 localRow("Clarity", index: index, keyPath: \.clarity, range: -100...100)
+                localRow("Luma low", index: index, keyPath: \.lumaLow, range: 0...100)
+                localRow("Luma high", index: index, keyPath: \.lumaHigh, range: 0...100)
                 if model.edit.locals[index].kind != .linear {
                     localRow("Feather", index: index, keyPath: \.feather, range: 0...100)
                 }
