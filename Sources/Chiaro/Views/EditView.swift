@@ -216,9 +216,17 @@ struct EditView: View {
             }
             iconAction("Undo", icon: "arrow.uturn.backward", disabled: !model.canUndo) { model.undo() }
             iconAction("Redo", icon: "arrow.uturn.forward", disabled: !model.canRedo) { model.redo() }
-            iconAction("Original", icon: model.showOriginal ? "eye.fill" : "eye", active: model.showOriginal) {
-                model.showOriginal.toggle()
-            }
+            // A before/after split rather than an eye: this shows the RAW
+            // against the edit, not a show/hide toggle, so the eye glyph read
+            // wrong. Press-and-hold mirrors the \ key exactly — a tap alone
+            // does nothing, since HoverLabelButton still wants an action.
+            iconAction("Original", icon: "square.righthalf.filled", active: model.showOriginal) {}
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { _ in model.showOriginal = true }
+                        .onEnded { _ in model.showOriginal = false }
+                )
+                .help("Hold to see the original (\\)")
             iconAction("Copy edits", icon: "doc.on.doc", disabled: model.edit.isNeutral) {
                 library.copiedEdit = model.edit
             }
