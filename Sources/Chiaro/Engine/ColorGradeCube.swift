@@ -122,7 +122,14 @@ enum ColorGradeCube {
         // saturation.
         let mx = max(c.0, max(c.1, c.2))
         let mn = min(c.0, min(c.1, c.2))
-        let existing = mx > 0.004 ? (mx - mn) / mx : 0.0
+        // (mx - mn) / mx is a ratio, so as mx -> 0 it's ill-conditioned: two
+        // near-black pixels a hair apart in absolute channel value can land
+        // at wildly different existing/protect, which read as patchy tint in
+        // shadows. Flooring the denominator is equivalent to fading the
+        // ratio's contribution to 0 as mx drops below the floor -- fitting,
+        // since a near-black pixel carries almost no colour to protect.
+        let darkFloor = 0.15
+        let existing = (mx - mn) / max(mx, darkFloor)
         let protect = (1.0 - existing) * (1.0 - existing)
 
         // A fixed chroma offset is a large *relative* shift on a dark pixel, so
