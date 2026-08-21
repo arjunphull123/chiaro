@@ -50,11 +50,50 @@ final class RawEngine {
         return appleDefault + (1 - appleDefault) * t
     }
 
+    /// RAW 9 (WWDC 2026 session 305): a tiled Core ML model on the Neural
+    /// Engine that folds denoise into demosaic. CIRAWFilter doesn't select it
+    /// by default the way it does older versions — camera-model coverage is
+    /// still rolling out (as of macOS 26.1 the Sony RX100 IV isn't covered;
+    /// `supportedDecoderVersions` is the per-image, per-OS truth) — so this
+    /// opts in explicitly whenever the current image supports it, rather than
+    /// relying on an implicit default that may not extend to it.
+    private static func selectDecoderVersion(_ raw: CIRAWFilter) {
+        if raw.supportedDecoderVersions.contains(.version9) {
+            raw.decoderVersion = .version9
+        }
+    }
+
     private static func apply(_ decode: DecodeParams, to raw: CIRAWFilter) {
+        selectDecoderVersion(raw)
         raw.detailAmount = scaled(decode.detail, from: raw.detailAmount)
         raw.luminanceNoiseReductionAmount = scaled(decode.luminanceNoise, from: raw.luminanceNoiseReductionAmount)
         raw.colorNoiseReductionAmount = scaled(decode.colorNoise, from: raw.colorNoiseReductionAmount)
         raw.moireReductionAmount = scaled(decode.moire, from: raw.moireReductionAmount)
+    }
+
+    /// Which Detail-rail, RAW-only controls still do anything for this image.
+    /// RAW 9 folds detail enhancement and moiré reduction into the decode
+    /// model itself (no longer supported as separate amounts) and reduces
+    /// color noise automatically — but only once RAW 9 is actually selected
+    /// for this camera, so this is a per-image query via CIRAWFilter's own
+    /// `isXSupported` flags, never a static "RAW 9 means X" assumption.
+    struct DecodeCapabilities: Equatable {
+        var sharpness = true
+        var luminanceNoise = true
+        var colorNoise = true
+        var moire = true
+        static let allSupported = DecodeCapabilities()
+    }
+
+    func decodeCapabilities(for url: URL) -> DecodeCapabilities {
+        guard let raw = CIRAWFilter(imageURL: url) else { return .allSupported }
+        Self.selectDecoderVersion(raw)
+        return DecodeCapabilities(
+            sharpness: raw.isDetailSupported,
+            luminanceNoise: raw.isLuminanceNoiseReductionSupported,
+            colorNoise: raw.isColorNoiseReductionSupported,
+            moire: raw.isMoireReductionSupported
+        )
     }
 
     func fullImage(for url: URL, decode: DecodeParams = .neutral) -> CIImage? {

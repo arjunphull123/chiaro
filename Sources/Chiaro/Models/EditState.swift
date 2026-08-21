@@ -123,6 +123,9 @@ struct EditState: Codable, Equatable {
     // Detail — sharpness/noiseReduction route to RAW decode time for RAW
     // files (RawEngine.DecodeParams); colorNoiseReduction/moireReduction are
     // decode-only controls with no post-demosaic equivalent, so RAW-only.
+    // Any of the four can stop doing anything for a given photo once its
+    // camera gets RAW 9 decode coverage — the value stays stored either way;
+    // RailView just hides the dead rows per photo (EditViewModel.decodeCapabilities).
     var sharpness: Double = 0     // 0...100
     var noiseReduction: Double = 0 // 0...100
     var colorNoiseReduction: Double = 0 // 0...100, RAW only

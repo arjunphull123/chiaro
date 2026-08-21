@@ -75,9 +75,7 @@ struct RailView: View {
                     section("Effects", [.clarity, .vignette], help: "Punch and framing")
                     section(
                         "Detail",
-                        model.photo.isRAW
-                            ? [.sharpness, .noiseReduction, .colorNoiseReduction, .moireReduction]
-                            : [.sharpness, .noiseReduction],
+                        model.photo.isRAW ? rawDetailRows : [.sharpness, .noiseReduction],
                         help: "Fine texture and grain cleanup"
                     )
                     actions
@@ -133,6 +131,22 @@ struct RailView: View {
                     .foregroundStyle(Theme.ink3)
             }
         }
+    }
+
+    /// RAW-only Detail rows, filtered to the ones this photo's decoder still
+    /// acts on — RAW 9 (once selected for a given camera) folds detail and
+    /// moiré reduction into the decode model and reduces color noise
+    /// automatically, so a slider for either would sit in the rail doing
+    /// nothing. `EditViewModel.decodeCapabilities` is queried per photo via
+    /// CIRAWFilter's own `isXSupported` flags rather than assumed from OS version.
+    private var rawDetailRows: [EditParameter] {
+        let c = model.decodeCapabilities
+        var rows: [EditParameter] = []
+        if c.sharpness { rows.append(.sharpness) }
+        if c.luminanceNoise { rows.append(.noiseReduction) }
+        if c.colorNoise { rows.append(.colorNoiseReduction) }
+        if c.moire { rows.append(.moireReduction) }
+        return rows
     }
 
     private var curveSection: some View {

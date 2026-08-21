@@ -132,6 +132,9 @@ final class EditViewModel {
     var isLoading = true
 
     private var basePreview: CIImage?
+    /// Which RAW-only Detail controls still do anything for this photo's
+    /// decoder (RailView hides the rest rather than leaving a dead slider).
+    var decodeCapabilities = RawEngine.DecodeCapabilities.allSupported
     private var personMask: CIImage?
     private var maskKind: PortraitEngine.MaskKind = .subject
     /// 3D depth scene visibility, and one-shot commands routed to it
@@ -185,6 +188,7 @@ final class EditViewModel {
         preview = nil
         originalPreview = nil
         basePreview = nil
+        decodeCapabilities = .allSupported
         personMask = nil
         hasPerson = nil
         depthSceneVisible = false
@@ -196,16 +200,19 @@ final class EditViewModel {
     private func load() {
         KeepAwake.poke(30)
         let url = photo.url
+        let isRAW = photo.isRAW
         renderGeneration += 1
         Task { [weak self] in
-            guard let decoded = await Offload.on(Offload.render, { () -> (CIImage, CGImage?)? in
+            guard let decoded = await Offload.on(Offload.render, { () -> (CIImage, CGImage?, RawEngine.DecodeCapabilities)? in
                 guard let base = RawEngine.shared.preview(for: url) else { return nil }
-                return (base, RawEngine.shared.context.createCGImage(base, from: base.extent))
+                let capabilities = isRAW ? RawEngine.shared.decodeCapabilities(for: url) : .allSupported
+                return (base, RawEngine.shared.context.createCGImage(base, from: base.extent), capabilities)
             }) else { return }
-            let (base, baseCG) = decoded
+            let (base, baseCG, capabilities) = decoded
             guard let self, self.photo.url == url else { return }
             self.basePreview = base
             self.originalPreview = baseCG
+            self.decodeCapabilities = capabilities
             self.isLoading = false
             self.scheduleRender()
 
