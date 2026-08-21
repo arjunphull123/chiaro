@@ -109,6 +109,11 @@ enum RenderPipeline {
             f.radius = Float(1.6)
             image = f.outputImage ?? image
         }
+        // Grain last: a property of the print, not the light, so it comes
+        // after tone, colour, grading and vignette.
+        if edit.grain > 0 {
+            image = grain(image, amount: edit.grain, size: edit.grainSize, scale: scale)
+        }
         // Focus peaking (preview only, never export): amber wash over the
         // in-focus plane while the Focus control is armed.
         if focusPeaking, edit.blurMode == .depth, let depthMap {
@@ -269,6 +274,142 @@ enum RenderPipeline {
         return image.applyingFilter("CIDissolveTransition", parameters: [
             "inputTargetImage": blurred,
             "inputTime": Float(-amount / 100 * 0.5),
+        ])
+    }
+
+    /// Film grain. `CIRandomGenerator` is a pure function of pixel coordinates
+    /// (no per-render reseed), so the same edit at the same render size always
+    /// draws the same grain field — preview and export agree, and re-rendering
+    /// never flickers.
+    ///
+    /// The context works in extended-linear P3 (RawEngine): a fixed-amplitude
+    /// perturbation there is not perceptually uniform. Linear values are
+    /// crushed toward zero in the shadows, so a flat delta is a huge relative
+    /// swing in the dark and nearly nothing near the highlights — the opposite
+    /// of real grain, which is strongest in the midtones and fades at both
+    /// ends. `grainWeight` bakes that falloff into a `CIColorCube` keyed on
+    /// PERCEPTUAL (gamma-encoded) luminance. That cube emits a coefficient
+    /// that multiplies the noise, not a colour, so — like `LumaRangeMask`,
+    /// unlike `HSLCube`/`ColorGradeCube` — it stays the plain, untagged
+    /// `CIColorCube`: tagging it `WithColorSpace` would ask Core Image to
+    /// reinterpret a multiplier as gamma-encoded light and warp it back down.
+    private static func grain(_ image: CIImage, amount: Double, size: Double, scale: CGFloat) -> CIImage {
+        let extent = image.extent
+        // Fine at 0 (just over a pixel) to visibly coarse at 100 (~4px);
+        // 50 lands near 2.3px, the density of an ordinary 400-speed film
+        // rather than either extreme. Scaled by `scale` so a grain cell is
+        // the same fraction of the frame at preview and export resolution —
+        // the same reasoning as clarity's blur radius below.
+        let cellSize = CGFloat(0.6 + size / 100 * 3.4) * scale
+        guard let noise = CIFilter.randomGenerator().outputImage else { return image }
+        let noiseField = noise.transformed(by: CGAffineTransform(scaleX: cellSize, y: cellSize))
+
+        // Desaturate: CIRandomGenerator draws independent noise per channel
+        // (alpha included), so average R/G/B into one grey value and force
+        // alpha to 1, discarding the generator's own random alpha.
+        let mono = noiseField.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: 1.0 / 3, y: 1.0 / 3, z: 1.0 / 3, w: 0),
+            "inputGVector": CIVector(x: 1.0 / 3, y: 1.0 / 3, z: 1.0 / 3, w: 0),
+            "inputBVector": CIVector(x: 1.0 / 3, y: 1.0 / 3, z: 1.0 / 3, w: 0),
+            "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+            "inputBiasVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+        ])
+
+        // Composed as an interpolation, not as an added delta layer. Adding
+        // one would need a signed image, and Core Image treats images as
+        // premultiplied: give the delta alpha 1 and CIAdditionCompositing sums
+        // alpha to 2, give it alpha 0 and the layer is simply transparent and
+        // contributes nothing at all. Blending between image±peak has neither
+        // problem, since every image in the graph stays opaque, and it is how
+        // the rest of this pipeline composes a mask.
+        //
+        // Weight folds into the mask rather than multiplying a delta: with
+        // m' = 0.5 + w(m - 0.5), blending image-peak to image+peak by m'
+        // resolves to image + peak·w·(2m - 1), which is the weighted signed
+        // grain, exactly.
+        let weight = grainWeight(image).cropped(to: extent)
+        let centered = mono.applyingFilter("CIColorMatrix", parameters: [
+            "inputBiasVector": CIVector(x: -0.5, y: -0.5, z: -0.5, w: 0),
+        ])
+        let mask = centered
+            .applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: weight])
+            .applyingFilter("CIColorMatrix", parameters: [
+                "inputBiasVector": CIVector(x: 0.5, y: 0.5, z: 0.5, w: 0),
+            ])
+            .cropped(to: extent)
+
+        let peak = amount / 100 * grainMaxDelta
+        let lighter = image.applyingFilter("CIColorMatrix", parameters: [
+            "inputBiasVector": CIVector(x: peak, y: peak, z: peak, w: 0),
+        ])
+        let darker = image.applyingFilter("CIColorMatrix", parameters: [
+            "inputBiasVector": CIVector(x: -peak, y: -peak, z: -peak, w: 0),
+        ])
+        let blend = CIFilter.blendWithMask()
+        blend.inputImage = lighter
+        blend.backgroundImage = darker
+        blend.maskImage = mask
+        return (blend.outputImage ?? image).cropped(to: extent)
+    }
+
+    /// Peak per-channel delta, in linear light, at amount 100 and full weight.
+    /// At the weight curve's peak (~0.65 display) this moves a pixel by about
+    /// 0.06 in display terms: visible grain, not a wash.
+    private static let grainMaxDelta = 0.08
+    private static let grainCubeDimension = 32
+    private static let grainWeightData: Data = {
+        let n = grainCubeDimension
+        var cube = [Float](repeating: 0, count: n * n * n * 4)
+        var offset = 0
+        for b in 0..<n {
+            for g in 0..<n {
+                for r in 0..<n {
+                    let rf = Double(r) / Double(n - 1)
+                    let gf = Double(g) / Double(n - 1)
+                    let bf = Double(b) / Double(n - 1)
+                    let linear = rf * 0.2126 + gf * 0.7152 + bf * 0.0722
+                    let weight = Float(grainWeightAt(linear))
+                    cube[offset] = weight
+                    cube[offset + 1] = weight
+                    cube[offset + 2] = weight
+                    cube[offset + 3] = 1
+                    offset += 4
+                }
+            }
+        }
+        return cube.withUnsafeBufferPointer { Data(buffer: $0) }
+    }()
+
+    /// Grain weight for a linear luminance, as a multiplier on a LINEAR delta.
+    ///
+    /// Two factors. The first is the shape grain should have to the eye: a
+    /// parabola peaking at mid-grey, since film grain is a midtone phenomenon
+    /// and falls away into both the toe and the shoulder. The second is the
+    /// conversion between a perceptual delta and a linear one, `d(linear)/d(display)`,
+    /// which is proportional to `display^1.2`. Without it the parabola alone
+    /// only decides WHICH tones get grain, not how much change the eye sees
+    /// per unit of it: a delta fixed in linear light is a huge perceptual jump
+    /// down in the shadows, where linear values are crushed toward zero, and
+    /// nearly invisible up in the highlights. That renders as white salt over
+    /// dark cloth and hair rather than as grain.
+    private static func grainWeightAt(_ linear: Double) -> Double {
+        let d = pow(max(linear, 0), 1.0 / 2.2)
+        return 4 * d * (1 - d) * pow(d, 1.2) / grainWeightPeak
+    }
+
+    /// Normalises `grainWeightAt` to a peak of 1, so `grainMaxDelta` means the
+    /// same thing regardless of the curve's shape.
+    private static let grainWeightPeak: Double = {
+        (0...1000).map { i -> Double in
+            let d = Double(i) / 1000
+            return 4 * d * (1 - d) * pow(d, 1.2)
+        }.max() ?? 1
+    }()
+
+    private static func grainWeight(_ image: CIImage) -> CIImage {
+        image.applyingFilter("CIColorCube", parameters: [
+            "inputCubeDimension": grainCubeDimension,
+            "inputCubeData": grainWeightData,
         ])
     }
 

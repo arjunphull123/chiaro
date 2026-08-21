@@ -76,11 +76,11 @@ struct RailView: View {
                         help: "White balance and color strength"
                     )
                     localSection
-                    section("Effects", [.clarity, .vignette], help: "Punch and framing")
+                    section("Effects", [.clarity, .vignette, .grain, .grainSize], help: "Punch and framing")
                     section(
                         "Detail",
                         model.photo.isRAW ? rawDetailRows : [.sharpness, .noiseReduction],
-                        help: "Fine texture and grain cleanup"
+                        help: "Fine texture and noise cleanup"
                     )
                     actions
                     scrubHint

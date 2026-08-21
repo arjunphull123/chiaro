@@ -222,7 +222,7 @@ final class MCPServer {
             "shadows": "Light", "whites": "Light", "blacks": "Light",
             "temp": "Color", "tint": "Color", "vibrance": "Color", "saturation": "Color",
             "hsl": "Color mix", "curve": "Curve", "monochrome": "Color mix",
-            "clarity": "Effects", "vignette": "Effects",
+            "clarity": "Effects", "vignette": "Effects", "grain": "Effects", "grainSize": "Effects",
             "sharpness": "Detail", "noiseReduction": "Detail",
             "colorNoiseReduction": "Detail", "moireReduction": "Detail",
             "blurF": "Background blur", "relight": "Background blur", "maskReach": "Background blur",
@@ -287,6 +287,14 @@ final class MCPServer {
         props["monochrome"] = [
             "type": "boolean",
             "description": "black & white — greys using the color mixer's l values as channel weights, so e.g. hsl.blue.l -20 darkens a blue sky in the result",
+        ]
+        props["grain"] = [
+            "type": "number",
+            "description": "range 0...100 — film grain amount, strongest in the midtones and fading in deep shadows/blown highlights. 0 is off",
+        ]
+        props["grainSize"] = [
+            "type": "number",
+            "description": "range 0...100 — grain coarseness, fine at 0 to coarse at 100, default 50 is an ordinary film-speed grain. Only visible once grain > 0",
         ]
         props["curve"] = [
             "type": "array",

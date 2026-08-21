@@ -128,6 +128,8 @@ struct EditState: Codable, Equatable {
     // Effects
     var clarity: Double = 0       // -100...100
     var vignette: Double = 0      // 0...100
+    var grain: Double = 0         // 0...100, amount — 0 is inert (no-op)
+    var grainSize: Double = 50    // 0...100, coarseness — inert only via grain == 0
     // Detail — sharpness/noiseReduction route to RAW decode time for RAW
     // files (RawEngine.DecodeParams); colorNoiseReduction/moireReduction are
     // decode-only controls with no post-demosaic equivalent, so RAW-only.
@@ -258,7 +260,7 @@ struct EditState: Codable, Equatable {
 enum EditParameter: String, CaseIterable, Identifiable {
     case exposure, contrast, highlights, shadows, whites, blacks
     case temp, tint, vibrance, saturation
-    case clarity, vignette
+    case clarity, vignette, grain, grainSize
     case sharpness, noiseReduction, colorNoiseReduction, moireReduction
     case blurF, relight, maskReach, focusDepth
     case straighten, skewV, skewH
@@ -286,6 +288,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .highlightStrength: "Highlight strength"
         case .highlightHue: "Highlight hue"
         case .gradeBalance: "Balance"
+        case .grainSize: "Grain size"
         default: rawValue.prefix(1).uppercased() + rawValue.dropFirst()
         }
     }
@@ -296,6 +299,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .straighten: -45...45
         case .skewV, .skewH: -30...30
         case .vignette, .sharpness, .noiseReduction, .colorNoiseReduction, .moireReduction: 0...100
+        case .grain, .grainSize: 0...100
         case .blurF, .focusDepth: 0...1
         case .shadowStrength, .midStrength, .highlightStrength: 0...100
         case .shadowHue, .midHue, .highlightHue: 0...360
@@ -304,7 +308,11 @@ enum EditParameter: String, CaseIterable, Identifiable {
     }
 
     var defaultValue: Double {
-        self == .focusDepth ? 0.5 : 0
+        switch self {
+        case .focusDepth: 0.5
+        case .grainSize: 50
+        default: 0
+        }
     }
 
     /// Detent positions for haptic feedback while scrubbing (ADR 0005).
@@ -342,6 +350,8 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .saturation: \.saturation
         case .clarity: \.clarity
         case .vignette: \.vignette
+        case .grain: \.grain
+        case .grainSize: \.grainSize
         case .sharpness: \.sharpness
         case .noiseReduction: \.noiseReduction
         case .colorNoiseReduction: \.colorNoiseReduction
@@ -372,7 +382,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
                 let f = 16.0 * pow(1.4 / 16.0, v)
                 return f < 10 ? String(format: "ƒ%.1f", f) : String(format: "ƒ%.0f", f)
             }()
-        case .vignette, .sharpness, .noiseReduction, .colorNoiseReduction, .moireReduction: String(format: "%.0f", v)
+        case .vignette, .sharpness, .noiseReduction, .colorNoiseReduction, .moireReduction, .grain, .grainSize: String(format: "%.0f", v)
         case .focusDepth: v <= 0.02 ? "near" : v >= 0.98 ? "far" : String(format: "%.0f%%", v * 100)
         case .straighten: String(format: "%.1f°", v)
         case .skewV, .skewH: v == 0 ? "0" : String(format: "%+.0f", v)
