@@ -65,6 +65,15 @@ struct LibraryView: View {
             }
             galleryScroll
         }
+        // Clicking any part of the library that isn't itself a control gives
+        // up the search field's focus, the way Esc already does. Behind
+        // everything — including the header's own controls — so their taps
+        // still win; this only catches clicks nothing else claimed.
+        .background(
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { searchFocused = false }
+        )
         .onChange(of: library.folderURL) {
             library.folderScope = nil
             library.searchText = ""
@@ -194,13 +203,6 @@ struct LibraryView: View {
                 .padding(16)
             }
             .simultaneousGesture(zoomGesture)
-            // Clicking the gallery ground gives up the search field, the way Esc
-            // already did. Behind the tiles, so their own taps still win.
-            .background(
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture { searchFocused = false }
-            )
         }
     }
 
@@ -379,7 +381,9 @@ struct LibraryView: View {
                 .buttonStyle(AmberButtonStyle())
                 .clickCursor()
                 .keyboardShortcut(.defaultAction)
-                .disabled(library.selection.isEmpty)
+                // While the search field has focus, Return commits/edits the
+                // query — it shouldn't also fire the library's default action.
+                .disabled(library.selection.isEmpty || searchFocused)
                 .fixedSize()
                 .help("Edit the selected photo (⏎)")
         }
@@ -431,9 +435,10 @@ struct LibraryView: View {
                 .font(Theme.ui(11.5))
                 .foregroundStyle(Theme.ink)
                 .focused($searchFocused)
-                .onExitCommand {
+                .onKeyPress(.escape) {
                     library.searchText = ""
                     searchFocused = false
+                    return .handled
                 }
                 .frame(width: 108)
             if !library.searchText.isEmpty {
