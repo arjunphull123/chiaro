@@ -308,14 +308,18 @@ final class MCPServer {
         open_photo displays a photo in the editor so the user can watch. export writes the \
         finished file. All edits are non-destructive and render live.
 
-        How to edit well:
-        1. Diagnose before reaching for sliders. Call get_preview and name what is actually \
-        wrong. "Flat" is usually no true black rather than missing saturation, and the fix is \
-        blacks, not vibrance.
-        2. Work in small passes, one set_edit each: tone first, look, then colour. If you send \
-        nine values at once you cannot tell which one did the damage.
-        3. Few modest moves beat many large ones. Contrast, clarity, vibrance and saturation all \
-        push in the same direction — stack them and the photo comes out looking like a preset.
+        The full editing method, the look recipes, and this app's traps live in the chiaro \
+        skill: `npx skills add arjunphull123/chiaro`. Install it and follow it. Until then, \
+        four rules carry most of the weight:
+        1. Look before and after every change, and pass maxDimension 1400 or more to \
+        get_preview. The 768 default is too small to judge tone; crushed shadows are invisible \
+        at that size.
+        2. Diagnose before reaching for sliders, and tell the two faults apart. Flat is a \
+        tonal-range problem, so the fix is the black point and contrast. Dull is a colour \
+        problem, so the fix is vibrance. Naming the wrong one is how a photo ends up looking \
+        like a preset.
+        3. Few small moves, one intent per set_edit. Contrast, clarity, vibrance and saturation \
+        all push the same direction, so never stack all four.
         4. The photographer's taste decides. Offer a direction, show the result, and let them \
         redirect; do not apply a look you were not asked for.
         """
