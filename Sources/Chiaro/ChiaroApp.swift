@@ -347,27 +347,11 @@ struct RootView: View {
         // The title strip is WINDOW-level chrome, drawn here rather than inside
         // any of the views above, so it's identical in position for the
         // library, the editor, and the start screen. It holds only
-        // window-level state: the open folder's name in the centre — the
-        // document-title slot on macOS — with agent status trailing, above
-        // where it lands in the editor's own rail. View controls (filters,
-        // view mode, zoom, search) belong in their own view's header, not here.
+        // window-level state: agent status, trailing, above where it lands in
+        // the editor's own rail. View controls (filters, view mode, zoom,
+        // search) and the folder's name belong in their own view's header.
         .overlay(alignment: .top) {
             ZStack {
-                if library.folderURL != nil {
-                    Text(library.folderName)
-                        .font(Theme.serif(13, .medium))
-                        .foregroundStyle(Theme.ink2)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        // AgentStatusStrip caps at 440pt plus its own 16pt of
-                        // trailing padding; the traffic lights need far less.
-                        // Reserving this much on BOTH sides keeps the title
-                        // centred in the full window instead of centred in
-                        // whatever's left over, while guaranteeing it can never
-                        // reach either one, even at the 1080pt minimum width.
-                        .padding(.horizontal, 470)
-                        .frame(maxWidth: .infinity)
-                }
                 HStack {
                     Spacer()
                     AgentStatusStrip(library: library)

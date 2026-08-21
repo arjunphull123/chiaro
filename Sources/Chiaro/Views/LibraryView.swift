@@ -314,6 +314,10 @@ struct LibraryView: View {
             .buttonStyle(.plain)
             .clickCursor()
             .help("Back to the start screen (⌘W)")
+            Text(library.folderName)
+                .font(Theme.ui(18, .semibold))
+                .foregroundStyle(Theme.ink)
+                .lineLimit(1) // truncates on a long name; never wraps
             Spacer()
             HStack(spacing: 3) {
                 allChip()

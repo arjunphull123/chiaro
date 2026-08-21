@@ -57,6 +57,10 @@ struct AgentStatusStrip: View {
             .buttonStyle(.plain)
             .clickCursor()
             .animation(.easeOut(duration: 0.2), value: editing)
+            // Anchored to the pill, inside the 440pt frame below: attached
+            // outside it, the popover points at the frame's centre instead.
+            .popoverTip(AgentTip.isEligible ? agentTip : nil, arrowEdge: .bottom)
+            .popover(isPresented: $showing, arrowEdge: .bottom) { AgentConnectPopover() }
         }
         // Caps growth so a long intent truncates instead of pushing the strip
         // toward the traffic lights or the window edge; short states just size
@@ -64,8 +68,6 @@ struct AgentStatusStrip: View {
         // stays pinned to the window edge at any width — it grows leftward
         // rather than floating centred in the 440pt ceiling.
         .frame(maxWidth: 440, alignment: .trailing)
-        .popoverTip(AgentTip.isEligible ? agentTip : nil, arrowEdge: .bottom)
-        .popover(isPresented: $showing, arrowEdge: .bottom) { AgentConnectPopover() }
     }
 
     /// State phrase, plus the intent appended in a dimmer run when editing —
