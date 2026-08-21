@@ -65,6 +65,22 @@ Three modes, and each one can fail differently:
   the Portrait section of the app.** Nothing you can call triggers that
   download.
 
+**Choosing between them.** Ask what the photograph is: a figure against a
+background, or a scene with continuous depth.
+
+- One clear subject, and it is a person: `person`. The most reliable choice
+  for a portrait, since it will not mistake a foreground object for the
+  subject.
+- One clear subject that is not a person, or a person plus other foreground
+  that should stay sharp: `subject`. This is the sensible default.
+- No figure-and-ground at all, such as a street receding, a table top, a
+  landscape: `depth`. Subject masking has nothing to grab in those frames, and
+  depth is also the only mode where you choose *where* the sharp plane sits,
+  through `focusDepth`.
+- Subject or person came back with nothing changed: `depth` is the fallback,
+  because it does not depend on finding a subject. Tell the user it needs the
+  model downloaded.
+
 Two silent failures to guard against:
 
 1. **`blurMode` turns blur on.** Choosing a mode while blur is off lifts
