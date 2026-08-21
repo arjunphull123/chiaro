@@ -1,6 +1,6 @@
 ---
 name: chiaro
-description: Edit, grade, and cull photographs in Chiaro, a RAW editor that serves MCP from inside the app. Use when the user asks to edit, fix, grade, warm, brighten, crop, straighten, blur the background, convert to black and white, or export photos; when they name a photo or a RAW file (.arw, .dng, .cr3, .nef); when they ask for a look such as cinematic, film, moody, airy, punchy, or golden hour; or when they want a folder culled, rated, or batch edited.
+description: Edit, grade, and cull photographs in Chiaro, a RAW editor that serves MCP from inside the app. Use when the user asks to edit, fix, grade, warm, brighten, crop, straighten, blur the background, split tone, soften skin, add grain, convert to black and white, or export photos; when they name a photo or a RAW file (.arw, .dng, .cr3, .nef); when they ask for a look such as cinematic, film, moody, airy, punchy, or golden hour; or when they want a folder culled, rated, or batch edited.
 argument-hint: [photo or folder and what you want done]
 ---
 
@@ -26,6 +26,7 @@ Follow this for every photo. It is short on purpose.
 ```
 - [ ] open_photo, so the user can watch
 - [ ] get_preview at maxDimension 1400
+- [ ] get_stats, when the fault is tonal or a cast
 - [ ] name the fault in words
 - [ ] one set_edit, with intent filled in
 - [ ] get_preview again at the same size
@@ -49,6 +50,19 @@ produced wrong calls in practice.
 **Fill in `intent` on every `set_edit`.** It is shown live in the app while you
 work. Write it as a photographer would: "lifting the shadows off the floor",
 "warming the stone", not "setting shadows to 24".
+
+**Measure before you guess, then look before you believe the measurement.**
+`chiaro:get_stats` reads the rendered pixels and answers the questions your eye
+is bad at: how much of each channel is railed at the ceiling or the floor, where
+the luminance percentiles sit, and whether neutrals carry a cast. Use it to
+settle "is this flat or is it dull", "am I clipping", and "is that warmth real or
+am I imagining it".
+
+It has one blind spot worth knowing, because it has caused a wrong call. Every
+figure except the clipping percentages is a whole-image aggregate, and midtones
+dominate any average. A control scoped to one tonal zone can be doing nothing at
+all while the means barely move. When you are judging a highlight or shadow
+control, look at two previews instead.
 
 **Stop after one refinement.** Two passes is a finished photo. Four passes is
 mush, and you will not be able to tell which move did the damage.
@@ -88,6 +102,13 @@ distinguishing, because each has a different fix:
 | Shadow detail gone, hard edge at the histogram floor | Crushed | Raise `blacks`, lower `contrast`, lift the curve toe |
 | Highlight detail gone | Clipped | Not recoverable. Say so rather than fighting it |
 | Grain and colour speckle in shadows | Noise | `noiseReduction`, sparingly |
+| Skin reads harsh, every pore drawn | Over-sharp | Negative `clarity`, around -8 to -20 |
+
+`get_stats` settles most of the top half of that table faster than looking does.
+A clipping ceiling above a few percent names Clipped; a floor above a few percent
+names Crushed; `p05` well off zero with `p95` well short of one names Flat; and
+`neutralCast` pulling away from `grayWorld` names a Cast in the neutrals rather
+than a genuinely coloured scene.
 
 **Flat and dull are different faults.** Flat is a tonal-range problem: the image
 does not reach from black to white, and the fix is the black point and contrast.
@@ -114,8 +135,10 @@ things, so your edits compose predictably instead of fighting each other:
 3. Tone: `contrast`, `highlights`, `shadows`, `whites`, `blacks`.
 4. `curve`, for finer contrast shaping than the sliders give.
 5. Colour: `vibrance`, then `saturation`, then `hsl` per band.
-6. `locals`, masked adjustments, once the global edit is settled.
-7. Finishing: `clarity`, `noiseReduction`, `sharpness`, `vignette`.
+6. Grading by tonal zone, once the colour underneath is honest.
+7. `locals`, masked adjustments, once the global edit is settled.
+8. Finishing: `clarity`, `noiseReduction`, `sharpness`, `vignette`.
+9. `grain`, last of all. It belongs to the print, not to the light.
 
 Correct before you grade. A cast fixed after grading means the grade was built
 on a lie.
@@ -135,9 +158,15 @@ Each of these has produced a bad photo in practice.
   the other two still crush is a wasted pass.
 - **Once contrast and blacks are set, saturation rarely needs to exceed +20.**
   If contrast went up, saturation often needs to come down to compensate.
-- **`clarity` is 0 on people.** +15 to +30 on landscape, architecture, and
-  texture. Past about +35 it halos, and halos are the clearest sign of an
-  over-processed photo.
+- **`clarity` goes negative on people, not to zero.** +15 to +30 on landscape,
+  architecture, and texture; past about +35 it halos, and halos are the clearest
+  sign of an over-processed photo. On faces, -8 to -20 softens skin without
+  losing the eyes, which is what the Portrait glow preset does. Zero is merely
+  neutral, and a portrait that was sharpened at decode often needs less than
+  neutral.
+- **Grain is the last move, and it is subtle at useful strengths.** 15 to 35
+  reads as film stock; past about 60 it reads as a filter. `grainSize` is
+  coarseness, and it does nothing at all while `grain` is 0.
 - **Do not exceed 2 stops of `exposure`** without saying why. RAW tolerates
   about 3, and a JPEG about 2, before noise and banding take over.
 - **Never apply a preset after refining.** `chiaro:apply_preset` overwrites
@@ -156,13 +185,20 @@ name from the UI, then refine from there.
 For anything else, read `references/looks.md`, which has each look as a starting
 point in Chiaro's actual controls.
 
-Two systems do colour, and picking the right one matters. Grade **by tonal
-zone** (`shadowHue`/`shadowStrength`, `midHue`/`midStrength`,
+Three systems do colour, and picking the right one is most of the skill. Grade
+**by tonal zone** (`shadowHue`/`shadowStrength`, `midHue`/`midStrength`,
 `highlightHue`/`highlightStrength`, `gradeBalance`) when the request names a
 mood, since that is real split toning and preserves the colours already in the
 frame. Use the **colour mixer** (`hsl`) when the request names an object, such
-as foliage, skin, or a sky. Black and white is `monochrome: true`, never
-`saturation: -100`.
+as foliage, skin, or a sky. Use a **local with a luminance range**
+(`lumaLow`/`lumaHigh`) when the target is neither a mood nor a hue but a tonal
+band inside one part of the frame, such as the bright half of a sky. Black and
+white is `monochrome: true`, never `saturation: -100`.
+
+All three zones grade, and they are not equally forceful at equal numbers.
+Midtones cover most of a photograph's pixels, so `midStrength` at 30 shows far
+more than `highlightStrength` at 30 on a frame with little bright area. Set
+strength by what you see, not by matching numbers across zones.
 
 Recipes are starting points keyed to a diagnosis, never destinations. Apply,
 look, adjust to the photograph in front of you.

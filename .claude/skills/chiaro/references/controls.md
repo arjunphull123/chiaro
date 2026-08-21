@@ -6,9 +6,11 @@ masks, blur, geometry, or the curve.
 
 - [Ranges](#ranges)
 - [Controls whose names mislead](#controls-whose-names-mislead)
+- [Measuring a photograph](#measuring-a-photograph)
 - [Background blur](#background-blur)
 - [The tone curve](#the-tone-curve)
 - [The colour mixer](#the-colour-mixer)
+- [Grading by tonal zone](#grading-by-tonal-zone)
 - [Local adjustments](#local-adjustments)
 - [Geometry](#geometry)
 - [Presets](#presets)
@@ -28,6 +30,13 @@ except inside `locals` (see below).
 | `clarity` | -100 to 100 | 0 |
 | `vignette` | 0 to 100 | 0 |
 | `sharpness`, `noiseReduction` | 0 to 100 | 0 |
+| `colorNoiseReduction`, `moireReduction` | 0 to 100 | 0 (RAW only) |
+| `grain` | 0 to 100 | 0 (off) |
+| `grainSize` | 0 to 100 | 50 |
+| `shadowStrength`, `midStrength`, `highlightStrength` | 0 to 100 | 0 (off) |
+| `shadowHue`, `midHue`, `highlightHue` | 0 to 360 | 0 |
+| `gradeBalance` | -100 to 100 | 0 |
+| `monochrome` | boolean | false |
 | `blurF` | 0 to 1 | 0 (off) |
 | `focusDepth` | 0 to 1 | 0.5 |
 | `relight`, `maskReach` | -100 to 100 | 0 |
@@ -38,6 +47,15 @@ except inside `locals` (see below).
 `vibrance` protects colours that are already saturated and lifts the muted
 ones, so it is the safer of the two on anything containing skin. `saturation`
 moves everything equally.
+
+`clarity` works in both directions. Positive is local-contrast sharpening;
+negative blends toward a soft blur, which is the glow a portrait wants. Two
+separate code paths, because the underlying filter refuses negative amounts.
+
+`grainSize` is coarseness, not amount, and it does nothing while `grain` is 0.
+Grain is achromatic, weighted to the midtones, and applied after everything
+else. Its cell size tracks the render resolution, so a preview and an export
+show the same grain rather than different-sized grain.
 
 ## Controls whose names mislead
 
@@ -52,6 +70,31 @@ moves everything equally.
   plane stays sharp; blur ramps in beyond it. 0 is nearest, 1 is farthest.
 - **`skewV`** and **`skewH`** name the lines being corrected, verticals and
   horizontals, not the direction of the motion.
+
+## Measuring a photograph
+
+`get_stats` renders the photo with its current edit and measures the result, so
+it reflects your edits rather than the original file. What comes back:
+
+| Field | Use |
+| --- | --- |
+| `clipping.{red,green,blue,luminance}.{ceiling,floor}` | percentages railed at each end, per channel |
+| `luminance.{p05,p50,p95,mean}` | where the tonal range actually sits |
+| `saturation.mean` | whether colour is genuinely lifeless or just looks it |
+| `grayWorld.{r,g,b}` | average of all midtones, so a coloured scene reads as coloured |
+| `neutralCast.{r,g,b}` | average of *low-saturation* midtones only, so this isolates a cast |
+| `histogram` | 32 luminance buckets |
+
+The two cast measures answer different questions on purpose. `grayWorld` includes
+every midtone, so a genuinely orange sunset looks orange in it. `neutralCast`
+looks only at pixels that were near-neutral to begin with, so a divergence
+between the two means a real cast in the whites rather than a colourful subject.
+
+**Clipping is the one figure that is not an average**, and so the one figure that
+can settle a question on its own. A red ceiling of 9% is a railed channel, full
+stop. Everything else is a whole-image mean, and midtones dominate any mean: a
+control scoped to shadows or highlights can be doing nothing while the means sit
+still. Judge zone-scoped work with two previews, not with these numbers.
 
 ## Background blur
 
@@ -124,9 +167,43 @@ Bands and their hue centres: `red` 0, `orange` 30, `yellow` 60, `green` 120,
 Use it for hue-specific work: skin sits in `orange`, foliage in `green` and
 `yellow`, skies in `blue` and `aqua`.
 
-Because one shared curve and no per-zone tinting exist, this is the only route
-to selective colour, and it selects by hue rather than by brightness. That
-distinction is the main constraint on grading in Chiaro.
+The mixer selects by **hue**. Grading selects by **brightness**. They are
+independent, they compose, and confusing them is the most common way to reach
+for the wrong control: a request to cool the shadows is grading, a request to
+cool the sky is the mixer.
+
+One limit worth knowing: a neutral grey has no hue, so no band selects it. A
+white overcast sky is unreachable by the mixer. Grade it by zone, or mask it
+with a local carrying a luminance range.
+
+## Grading by tonal zone
+
+Three zones, two values each, plus a balance. Hues are degrees on the colour
+wheel and wrap; strengths are 0 to 100 and default to 0, so grading is inert
+until asked for.
+
+| Field | Meaning |
+| --- | --- |
+| `shadowHue`, `shadowStrength` | tint the dark end |
+| `midHue`, `midStrength` | tint the middle |
+| `highlightHue`, `highlightStrength` | tint the bright end |
+| `gradeBalance` | -100 to 100, moves where shadows end and highlights begin |
+
+This is real split toning, not a wash. It adds a chroma shift at the luminance
+you target while preserving both brightness and the pixel's own hue, so tinting
+shadows teal does not flatten a red awning to grey. It also deliberately still
+applies in monochrome, which is how you get toned black and white: sepia and
+selenium are a grade away, not a separate feature.
+
+Two behaviours to expect:
+
+- **Equal strengths are not equally visible.** The zones are weighted by
+  luminance and normalised, and midtones are most of any photograph. 30 in the
+  mids will read strongly where 30 in the highlights may barely show on a frame
+  with little bright area. Judge by eye, not by matching numbers.
+- **Saturated pixels resist the tint** on purpose, so grading does not muddy
+  colour that is already there. A grade lands hardest on neutrals, which is
+  usually what you want and is why it works on grey days.
 
 ## Local adjustments
 
@@ -139,8 +216,20 @@ Coordinates are normalised 0 to 1 with y measured from the top.
 - `kind: "linear"`, a gradient running from `a` (full effect) to `b` (none)
 - `kind: "subject"`, uses the detected subject mask, no geometry needed
 
-Each local carries `feather` 0 to 100, `invert`, and its own `exposure`,
-`contrast`, `highlights`, `shadows`, `temp`, `tint`, `saturation`, `clarity`.
+Each local carries `feather` 0 to 100, `invert`, its own `exposure`, `contrast`,
+`highlights`, `shadows`, `temp`, `tint`, `saturation`, `clarity`, and a
+luminance range.
+
+**`lumaLow` and `lumaHigh`**, 0 to 100, default 0 and 100, narrow the local to a
+tone band *inside* its geometric mask. `lumaHigh: 40` confines it to the shadows
+there; `lumaLow: 60` to the highlights. Edges feather smoothly, so gradients do
+not band, and a fully open window is exactly inert. Crossed values read as the
+band between them.
+
+This is the tool for the target that is neither a mood nor a hue: the bright half
+of a sky, the shadow side of a building, a white overcast sky that no hue band
+can select. A linear gradient across the horizon plus `lumaLow: 55` darkens the
+sky and leaves the roofline alone, which geometry alone cannot do.
 
 **Values inside `locals` are not clamped.** A local `exposure` of 40 will be
 accepted and stored even though the sane range is -3 to 3. Stay inside the
@@ -177,10 +266,17 @@ The built-ins, for reference:
 | --- | --- |
 | Punch | contrast 18, vibrance 25, clarity 12, blacks -8 |
 | Soft film | contrast -10, saturation -12, temp 6, lifted matte curve |
-| Silver | saturation -100, contrast 15, whites 10, blacks -10, clarity 10 |
+| Silver | monochrome, contrast 15, whites 10, blacks -10, clarity 10, blue l -35, aqua l -20, orange l 20, red l 10 |
 | Golden hour | temp 22, tint 4, vibrance 15, highlights -15, vignette 12 |
 | Cool morning | temp -18, tint -2, contrast 8, saturation -8 |
 | Portrait glow | temp 8, highlights -20, shadows 12, clarity -8, vibrance 10, sharpness 12 |
+
+Silver is a real channel-mixer conversion, not a desaturation: it darkens sky and
+lifts skin through the mixer's luminance values. Portrait glow's negative
+`clarity` is the softening path, so it is a genuine glow rather than a no-op.
+
+None of the built-ins use grading or grain, so both are yours to add on top of a
+preset without anything being overwritten.
 
 `list_presets` also returns the user's saved presets, mixed in with these and
 not distinguishable in the response.

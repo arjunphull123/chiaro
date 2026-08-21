@@ -6,8 +6,9 @@ applied over an uncorrected frame amplifies the fault.
 
 Apply, look at a preview of 1400px or more, then adjust to the photograph.
 
-- [What Chiaro can and cannot grade](#what-chiaro-can-and-cannot-grade)
+- [How Chiaro grades](#how-chiaro-grades)
 - [Cinematic](#cinematic)
+- [Overcast](#overcast)
 - [Film](#film)
 - [Moody](#moody)
 - [Airy](#airy)
@@ -34,8 +35,17 @@ shadows teal does not flatten a red awning into grey. Use it for mood.
 saturation and luminance. Use it when the target is a *thing* rather than a
 tonal range, such as foliage, skin, or a sky.
 
+**By tone within a region**, which is a local carrying `lumaLow`/`lumaHigh`. Use
+it when the target is a tonal band inside part of the frame rather than across
+all of it: the bright half of a sky, the shadow side of a building, a white
+overcast sky that has no hue for the mixer to grab.
+
 A useful rule: if the request names a mood, grade by zone. If it names an
-object, use the mixer.
+object, use the mixer. If it names a place in the frame, use a local.
+
+Equal strengths across zones are not equally visible. Midtones are most of a
+photograph, so `midStrength` 30 reads strongly where `highlightStrength` 30 may
+barely show on a frame with little bright area. Set each by eye.
 
 ## Cinematic
 
@@ -128,7 +138,16 @@ film rather than as a vintage filter: greens toward olive, skin toward peach.
 {"hsl": {"green": {"h": -8, "s": -12}, "orange": {"h": 4}}}
 ```
 
-There is no grain and no halation in Chiaro, so do not promise either.
+Then grain, which is the part that actually reads as film rather than as a
+filter. It is the last move, after everything else:
+
+```json
+{"grain": 22, "grainSize": 55}
+```
+
+Keep it under about 35. Grain is meant to be noticed at full size and invisible
+in a thumbnail; past that it becomes the subject. There is no halation in
+Chiaro, so do not promise that.
 
 ## Moody
 
@@ -168,7 +187,10 @@ Bright, low contrast, nothing fully black.
 ```
 
 Watch the whites: the look dies the moment highlights actually clip, because
-then it reads as blown out rather than luminous.
+then it reads as blown out rather than luminous. `get_stats` answers that
+directly; a ceiling of more than two or three percent has gone too far.
+
+The negative `clarity` here is the softening path and carries much of the look.
 
 ## Punchy
 
@@ -179,8 +201,9 @@ having.
 {"contrast": 16, "blacks": -6, "vibrance": 18}
 ```
 
-On landscape or architecture, add `clarity` between 15 and 30. On people, leave
-clarity at 0, because it draws every pore and line.
+On landscape or architecture, add `clarity` between 15 and 30. On people it goes
+the other way: -8 to -20 softens skin while the eyes stay sharp. Zero is merely
+neutral, and a face that was sharpened at decode usually wants less than that.
 
 The app's Punch preset does this in one call. Prefer it when the user has not
 asked for anything specific.
@@ -229,10 +252,18 @@ Black and white tolerates harder contrast than colour, since there is no
 saturation to blow out, so push further than you otherwise would.
 
 Two things worth knowing. A neutral overcast sky has no chroma, so no band
-selects it; darkening a white sky needs a linear local adjustment across the
-horizon, not the mixer. And grading still applies in monochrome, so adding a
-warm highlight tint or a cool shadow tint gives you toned black and white:
-sepia and selenium are a grade away, not a separate feature.
+selects it. Darkening a white sky wants a linear local across the horizon with a
+luminance range on it, which catches the bright sky and leaves a dark roofline
+alone in a way geometry by itself cannot:
+
+```json
+{"locals": [{"kind": "linear", "ax": 0.5, "ay": 0.0, "bx": 0.5, "by": 0.55,
+             "feather": 60, "exposure": -0.7, "lumaLow": 55}]}
+```
+
+And grading still applies in monochrome, so a warm highlight tint or a cool
+shadow tint gives you toned black and white: sepia and selenium are a grade
+away, not a separate feature.
 
 ## Signs you went too far
 
