@@ -96,6 +96,10 @@ stop. Everything else is a whole-image mean, and midtones dominate any mean: a
 control scoped to shadows or highlights can be doing nothing while the means sit
 still. Judge zone-scoped work with two previews, not with these numbers.
 
+**Measure before you add grain.** Grain pushes pixels toward both rails, so it
+raises the clipping figures on its own. Diagnose clipping first, then add grain
+last, or you will chase clipping that is only the grain you just applied.
+
 ## Background blur
 
 Three modes, and each one can fail differently:

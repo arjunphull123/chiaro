@@ -13,6 +13,7 @@ struct Preset: Codable, Identifiable, Equatable {
         .exposure, .contrast, .highlights, .shadows, .whites, .blacks,
         .temp, .tint, .vibrance, .saturation,
         .clarity, .vignette, .sharpness, .noiseReduction, .colorNoiseReduction, .moireReduction,
+        .grain, .grainSize,
         .shadowStrength, .shadowHue, .midStrength, .midHue,
         .highlightStrength, .highlightHue, .gradeBalance,
     ]
