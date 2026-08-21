@@ -78,6 +78,7 @@ final class Library {
     // walk the same filtered set the gallery is showing (ADR-less mechanical fix).
     var filterStarred = false
     var filterEdited = false
+    var filterRAW = false
     /// Top-level subfolder filter (nil = everything).
     var folderScope: String?
     var searchText = ""
@@ -86,6 +87,7 @@ final class Library {
         var result = photos
         if filterStarred { result = result.filter(\.starred) }
         if filterEdited { result = result.filter(\.hasEdits) }
+        if filterRAW { result = result.filter(\.isRAW) }
         if let folderScope {
             result = result.filter { topFolder($0) == folderScope }
         }

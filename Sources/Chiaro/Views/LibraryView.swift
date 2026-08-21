@@ -240,6 +240,7 @@ struct LibraryView: View {
     /// The RAW tally only earns its place in a genuinely mixed folder — "22 RAW"
     /// out of 22, or "0 RAW" out of 6, is just the photo count restated.
     private var countLabel: String {
+        if library.filterRAW { return "\(visiblePhotos.count) photos" }
         let total = library.photos.count
         let raws = library.photos.filter(\.isRAW).count
         guard raws > 0, raws < total else { return "\(total) photos" }
@@ -311,6 +312,8 @@ struct LibraryView: View {
             }
             .padding(3)
             .background(RoundedRectangle(cornerRadius: 8).stroke(Theme.hairline))
+            Chip(title: "RAW", selected: library.filterRAW) { library.filterRAW.toggle() }
+                .help("RAW files only")
             HStack(spacing: 3) {
                 ForEach(Library.ViewMode.allCases, id: \.self) { mode in
                     Button { library.viewMode = mode } label: {
