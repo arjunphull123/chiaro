@@ -20,7 +20,14 @@ tint alone on RAW, and the agent status card in all three of its states.
 
 ## Outstanding bugs
 
-1. **Depth blur may blur uniformly** rather than masking by distance. Reported
+1. **Focus peaking paints rather than tints.** The in-focus wash is amber at
+   0.45 opacity composited over the image, which on a dark subject obliterates
+   it: the shoot's peaking frame reads as a solid orange cat-shaped cutout with
+   no cat in it. Around 0.2 would tint without erasing. Found by shooting it,
+   not by testing it. The screenshot was dropped rather than reshot, since the
+   3D scene covers the same ground better, so this is a product fix rather than
+   a blocker.
+2. **Depth blur may blur uniformly** rather than masking by distance. Reported
    by an automated test whose blur findings proved unreliable, so treat as
    unconfirmed until checked by eye with the depth model downloaded. The only
    bug left on the list.
@@ -117,7 +124,27 @@ frame moved by half a percent. Whole-image means are a bad proxy for whether a
 zone control is visible, because midtones dominate any mean. Render two previews
 and look.
 
-## Shoot dependencies
+## Shoot: done, 2026-08-21
+
+15 stills and one screen recording in `~/Desktop/chiaro shoot`. The recording is
+950 MB, so it is a source for frame grabs rather than something to ship; the
+"Claude is editing" moments in it are the only clean captures of the status card
+mid-edit. Two pairs came out byte-identical (a double press, and the peaking
+frame). Three frames have the wrong app name in the menu bar, which does not
+matter because nothing on the site includes the menu bar.
+
+The frames that earn their place: the paired shot with the terminal, which is
+the only one that proves the claim and whose terminal text is the best copy in
+the set; the 3D point cloud, which nothing on a competitor's site resembles; and
+the black and white tram frame, which also closes the tungsten night question.
+
+Verbatim transcript of the driven session is at
+`chiaro-site/docs/demo-transcript.md`.
+
+Next phase is the site, built close to cursor.com's structure by the owner's
+call. Specs already in `chiaro-site/docs/`.
+
+## Shoot dependencies (now historical)
 
 Blur works, so the portrait shot is unblocked. The highlight and clarity fixes
 have landed and the status card is approved. Still waiting on a look at a
