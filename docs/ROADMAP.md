@@ -87,6 +87,12 @@ Ranked, with the reasoning that put them here rather than in a tier.
 - **Healing and clone.** Wanted by every photographer, and a real gap. Note
   ADR 0012 already cut generative inpainting on quality evidence, so this means
   classical patch-based healing, not a model.
+- **Move the grading kernel off Core Image Kernel Language.**
+  `CIColorKernel(source:)` has been deprecated since macOS 10.14 and it fails
+  *silently*: a source typo returns nil, and grading shipped as a permanent
+  no-op because of exactly that. There is now an assert, but the clean fix is a
+  computed `CIColorCube`, matching what `HSLCube` already does, since zone
+  grading is a pure function of RGB and expresses fine as a 3D LUT.
 
 Considered and deliberately not planned:
 
