@@ -336,11 +336,14 @@ struct LibraryView: View {
                         .fill(library.filterEdited ? Theme.amber : Theme.ink3)
                         .frame(width: 11, height: 11)
                 }
+                toggleChip(active: library.filterRAW, help: "RAW files only", toggle: { library.filterRAW.toggle() }) {
+                    Text("RAW")
+                        .font(Theme.ui(9.5, .medium))
+                        .foregroundStyle(library.filterRAW ? Theme.amber : Theme.ink3)
+                }
             }
             .padding(3)
             .background(RoundedRectangle(cornerRadius: 8).stroke(Theme.hairline))
-            Chip(title: "RAW", selected: library.filterRAW) { library.filterRAW.toggle() }
-                .help("RAW files only")
             HStack(spacing: 3) {
                 ForEach(Library.ViewMode.allCases, id: \.self) { mode in
                     Button { library.viewMode = mode } label: {
