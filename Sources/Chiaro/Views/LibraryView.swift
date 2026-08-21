@@ -259,9 +259,13 @@ struct LibraryView: View {
     /// selection is already shown by the tile's border — the count only
     /// earns its place once there's a set worth naming.
     private var footerCount: Text {
-        let filtering = library.filterRAW
         let total = library.photos.count
-        var text = footerRun("\(filtering ? visiblePhotos.count : total)", mono: true) + footerRun(" photos", mono: false)
+        let shown = visiblePhotos.count
+        // Filters only ever remove photos, never add — a shown count short of the
+        // total is proof something (any of them, or search) is active, without
+        // restating the filter list here too.
+        let filtering = shown < total
+        var text = footerRun("\(shown)", mono: true) + footerRun(" photos", mono: false)
         if !filtering {
             let raws = library.photos.filter(\.isRAW).count
             if raws > 0, raws < total {
