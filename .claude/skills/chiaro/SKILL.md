@@ -171,8 +171,12 @@ look, adjust to the photograph in front of you.
 
 Four behaviours that will fool you. Full detail in `references/controls.md`.
 
-- **Setting `blurMode` does not turn blur on.** `blurF` defaults to 0, which is
-  off. Set both, or nothing happens.
+- **Choosing a blur mode turns blur on.** Setting `blurMode` when blur is off
+  also lifts `blurF` to a default amount, the same way clicking the mode chip
+  does in the app. Send `blurF: 0` to turn blur off, and set `blurF` yourself
+  when you want a specific amount.
+- **`colorNoiseReduction` and `moireReduction` are RAW-only** and are refused
+  on anything else, since they exist only as decode parameters.
 - **Depth blur degrades silently.** If the depth model is not downloaded,
   `blurMode: "depth"` falls back to ordinary subject blur with no error. If the
   user asked for a focus plane, verify in a preview and tell them to download

@@ -67,8 +67,9 @@ Three modes, and each one can fail differently:
 
 Two silent failures to guard against:
 
-1. **`blurMode` alone does nothing.** `blurF` starts at 0. Send both, for
-   example `{"blurMode": "person", "blurF": 0.57}`.
+1. **`blurMode` turns blur on.** Choosing a mode while blur is off lifts
+   `blurF` to a default amount, matching the app's mode chips. Send `blurF`
+   yourself for a specific amount, and `blurF: 0` to turn blur off.
 2. **A missing depth model does not error.** Depth mode falls back to subject
    blur silently. If the user wanted a focus plane, look at the result.
 
