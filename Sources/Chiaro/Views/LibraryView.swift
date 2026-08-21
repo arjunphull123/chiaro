@@ -307,8 +307,15 @@ struct LibraryView: View {
             Spacer()
             // Same presence pill and live intent as the edit rail (ADR 0008) —
             // a folder-wide pass happens with the library open, not the editor.
-            AgentRailStatus(library: library)
-                .fixedSize()
+            // Only while an agent is actually working: the header is already full
+            // at the 1080 minimum, and the connect call to action lives in the
+            // edit rail. The library stays mounted under the editor (see
+            // RootView), so width taken here clips both views.
+            if library.agentActive || AgentStatus.shared.isConnected {
+                AgentRailStatus(library: library)
+                    .frame(maxWidth: 190)
+                    .layoutPriority(-2)
+            }
             HStack(spacing: 3) {
                 allChip()
                 toggleChip(active: library.filterStarred, help: "Starred only", toggle: { library.filterStarred.toggle() }) {

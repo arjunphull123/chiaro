@@ -328,9 +328,17 @@ struct RootView: View {
             Theme.ground.opacity(0.6).ignoresSafeArea()
             // Library stays mounted beneath the editor so its scroll position
             // survives a round trip into a photo and back.
-            LibraryView(library: library, onExport: { exporting = true })
-                .opacity(library.editing == nil ? 1 : 0)
-                .allowsHitTesting(library.editing == nil)
+            // Wrapped so the library's own intrinsic width cannot raise the
+            // window's minimum: a GeometryReader proposes a size to its child
+            // instead of growing to fit it. Without this, anything added to the
+            // library header overflows and clips BOTH views, since the library
+            // stays mounted under the editor.
+            GeometryReader { geo in
+                LibraryView(library: library, onExport: { exporting = true })
+                    .frame(width: geo.size.width, height: geo.size.height)
+            }
+            .opacity(library.editing == nil ? 1 : 0)
+            .allowsHitTesting(library.editing == nil)
             if let editing = library.editing {
                 EditView(library: library, photo: editing, onExport: { exporting = true })
             }
