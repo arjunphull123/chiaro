@@ -35,7 +35,7 @@ enum HSLCube {
                         var hueShift = 0.0, satGain = 0.0, lumGain = 0.0
                         var total = 0.0
                         for (i, band) in bands.enumerated() where !band.isNeutral {
-                            let w = weight(hue: h * 360, center: HSLBand.centers[i])
+                            let w = weight(hue: h * 360, center: HSLBand.centers[i], halfWidth: halfWidths[i])
                             guard w > 0 else { continue }
                             hueShift += w * band.h
                             satGain += w * band.s
@@ -65,12 +65,29 @@ enum HSLCube {
         return data
     }
 
-    /// Cosine falloff around the band center, ±45° with wraparound.
-    private static func weight(hue: Double, center: Double) -> Double {
+    /// Cosine falloff around the band center, ±45° with wraparound — widened
+    /// per band so it always reaches the nearest neighboring center. Centers
+    /// aren't evenly spaced (30° red↔orange↔yellow, 60° yellow↔green↔aqua↔blue,
+    /// 45° blue↔purple↔magenta): a flat 45° leaves green and aqua, whose
+    /// neighbors sit 60° out on both sides, with a dead zone between the
+    /// bands — e.g. grass at hue ~70 (yellow-green) got zero weight from
+    /// green even though it's the nearest "green" control available.
+    private static let halfWidths: [Double] = HSLBand.centers.map { center in
+        let nearestGap = HSLBand.centers
+            .filter { $0 != center }
+            .map { other -> Double in
+                let d = abs(other - center)
+                return min(d, 360 - d)
+            }
+            .min() ?? 45
+        return max(45, nearestGap)
+    }
+
+    private static func weight(hue: Double, center: Double, halfWidth: Double) -> Double {
         var distance = abs(hue - center)
         if distance > 180 { distance = 360 - distance }
-        guard distance < 45 else { return 0 }
-        return 0.5 * (1 + cos(distance / 45 * .pi))
+        guard distance < halfWidth else { return 0 }
+        return 0.5 * (1 + cos(distance / halfWidth * .pi))
     }
 
     private static func rgbToHsv(_ r: Double, _ g: Double, _ b: Double) -> (Double, Double, Double) {
