@@ -120,9 +120,13 @@ struct EditState: Codable, Equatable {
     // Effects
     var clarity: Double = 0       // -100...100
     var vignette: Double = 0      // 0...100
-    // Detail
+    // Detail — sharpness/noiseReduction route to RAW decode time for RAW
+    // files (RawEngine.DecodeParams); colorNoiseReduction/moireReduction are
+    // decode-only controls with no post-demosaic equivalent, so RAW-only.
     var sharpness: Double = 0     // 0...100
     var noiseReduction: Double = 0 // 0...100
+    var colorNoiseReduction: Double = 0 // 0...100, RAW only
+    var moireReduction: Double = 0      // 0...100, RAW only
     // Portrait
     var blurF: Double = 0         // 0...1 (0 = off/f16, 1 = f1.4)
     var relight: Double = 0       // -100...100
@@ -244,7 +248,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
     case exposure, contrast, highlights, shadows, whites, blacks
     case temp, tint, vibrance, saturation
     case clarity, vignette
-    case sharpness, noiseReduction
+    case sharpness, noiseReduction, colorNoiseReduction, moireReduction
     case blurF, relight, maskReach, focusDepth
     case straighten, skewV, skewH
     case shadowStrength, shadowHue, midStrength, midHue, highlightStrength, highlightHue, gradeBalance
@@ -254,6 +258,8 @@ enum EditParameter: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .noiseReduction: "Noise"
+        case .colorNoiseReduction: "Color noise"
+        case .moireReduction: "Moiré"
         case .blurF: "Blur"
         case .temp: "Temp"
         case .relight: "Relight"
@@ -278,7 +284,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .exposure: -3...3
         case .straighten: -45...45
         case .skewV, .skewH: -30...30
-        case .vignette, .sharpness, .noiseReduction: 0...100
+        case .vignette, .sharpness, .noiseReduction, .colorNoiseReduction, .moireReduction: 0...100
         case .blurF, .focusDepth: 0...1
         case .shadowStrength, .midStrength, .highlightStrength: 0...100
         case .shadowHue, .midHue, .highlightHue: 0...360
@@ -327,6 +333,8 @@ enum EditParameter: String, CaseIterable, Identifiable {
         case .vignette: \.vignette
         case .sharpness: \.sharpness
         case .noiseReduction: \.noiseReduction
+        case .colorNoiseReduction: \.colorNoiseReduction
+        case .moireReduction: \.moireReduction
         case .blurF: \.blurF
         case .relight: \.relight
         case .maskReach: \.maskReach
@@ -353,7 +361,7 @@ enum EditParameter: String, CaseIterable, Identifiable {
                 let f = 16.0 * pow(1.4 / 16.0, v)
                 return f < 10 ? String(format: "ƒ%.1f", f) : String(format: "ƒ%.0f", f)
             }()
-        case .vignette, .sharpness, .noiseReduction: String(format: "%.0f", v)
+        case .vignette, .sharpness, .noiseReduction, .colorNoiseReduction, .moireReduction: String(format: "%.0f", v)
         case .focusDepth: v <= 0.02 ? "near" : v >= 0.98 ? "far" : String(format: "%.0f%%", v * 100)
         case .straighten: String(format: "%.1f°", v)
         case .skewV, .skewH: v == 0 ? "0" : String(format: "%+.0f", v)

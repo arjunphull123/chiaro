@@ -764,11 +764,14 @@ struct LibraryView: View {
                     // The hero says "Edited 2 minutes ago", so it should show the
                     // edit — a file thumbnail would show the untouched original.
                     // Strip thumbnails stay cheap.
-                    guard isHero, let base = RawEngine.shared.preview(for: url) else {
-                        return Library.scan(url, maxPixelSize: isHero ? 1600 : 480).image
+                    guard isHero else {
+                        return Library.scan(url, maxPixelSize: 480).image
                     }
                     let edit = Sidecar.read(for: url)?.edit ?? .neutral
-                    let rendered = RenderPipeline.render(base: base, edit: edit, personMask: nil)
+                    guard let base = RawEngine.shared.preview(for: url, decode: RawEngine.DecodeParams(edit)) else {
+                        return Library.scan(url, maxPixelSize: 1600).image
+                    }
+                    let rendered = RenderPipeline.render(base: base, edit: edit, personMask: nil, isRAW: Photo.isRAW(url))
                     return RawEngine.shared.context.createCGImage(rendered, from: rendered.extent)
                         ?? Library.scan(url, maxPixelSize: 1600).image
                 }

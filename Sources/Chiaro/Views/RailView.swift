@@ -74,7 +74,13 @@ struct RailView: View {
                     )
                     localSection
                     section("Effects", [.clarity, .vignette], help: "Punch and framing")
-                    section("Detail", [.sharpness, .noiseReduction], help: "Fine texture and grain cleanup")
+                    section(
+                        "Detail",
+                        model.photo.isRAW
+                            ? [.sharpness, .noiseReduction, .colorNoiseReduction, .moireReduction]
+                            : [.sharpness, .noiseReduction],
+                        help: "Fine texture and grain cleanup"
+                    )
                     actions
                     scrubHint
                 }

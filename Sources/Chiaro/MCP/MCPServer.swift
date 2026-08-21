@@ -224,6 +224,7 @@ final class MCPServer {
             "hsl": "Color mix", "curve": "Curve", "monochrome": "Color mix",
             "clarity": "Effects", "vignette": "Effects",
             "sharpness": "Detail", "noiseReduction": "Detail",
+            "colorNoiseReduction": "Detail", "moireReduction": "Detail",
             "blurF": "Background blur", "relight": "Background blur", "maskReach": "Background blur",
             "focusDepth": "Background blur",
             "blurMode": "Background blur", "depthBlur": "Background blur",
@@ -595,9 +596,9 @@ final class MCPServer {
         case "get_preview":
             let p = try photo(args)
             let maxDim = args["maxDimension"] as? Double ?? 768
-            let url = p.url, edit = p.edit
+            let url = p.url, edit = p.edit, isRAW = p.isRAW
             let jpeg = await Offload.on(Offload.render) { () -> Data? in
-                guard let base = RawEngine.shared.preview(for: url) else { return nil }
+                guard let base = RawEngine.shared.preview(for: url, decode: RawEngine.DecodeParams(edit)) else { return nil }
                 var mask: CIImage?
                 if edit.blurF > 0 || edit.relight != 0 {
                     mask = PortraitEngine.shared.mask(
@@ -606,7 +607,7 @@ final class MCPServer {
                 }
                 let depth = edit.blurMode == .depth && edit.blurF > 0
                     ? DepthEngine.shared.depthMap(for: url, image: base) : nil
-                var out = RenderPipeline.render(base: base, edit: edit, personMask: mask, depthMap: depth)
+                var out = RenderPipeline.render(base: base, edit: edit, personMask: mask, depthMap: depth, isRAW: isRAW)
                 let scale = maxDim / Double(max(out.extent.width, out.extent.height))
                 if scale < 1 { out = out.transformed(by: .init(scaleX: scale, y: scale)) }
                 return RawEngine.shared.context.jpegRepresentation(

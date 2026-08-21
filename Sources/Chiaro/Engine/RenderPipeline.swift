@@ -4,7 +4,7 @@ import CoreImage.CIFilterBuiltins
 /// Pure function (base image, edit, optional person mask) -> adjusted image.
 /// Order is fixed by SPEC.md; every node reads only EditState values.
 enum RenderPipeline {
-    static func render(base: CIImage, edit: EditState, personMask: CIImage?, depthMap: CIImage? = nil, skipCrop: Bool = false, focusPeaking: Bool = false, clippingWarnings: Bool = false) -> CIImage {
+    static func render(base: CIImage, edit: EditState, personMask: CIImage?, depthMap: CIImage? = nil, isRAW: Bool, skipCrop: Bool = false, focusPeaking: Bool = false, clippingWarnings: Bool = false) -> CIImage {
         var image = applyGeometry(base, edit: edit, skipCrop: skipCrop)
         // Masks are aligned to the un-transformed base, so they get the same
         // geometry before use.
@@ -74,14 +74,17 @@ enum RenderPipeline {
             f.intensity = Float(edit.clarity / 100 * 0.5)
             image = f.outputImage ?? image
         }
-        if edit.noiseReduction > 0 {
+        // RAW files route sharpness/noiseReduction to decode time instead
+        // (RawEngine.DecodeParams, baked into `base` before this function ever
+        // runs) — applying these post-demosaic too would double them up.
+        if edit.noiseReduction > 0 && !isRAW {
             let f = CIFilter.noiseReduction()
             f.inputImage = image
             f.noiseLevel = Float(edit.noiseReduction / 100 * 0.06)
             f.sharpness = 0.4
             image = f.outputImage ?? image
         }
-        if edit.sharpness > 0 {
+        if edit.sharpness > 0 && !isRAW {
             let f = CIFilter.sharpenLuminance()
             f.inputImage = image
             f.sharpness = Float(edit.sharpness / 100 * 1.2)

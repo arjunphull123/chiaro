@@ -22,7 +22,7 @@ final class Photo: Identifiable {
 
     init(url: URL) {
         self.url = url
-        self.isRAW = Photo.rawExtensions.contains(url.pathExtension.lowercased())
+        self.isRAW = Photo.isRAW(url)
         let sidecar = Sidecar.read(for: url)
         self.edit = sidecar?.edit ?? .neutral
         self.starred = sidecar?.starred ?? false
@@ -30,5 +30,6 @@ final class Photo: Identifiable {
     }
 
     static let rawExtensions: Set<String> = ["arw", "dng", "nef", "cr2", "cr3", "raf", "orf", "rw2", "srw", "pef"]
+    static func isRAW(_ url: URL) -> Bool { rawExtensions.contains(url.pathExtension.lowercased()) }
     static let imageExtensions: Set<String> = rawExtensions.union(["jpg", "jpeg", "heic", "heif", "tiff", "tif", "png"])
 }

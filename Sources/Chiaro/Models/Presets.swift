@@ -12,7 +12,7 @@ struct Preset: Codable, Identifiable, Equatable {
     static let carried: [EditParameter] = [
         .exposure, .contrast, .highlights, .shadows, .whites, .blacks,
         .temp, .tint, .vibrance, .saturation,
-        .clarity, .vignette, .sharpness, .noiseReduction,
+        .clarity, .vignette, .sharpness, .noiseReduction, .colorNoiseReduction, .moireReduction,
         .shadowStrength, .shadowHue, .midStrength, .midHue,
         .highlightStrength, .highlightHue, .gradeBalance,
     ]

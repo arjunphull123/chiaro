@@ -363,7 +363,7 @@ final class EditViewModel {
     }
 
     private func scheduleRender() {
-        guard let basePreview else { return }
+        guard basePreview != nil else { return }
         let neededKind: PortraitEngine.MaskKind = edit.blurMode == .person ? .person : .subject
         if neededKind != maskKind {
             maskKind = neededKind
@@ -376,13 +376,19 @@ final class EditViewModel {
         let mask = personMask
         let skipCrop = cropMode
         let url = photo.url
+        let isRAW = photo.isRAW
+        let decode = RawEngine.DecodeParams(edit)
         let peaking = armed == .focusDepth && edit.blurMode == .depth
         let clipping = showClipping
         Task { [weak self] in
             let result = await Offload.on(Offload.render) { () -> (CGImage, HistogramData)? in
+                // Re-fetched (not the cached `basePreview` captured at load) so a
+                // sharpness/noise-reduction change reaches RAW decode; RawEngine's
+                // own cache keeps this a no-op redecode when nothing changed.
+                guard let base = RawEngine.shared.preview(for: url, decode: decode) else { return nil }
                 let depth = edit.blurMode == .depth && (edit.blurF > 0 || peaking)
-                    ? DepthEngine.shared.depthMap(for: url, image: basePreview) : nil
-                let output = RenderPipeline.render(base: basePreview, edit: edit, personMask: mask, depthMap: depth, skipCrop: skipCrop, focusPeaking: peaking, clippingWarnings: clipping)
+                    ? DepthEngine.shared.depthMap(for: url, image: base) : nil
+                let output = RenderPipeline.render(base: base, edit: edit, personMask: mask, depthMap: depth, isRAW: isRAW, skipCrop: skipCrop, focusPeaking: peaking, clippingWarnings: clipping)
                 guard let cg = RawEngine.shared.context.createCGImage(output, from: output.extent) else { return nil }
                 return (cg, HistogramSampler.sample(output))
             }

@@ -79,7 +79,7 @@ enum Exporter {
         }
 
         let engine = RawEngine.shared
-        guard let full = engine.fullImage(for: url) else {
+        guard let full = engine.fullImage(for: url, decode: RawEngine.DecodeParams(edit)) else {
             throw CocoaError(.fileReadCorruptFile)
         }
         var mask: CIImage?
@@ -90,7 +90,7 @@ enum Exporter {
         }
         let depth = edit.blurMode == .depth && edit.blurF > 0
             ? DepthEngine.shared.depthMap(for: url, image: full) : nil
-        var rendered = RenderPipeline.render(base: full, edit: edit, personMask: mask, depthMap: depth)
+        var rendered = RenderPipeline.render(base: full, edit: edit, personMask: mask, depthMap: depth, isRAW: Photo.isRAW(url))
         if let maxDim = options.maxDimension {
             let scale = maxDim / Double(max(rendered.extent.width, rendered.extent.height))
             if scale < 1 {
