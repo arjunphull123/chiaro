@@ -12,6 +12,16 @@ enum RenderPipeline {
         let depthMap = depthMap.map { applyGeometry($0, edit: edit, skipCrop: skipCrop) }
         let scale = max(base.extent.width, base.extent.height) / RawEngine.previewMaxDimension
 
+        // `base` already carries the camera's as-shot white balance: RawEngine
+        // never touches CIRAWFilter's neutralTemperature/neutralTint, so RAW
+        // decode applies the camera's own reading by default, and the result
+        // lands at this working space's D65/~6500K neutral regardless of the
+        // original scene's color temperature (that's what white-balancing
+        // does — verified against real .arw files down to a 3100K tungsten
+        // frame). So `neutral: 6500` describes the incoming image correctly
+        // for every photo, and temp/tint at 0 already means "as the camera
+        // saw it" — this is a relative nudge from as-shot, not an absolute
+        // 6500K target.
         if edit.temp != 0 || edit.tint != 0 {
             let f = CIFilter.temperatureAndTint()
             f.inputImage = image

@@ -7,7 +7,7 @@ import CoreImage
 /// white balance, and conservative clamps throughout — a starting point,
 /// never a look.
 enum AutoEnhance {
-    static func compute(base: CIImage, subjectMask: CIImage?, onto current: EditState) -> EditState? {
+    static func compute(base: CIImage, subjectMask: CIImage?, isRAW: Bool, onto current: EditState) -> EditState? {
         let n = 96
 
         func bitmap(_ source: CIImage) -> [UInt8] {
@@ -83,9 +83,17 @@ enum AutoEnhance {
         // Gentle contrast when the histogram is narrow.
         edit.contrast = ((0.82 - (p995 - p005)) * 80).clamped(to: 0...22)
 
-        // Gray-world white balance from the neutral pool, conservatively —
-        // and only when enough of the frame is actually neutral.
-        if wbCount > total * 0.12 {
+        // White balance: RAW files decode at the camera's own as-shot neutral
+        // (CIRAWFilter defaults neutralTemperature/neutralTint to the camera's
+        // reading, applied before this function ever sees pixels — verified
+        // against real .arw files, including a 3100K tungsten frame), so
+        // temp/tint already start at 0 meaning "as the camera saw it." A
+        // gray-world guess on top of that would just be re-litigating the
+        // camera's own (generally better-informed) call using a 96x96 pixel
+        // average that a foliage-, sunset-, or skin-dominated frame can bias
+        // hard toward magenta or blue. JPEGs carry no as-shot channel here,
+        // so they keep the estimate.
+        if !isRAW, wbCount > total * 0.12 {
             let meanR = sumR / wbCount, meanG = sumG / wbCount, meanB = sumB / wbCount
             edit.temp = (((meanB - meanR) / meanG) * 300).clamped(to: -30...30)
             // Excess R+B over G is a magenta cast; positive tint pushes magenta, so cancel with negative.

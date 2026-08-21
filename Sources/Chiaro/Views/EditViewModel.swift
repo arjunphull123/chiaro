@@ -319,9 +319,10 @@ final class EditViewModel {
         guard let basePreview else { return }
         let mask = personMask
         let current = edit
+        let isRAW = photo.isRAW
         Task { [weak self] in
             let enhanced = await Offload.on(Offload.render) {
-                AutoEnhance.compute(base: basePreview, subjectMask: mask, onto: current)
+                AutoEnhance.compute(base: basePreview, subjectMask: mask, isRAW: isRAW, onto: current)
             }
             guard let self, let enhanced else { return }
             self.preAutoEdit = current

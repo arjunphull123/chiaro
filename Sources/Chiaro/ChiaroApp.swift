@@ -171,7 +171,7 @@ struct ChiaroApp: App {
                         return
                     }
                     let mask = PortraitEngine.shared.mask(for: url, image: base)
-                    if let edit = AutoEnhance.compute(base: base, subjectMask: mask, onto: EditState()) {
+                    if let edit = AutoEnhance.compute(base: base, subjectMask: mask, isRAW: photo.isRAW, onto: EditState()) {
                         fputs(String(format: "AUTO: exp %.2f contrast %.0f hi %.0f sh %.0f wh %.0f bl %.0f temp %.0f tint %.0f vib %.0f\n",
                                      edit.exposure, edit.contrast, edit.highlights, edit.shadows,
                                      edit.whites, edit.blacks, edit.temp, edit.tint, edit.vibrance), stderr)
