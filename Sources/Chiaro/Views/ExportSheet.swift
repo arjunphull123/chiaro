@@ -307,6 +307,15 @@ struct ExportSheet: View {
             }
             finishedURL = last
             if reveal, let last { NSWorkspace.shared.activateFileViewerSelecting([last]) }
+            // Dismiss once the work is done: the sheet has nothing left to say,
+            // and on a reveal it would otherwise sit behind the Finder window
+            // the export just opened. Long enough for "Done ✓" to register as
+            // confirmation. A failure keeps the sheet up, since that message is
+            // the only place the reason is reported.
+            if failureCount == 0 {
+                try? await Task.sleep(for: .milliseconds(650))
+                isPresented = false
+            }
         }
     }
 }

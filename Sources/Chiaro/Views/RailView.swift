@@ -577,10 +577,11 @@ struct RailView: View {
         // (an agent's set_edit clearing them mid-drag).
         let id = model.edit.locals[index].id
         func resolve() -> Int? { model.edit.locals.firstIndex(where: { $0.id == id }) }
+        let isArmed = model.armedLocal?.id == id && model.armedLocal?.keyPath == keyPath
         return HStack {
             Text(label)
-                .font(Theme.ui(11.5))
-                .foregroundStyle(Theme.ink2)
+                .font(Theme.ui(11.5, isArmed ? .medium : .regular))
+                .foregroundStyle(isArmed ? Theme.ink : Theme.ink2)
             Spacer()
             if typingField == fieldID {
                 TextField("", text: $typingValue)
@@ -616,7 +617,14 @@ struct RailView: View {
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 5)
-        .background(RoundedRectangle(cornerRadius: 7).fill(Color.white.opacity(0.03)))
+        .background(
+            RoundedRectangle(cornerRadius: 7)
+                .fill(isArmed ? Theme.amber.opacity(0.1) : Color.white.opacity(0.03))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 7)
+                .stroke(isArmed ? Theme.amber.opacity(0.6) : .clear)
+        )
         .contentShape(Rectangle())
         .gesture(
             DragGesture(minimumDistance: 1)
@@ -636,7 +644,10 @@ struct RailView: View {
         )
         .onTapGesture(count: 2) {
             guard let i = resolve() else { return }
-            model.edit.locals[i][keyPath: keyPath] = 0
+            model.edit.locals[i][keyPath: keyPath] = LocalAdjustment.defaults[keyPath: keyPath]
+        }
+        .onTapGesture {
+            model.armedLocal = isArmed ? nil : (id, keyPath, label, range)
         }
         .clickCursor()
     }

@@ -157,7 +157,7 @@ struct CanvasView: View {
             .onChanged { g in
                 if model.spacePan {
                     gesturePan = g.translation
-                } else if model.armed != nil || model.armedHSL != nil {
+                } else if model.armed != nil || model.armedHSL != nil || model.armedLocal != nil {
                     let dx = g.location.x - (lastScrubX ?? g.startLocation.x)
                     lastScrubX = g.location.x
                     model.scrub(deltaX: dx)
@@ -195,7 +195,7 @@ struct CanvasView: View {
     }
 
     /// Whether a dial card (readout or depth focus) is on screen.
-    private var dialActive: Bool { model.armed != nil || model.armedHSL != nil }
+    private var dialActive: Bool { model.armed != nil || model.armedHSL != nil || model.armedLocal != nil }
 
     /// Crop mode controls: aspect dropdown, straighten arc, reset, done.
     /// Same grammar as the dial cards — the value being set sits centered up top.
@@ -414,6 +414,29 @@ struct CanvasView: View {
                     if let a = model.armedHSL { model.edit.hsl[a.band][keyPath: a.component.keyPath] = 0 }
                 },
                 onDone: { model.armedHSL = nil }
+            )
+        } else if let armedLocal = model.armedLocal,
+                  let i = model.edit.locals.firstIndex(where: { $0.id == armedLocal.id }) {
+            let local = model.edit.locals[i]
+            let keyPath = armedLocal.keyPath
+            let range = armedLocal.range
+            let value = local[keyPath: keyPath]
+            let isEV = range.upperBound <= 3
+            let defaultValue = LocalAdjustment.defaults[keyPath: keyPath]
+            let kindName = local.kind.rawValue.prefix(1).uppercased() + local.kind.rawValue.dropFirst()
+            dialCard(
+                label: "\(kindName) \(i + 1) · \(armedLocal.label)",
+                value: isEV ? String(format: "%+.2f", value) : (value == 0 ? "0" : String(format: "%+.0f", value)),
+                t: (value - range.lowerBound) / (range.upperBound - range.lowerBound),
+                detents: [(defaultValue - range.lowerBound) / (range.upperBound - range.lowerBound)],
+                doneHelp: "Done — back to pan and zoom (esc)",
+                onDrag: { dx in model.scrub(deltaX: dx * 1.6) },
+                onReset: {
+                    if let idx = model.edit.locals.firstIndex(where: { $0.id == armedLocal.id }) {
+                        model.edit.locals[idx][keyPath: keyPath] = defaultValue
+                    }
+                },
+                onDone: { model.armedLocal = nil }
             )
         } else if let armed = model.armed {
             let range = armed.range

@@ -68,16 +68,24 @@ final class EditViewModel {
         }
     }
     var armedHSL: (band: Int, component: HSLComponent)? {
-        didSet { if armedHSL != nil { armed = nil } }
+        didSet { if armedHSL != nil { armed = nil; armedLocal = nil } }
     }
 
     var armed: EditParameter? {
         didSet {
-            if armed != nil { armedHSL = nil }
+            if armed != nil { armedHSL = nil; armedLocal = nil }
             // Focus peaking overlays only while Focus is armed.
             guard armed != oldValue, armed == .focusDepth || oldValue == .focusDepth else { return }
             scheduleRender()
         }
+    }
+    /// Which local adjustment field is armed (drives the same glass dial).
+    /// Identified by UUID, not array index — `locals` can shrink mid-drag
+    /// (an agent's `set_edit`), same reason `RailView.localRow` resolves by id.
+    /// Label and range ride along from the row that armed it, rather than a
+    /// second table of per-field ranges living in the view model.
+    var armedLocal: (id: UUID, keyPath: WritableKeyPath<LocalAdjustment, Double>, label: String, range: ClosedRange<Double>)? {
+        didSet { if armedLocal != nil { armed = nil; armedHSL = nil } }
     }
     /// The local adjustment being edited (gizmo shows on the canvas).
     var selectedLocalID: UUID?
@@ -144,6 +152,7 @@ final class EditViewModel {
             if depthSceneVisible {
                 armed = nil
                 armedHSL = nil
+                armedLocal = nil
             }
         }
     }
@@ -468,6 +477,19 @@ final class EditViewModel {
             HapticDetents.ticks(span: 200, from: old, to: new, detent: 0)
             return
         }
+        if let armedLocal, let i = edit.locals.firstIndex(where: { $0.id == armedLocal.id }) {
+            let keyPath = armedLocal.keyPath
+            let range = armedLocal.range
+            let span = range.upperBound - range.lowerBound
+            let detent = LocalAdjustment.defaults[keyPath: keyPath]
+            let old = edit.locals[i][keyPath: keyPath]
+            let new = scrubbed(old: old, deltaX: deltaX, unitPerPx: span / 420,
+                               range: range, detent: detent, window: span * 0.03)
+            edit.locals[i][keyPath: keyPath] = new
+            scrubAnchor = new
+            HapticDetents.ticks(span: span, from: old, to: new, detent: detent)
+            return
+        }
         guard let armed else { return }
         let span = armed.range.upperBound - armed.range.lowerBound
         let old = armed.value(in: edit)
@@ -503,6 +525,12 @@ final class EditViewModel {
             let keyPath = armedHSL.component.keyPath
             let old = edit.hsl[armedHSL.band][keyPath: keyPath]
             edit.hsl[armedHSL.band][keyPath: keyPath] = (old + Double(direction)).clamped(to: -100...100)
+        } else if let armedLocal, let i = edit.locals.firstIndex(where: { $0.id == armedLocal.id }) {
+            let keyPath = armedLocal.keyPath
+            let range = armedLocal.range
+            let nudgeStep = range.upperBound <= 3 ? 0.01 : 1.0  // EV fields (exposure) vs. everything else
+            edit.locals[i][keyPath: keyPath] = (edit.locals[i][keyPath: keyPath] + Double(direction) * nudgeStep)
+                .clamped(to: range)
         } else if let armed {
             armed.set(armed.value(in: edit) + Double(direction) * armed.nudgeStep, in: &edit)
         } else if cropMode {

@@ -99,6 +99,11 @@ struct LocalAdjustment: Codable, Equatable, Identifiable {
         lumaLow = try c.decodeIfPresent(Double.self, forKey: .lumaLow) ?? 0
         lumaHigh = try c.decodeIfPresent(Double.self, forKey: .lumaHigh) ?? 100
     }
+
+    /// Shipped defaults, keyed by field — lets a reset (double-click, dial)
+    /// read the real default instead of hardcoding 0, which is wrong for
+    /// `lumaHigh` (100).
+    static let defaults = LocalAdjustment(kind: .radial)
 }
 
 /// The complete, serializable description of one photo's edit (ADR 0003).

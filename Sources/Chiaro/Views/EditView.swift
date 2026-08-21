@@ -42,9 +42,10 @@ struct EditView: View {
             if model.selectedLocalID != nil { model.selectedLocalID = nil }
             else if model.depthSceneVisible { model.depthSceneCommand = .exit }
             else if model.cropMode { model.cropMode = false }
-            else if model.armed != nil || model.armedHSL != nil {
+            else if model.armed != nil || model.armedHSL != nil || model.armedLocal != nil {
                 model.armed = nil
                 model.armedHSL = nil
+                model.armedLocal = nil
             }
             else { close() }
             return .handled
@@ -150,7 +151,7 @@ struct EditView: View {
                 model.scrubStraighten(deltaX: -dx)
                 return nil
             }
-            guard model.armed != nil || model.armedHSL != nil else { return event }
+            guard model.armed != nil || model.armedHSL != nil || model.armedLocal != nil else { return event }
             // Negated so the ruler's ticks travel with the fingers.
             model.scrub(deltaX: -dx)
             return nil
@@ -421,7 +422,7 @@ struct EditView: View {
     }
 
     private func nudgeOrStep(_ direction: Int) {
-        if model.armed != nil || model.armedHSL != nil || model.cropMode {
+        if model.armed != nil || model.armedHSL != nil || model.armedLocal != nil || model.cropMode {
             model.nudge(direction)
         } else {
             step(direction)
