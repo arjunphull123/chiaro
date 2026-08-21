@@ -609,7 +609,11 @@ struct LibraryView: View {
             )
             if showCaption {
                 // One row, so the badges can never land on top of the metadata.
-                HStack(alignment: .bottom, spacing: 8) {
+                // .center, not .bottom: badgePair carries its own uniform padding
+                // for its other life as a corner overlay, which only cancels out
+                // under center alignment — .bottom would count that padding twice
+                // and float the badges above the filename.
+                HStack(alignment: .center, spacing: 8) {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(photo.filename)
                             .font(Theme.ui(10.5, .semibold))
@@ -669,7 +673,7 @@ struct LibraryView: View {
             .overlay(alignment: .bottom) {
                 if showCaption {
                     // Same single row as the justified tile: name left, badges right.
-                    HStack(alignment: .bottom, spacing: 6) {
+                    HStack(alignment: .center, spacing: 6) {
                         Text(photo.filename)
                             .font(Theme.ui(9.5, .medium))
                             .foregroundStyle(.white)
