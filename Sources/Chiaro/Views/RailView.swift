@@ -14,8 +14,12 @@ struct RailView: View {
             VStack(alignment: .leading, spacing: 12) {
                 AppMark(size: 30)
                 photoHeader
-                    .opacity(library.agentActive ? 0.4 : 1)
             }
+            // The mark dims with the header, not just the header: while an agent
+            // drives, its status card expands down over this block, and a mark
+            // at full strength under a glass card reads as two things fighting
+            // for the same corner rather than one layer over another.
+            .opacity(library.agentActive ? 0.4 : 1)
             .padding(.horizontal, 16)
             .padding(.top, 42) // aligns with the canvas action cluster
             .padding(.bottom, 12)

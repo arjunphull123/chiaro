@@ -31,7 +31,15 @@ final class AgentStatus {
     }
 
     var brand: AgentBrand { AgentBrand.match(clientName) }
-    var displayName: String { brand.name == "Agent" ? (clientName ?? "Agent") : brand.name }
+    /// Capped: an unrecognized client self-reports this name over MCP, so it is
+    /// arbitrary text that ends up inside UI strings. The status card is a fixed
+    /// width and truncates, so this can't break the layout either way — the cap
+    /// just means a long name loses its own tail rather than the sentence losing
+    /// "is editing".
+    var displayName: String {
+        let name = brand.name == "Agent" ? (clientName ?? "Agent") : brand.name
+        return name.count > 14 ? name.prefix(13) + "…" : name
+    }
 
     /// HTTP transport is stateless: there is no disconnect signal, so any
     /// recency window produces false negatives. For a "do I still need to set

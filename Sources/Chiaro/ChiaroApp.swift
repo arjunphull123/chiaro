@@ -358,22 +358,11 @@ struct RootView: View {
                         .padding(.trailing, 16)
                 }
             }
-            .frame(height: 24) // the pill's own height, so both share one centre
-            .padding(.top, 9) // centres the row on the traffic lights
+            // No fixed height: the card grows downward when it carries the
+            // agent's intent. Its collapsed height is 24, so the traffic-light
+            // alignment below is unchanged.
+            .padding(.top, 9) // centres the collapsed row on the traffic lights
             .ignoresSafeArea()
-        }
-        // A separate overlay, not stacked with the pill above: the intent
-        // badge floats independently just beneath it and can't affect the
-        // pill's geometry (see AgentIntentBadge).
-        .overlay(alignment: .top) {
-            HStack {
-                Spacer()
-                AgentIntentBadge(library: library)
-                    .padding(.trailing, 16)
-            }
-            .padding(.top, 9 + 24 + 6)
-            .ignoresSafeArea()
-            .animation(.easeOut(duration: 0.2), value: library.agentIntent)
         }
         .sheet(isPresented: $exporting) {
             ExportSheet(
