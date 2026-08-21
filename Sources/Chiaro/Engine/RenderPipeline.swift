@@ -80,11 +80,7 @@ enum RenderPipeline {
             image = applyLocal(local, to: image, personMask: personMask, scale: scale)
         }
         if edit.clarity != 0 {
-            let f = CIFilter.unsharpMask()
-            f.inputImage = image
-            f.radius = Float(25 * scale)
-            f.intensity = Float(edit.clarity / 100 * 0.5)
-            image = f.outputImage ?? image
+            image = clarity(image, amount: edit.clarity, scale: scale)
         }
         // RAW files route sharpness/noiseReduction to decode time instead
         // (RawEngine.DecodeParams, baked into `base` before this function ever
@@ -256,6 +252,26 @@ enum RenderPipeline {
         return f.outputImage ?? image
     }
 
+    /// CIUnsharpMask clamps negative intensity to zero, so it can only sharpen —
+    /// softening needs its own path: blend toward a blur by the same amount
+    /// positive clarity would have sharpened by.
+    private static func clarity(_ image: CIImage, amount: Double, scale: CGFloat) -> CIImage {
+        if amount > 0 {
+            let f = CIFilter.unsharpMask()
+            f.inputImage = image
+            f.radius = Float(25 * scale)
+            f.intensity = Float(amount / 100 * 0.5)
+            return f.outputImage ?? image
+        }
+        let blurred = image.clampedToExtent()
+            .applyingFilter("CIGaussianBlur", parameters: ["inputRadius": Float(25 * scale)])
+            .cropped(to: image.extent)
+        return image.applyingFilter("CIDissolveTransition", parameters: [
+            "inputTargetImage": blurred,
+            "inputTime": Float(-amount / 100 * 0.5),
+        ])
+    }
+
     /// User tone curve: monotone spline sampled into a 256-entry LUT for CIColorCurves.
     private static func userCurve(_ image: CIImage, points: [CurvePoint]) -> CIImage {
         let samples = CurveSampler.sample(points, count: 256)
@@ -304,11 +320,7 @@ enum RenderPipeline {
             adjusted = f.outputImage ?? adjusted
         }
         if local.clarity != 0 {
-            let f = CIFilter.unsharpMask()
-            f.inputImage = adjusted
-            f.radius = Float(25 * scale)
-            f.intensity = Float(local.clarity / 100 * 0.5)
-            adjusted = f.outputImage ?? adjusted
+            adjusted = clarity(adjusted, amount: local.clarity, scale: scale)
         }
         let blend = CIFilter.blendWithMask()
         blend.inputImage = adjusted
