@@ -7,18 +7,6 @@ struct LibraryView: View {
     let onExport: () -> Void
 
     @FocusState private var searchFocused: Bool
-    /// Whether the field is open independent of focus: sets true the moment
-    /// focus lands (any path) and false once focus is given up on an empty
-    /// query. Kept separate from `searchFocused` itself — gating the field's
-    /// own presence on the very focus state it owns is what let a click-away
-    /// race focus and disappearance in the same update; this settles one
-    /// tick after focus actually changes instead.
-    @State private var searchOpen = false
-    /// Measured header width, so the search field can expand past its
-    /// icon-only default once there's comfortable room for it — Finder's
-    /// own toolbar search behaviour.
-    @State private var headerWidth: CGFloat = 0
-    private static let searchExpansionWidth: CGFloat = 1300
 
     enum ListSortKey: String { case name, starred, time, folder }
     @AppStorage("listSortKey") private var listSortRaw = ListSortKey.name.rawValue
@@ -78,15 +66,6 @@ struct LibraryView: View {
             galleryScroll
             footer
         }
-        // Clicking any part of the library that isn't itself a control gives
-        // up the search field's focus, the way Esc already does. Behind
-        // everything — including the header's own controls — so their taps
-        // still win; this only catches clicks nothing else claimed.
-        .background(
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture { searchFocused = false }
-        )
         .onChange(of: library.folderURL) {
             library.folderScope = nil
             library.searchText = ""
@@ -422,7 +401,6 @@ struct LibraryView: View {
                 .overlay(alignment: .bottom) { Theme.hairline.frame(height: 1) }
                 .ignoresSafeArea()
         )
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { headerWidth = $0 }
     }
 
     /// Card offload: copies the shoot into ~/Pictures/Chiaro Library.
@@ -453,41 +431,7 @@ struct LibraryView: View {
         }
     }
 
-    /// Finder collapses its toolbar search to a plain icon and only expands
-    /// it into a field on click, or once the window is wide enough to spare
-    /// the room. Live query text always wins, and `searchOpen` mirrors focus
-    /// once the field exists — so releasing focus on an empty query collapses
-    /// it back on its own.
-    private var searchExpanded: Bool {
-        searchOpen || !library.searchText.isEmpty || headerWidth > Self.searchExpansionWidth
-    }
-
-    @ViewBuilder private var searchField: some View {
-        if searchExpanded {
-            expandedSearchField
-        } else {
-            collapsedSearchButton
-        }
-    }
-
-    private var collapsedSearchButton: some View {
-        Button {
-            // Open first, focus once the field actually exists — asking a
-            // not-yet-rendered TextField to focus is a request SwiftUI drops.
-            searchOpen = true
-        } label: {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Theme.ink3)
-                .frame(width: 26, height: 22)
-        }
-        .buttonStyle(.plain)
-        .clickCursor()
-        .keyboardShortcut("f")
-        .help("Filter by filename (⌘F)")
-    }
-
-    private var expandedSearchField: some View {
+    private var searchField: some View {
         HStack(spacing: 5) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 10, weight: .medium))
@@ -497,16 +441,6 @@ struct LibraryView: View {
                 .font(Theme.ui(11.5))
                 .foregroundStyle(Theme.ink)
                 .focused($searchFocused)
-                .onAppear {
-                    if searchOpen { searchFocused = true }
-                }
-                .onChange(of: searchFocused) { _, focused in
-                    if focused {
-                        searchOpen = true
-                    } else if library.searchText.isEmpty {
-                        searchOpen = false
-                    }
-                }
                 .onKeyPress(.escape) {
                     library.searchText = ""
                     searchFocused = false
@@ -542,6 +476,15 @@ struct LibraryView: View {
                 .opacity(0)
                 .frame(width: 0, height: 0)
         )
+        // A `.background` catcher on the surrounding gallery can't release
+        // focus here: it sits behind the scroll view and the photo tiles,
+        // which consume a click before a SwiftUI gesture on the background
+        // ever sees it. This watches raw mouse-down events at the AppKit
+        // level, ahead of SwiftUI's own hit-testing, and only clears focus
+        // when the click lands outside this field's own frame — then hands
+        // the event back untouched so the click still does its normal job
+        // (selecting a photo, working a filter chip, etc).
+        .background(ClickAwayMonitor(isActive: searchFocused) { searchFocused = false })
         .help("Filter by filename (⌘F)")
     }
 
@@ -1242,5 +1185,56 @@ private struct PhotoInteractions: ViewModifier {
                 }
                 .disabled(library.copiedEdit == nil)
             }
+    }
+}
+
+/// Sized by SwiftUI to match the view it's attached to as a `.background`,
+/// so its AppKit frame always tracks the search field's real one. Installs
+/// a local mouse-down monitor for the field's lifetime and removes it when
+/// the field leaves the hierarchy — an outliving monitor is worse than the
+/// bug it would fix.
+private struct ClickAwayMonitor: NSViewRepresentable {
+    var isActive: Bool
+    var onOutsideClick: () -> Void
+
+    func makeNSView(context: Context) -> MonitorView {
+        MonitorView()
+    }
+
+    func updateNSView(_ nsView: MonitorView, context: Context) {
+        nsView.isActive = isActive
+        nsView.onOutsideClick = onOutsideClick
+    }
+
+    static func dismantleNSView(_ nsView: MonitorView, coordinator: ()) {
+        nsView.removeMonitor()
+    }
+
+    final class MonitorView: NSView {
+        var isActive = false
+        var onOutsideClick: (() -> Void)?
+        private var monitor: Any?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            removeMonitor()
+            guard window != nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+                guard let self, self.isActive, event.window === self.window else { return event }
+                if !self.bounds.contains(self.convert(event.locationInWindow, from: nil)) {
+                    self.onOutsideClick?()
+                }
+                return event
+            }
+        }
+
+        func removeMonitor() {
+            if let monitor {
+                NSEvent.removeMonitor(monitor)
+                self.monitor = nil
+            }
+        }
+
+        deinit { removeMonitor() }
     }
 }
