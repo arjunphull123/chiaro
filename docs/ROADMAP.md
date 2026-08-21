@@ -87,6 +87,23 @@ Ranked, with the reasoning that put them here rather than in a tier.
 - **Healing and clone.** Wanted by every photographer, and a real gap. Note
   ADR 0012 already cut generative inpainting on quality evidence, so this means
   classical patch-based healing, not a model.
+- **Share pixel-statistics primitives between AutoEnhance and StatsSampler.**
+  Both walk pixels to compute percentiles, clip fractions, saturation means and
+  a gray-world average, with constants that have already diverged: 96x96 sRGB
+  versus full-resolution Display P3, clip thresholds of 0.98/0.02 versus
+  254/255, and different neutral-pool gates. Nothing cross-checks one against
+  the other, which is precisely why the inverted white balance in `temp`
+  survived from the first commit until `f19516d`. Full unification is wrong,
+  since AutoEnhance needs a fast downsample for interactive latency, but the
+  percentile helper and the clip and saturation predicates should be one
+  implementation with one set of constants.
+- **Re-tune AutoEnhance's `temp` strength.** Its multiplier and clamp were
+  hand-tuned while the pipeline rendered temperature backwards, so they have
+  never been validated under the correct sign. Note the clamps are load-bearing
+  rather than a backstop: unclamped the formula reaches about ±67 against a
+  clamp of ±20, and a 5% channel imbalance already asks for half the maximum
+  correction, so do not raise the multiplier without rechecking where the clamp
+  bites.
 - **Move the grading kernel off Core Image Kernel Language.**
   `CIColorKernel(source:)` has been deprecated since macOS 10.14 and it fails
   *silently*: a source typo returns nil, and grading shipped as a permanent
