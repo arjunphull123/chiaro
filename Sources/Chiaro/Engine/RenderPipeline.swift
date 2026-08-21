@@ -62,7 +62,9 @@ enum RenderPipeline {
             image = HSLCube.apply(image, bands: edit.hsl)
         }
         // Grading (ADR 0015): after the mixer, before localisation — correction,
-        // then grading, then locals.
+        // then grading, then locals. Deliberately not guarded by !edit.monochrome:
+        // a warm highlight / cool shadow tint on a grey image is toned black and
+        // white, the way sepia and selenium prints work.
         image = ColorGradeKernel.apply(image, edit: edit)
         for local in edit.locals where !local.isNeutral {
             image = applyLocal(local, to: image, personMask: personMask, scale: scale)
