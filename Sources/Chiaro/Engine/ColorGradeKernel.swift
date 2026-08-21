@@ -71,7 +71,9 @@ enum ColorGradeKernel {
                     + chromaOf(midHue, lumaWeights) * (wM * midAmt)
                     + chromaOf(highlightHue, lumaWeights) * (wH * highlightAmt);
 
-        vec3 result = clamp(c + chroma * 0.6, 0.0, 1.0);
+        // A fixed chroma offset is a large *relative* shift on a dark pixel, so
+        // this stays low: at 0.6 a shadow strength of 16 landed like 40.
+        vec3 result = clamp(c + chroma * 0.3, 0.0, 1.0);
         return vec4(result, s.a);
     }
     """
