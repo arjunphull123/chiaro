@@ -39,20 +39,26 @@ enum RenderPipeline {
         if edit.curve != CurvePoint.identity {
             image = userCurve(image, points: edit.curve)
         }
-        if edit.contrast != 0 || edit.saturation != 0 {
+        // Monochrome (ADR 0015): grey first, using the mixer's l values as
+        // channel weights, then the rest of the color stage is moot — global
+        // saturation/vibrance/the hue cube would only re-desaturate a grey image.
+        if edit.monochrome {
+            image = HSLCube.applyMonochrome(image, bands: edit.hsl)
+        }
+        if edit.contrast != 0 || (edit.saturation != 0 && !edit.monochrome) {
             let f = CIFilter.colorControls()
             f.inputImage = image
             f.contrast = Float(1 + edit.contrast / 100 * 0.35)
-            f.saturation = Float(1 + edit.saturation / 100)
+            f.saturation = edit.monochrome ? 1 : Float(1 + edit.saturation / 100)
             image = f.outputImage ?? image
         }
-        if edit.vibrance != 0 {
+        if edit.vibrance != 0 && !edit.monochrome {
             let f = CIFilter.vibrance()
             f.inputImage = image
             f.amount = Float(edit.vibrance / 100)
             image = f.outputImage ?? image
         }
-        if edit.hsl.contains(where: { !$0.isNeutral }) {
+        if !edit.monochrome && edit.hsl.contains(where: { !$0.isNeutral }) {
             image = HSLCube.apply(image, bands: edit.hsl)
         }
         // Grading (ADR 0015): after the mixer, before localisation — correction,

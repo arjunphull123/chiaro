@@ -221,7 +221,7 @@ final class MCPServer {
             "exposure": "Light", "contrast": "Light", "highlights": "Light",
             "shadows": "Light", "whites": "Light", "blacks": "Light",
             "temp": "Color", "tint": "Color", "vibrance": "Color", "saturation": "Color",
-            "hsl": "Color mix", "curve": "Curve",
+            "hsl": "Color mix", "curve": "Curve", "monochrome": "Color mix",
             "clarity": "Effects", "vignette": "Effects",
             "sharpness": "Detail", "noiseReduction": "Detail",
             "blurF": "Background blur", "relight": "Background blur", "maskReach": "Background blur",
@@ -283,6 +283,10 @@ final class MCPServer {
         ]
         props["flipH"] = ["type": "boolean", "description": "mirror horizontally"]
         props["flipV"] = ["type": "boolean", "description": "mirror vertically"]
+        props["monochrome"] = [
+            "type": "boolean",
+            "description": "black & white — greys using the color mixer's l values as channel weights, so e.g. hsl.blue.l -20 darkens a blue sky in the result",
+        ]
         props["curve"] = [
             "type": "array",
             "items": ["type": "array", "items": ["type": "number"]],
@@ -535,9 +539,11 @@ final class MCPServer {
                     edit.rotation = degrees
                     continue
                 }
-                if key == "flipH" || key == "flipV" {
+                if key == "flipH" || key == "flipV" || key == "monochrome" {
                     guard let flag = value as? Bool else { throw ToolError("\(key) must be a boolean") }
-                    if key == "flipH" { edit.flipH = flag } else { edit.flipV = flag }
+                    if key == "flipH" { edit.flipH = flag }
+                    else if key == "flipV" { edit.flipV = flag }
+                    else { edit.monochrome = flag }
                     continue
                 }
                 if key == "locals" {

@@ -319,8 +319,14 @@ struct RailView: View {
                 Spacer(minLength: 0)
             }
             .padding(.bottom, 2)
-            bandRow(.h)
-            bandRow(.s)
+            Chip(title: "Monochrome", selected: model.edit.monochrome) {
+                model.edit.monochrome.toggle()
+            }
+            .padding(.bottom, 2)
+            if !model.edit.monochrome {
+                bandRow(.h)
+                bandRow(.s)
+            }
             bandRow(.l)
             }
         }

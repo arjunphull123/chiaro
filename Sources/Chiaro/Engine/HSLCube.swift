@@ -65,6 +65,57 @@ enum HSLCube {
         return data
     }
 
+    /// Black & white conversion (ADR 0015): grey weighted by the mixer's per-band
+    /// `l` values, sharing the exact hue weighting `apply` uses above — same
+    /// falloff, same widened half-widths, so there's no separate dead zone to
+    /// reintroduce. Cached separately since only `l` matters here.
+    static func applyMonochrome(_ image: CIImage, bands: [HSLBand]) -> CIImage {
+        image.applyingFilter("CIColorCubeWithColorSpace", parameters: [
+            "inputCubeDimension": dimension,
+            "inputCubeData": monochromeData(for: bands),
+            "inputColorSpace": CGColorSpace(name: CGColorSpace.displayP3)!,
+        ])
+    }
+
+    private static func monochromeData(for bands: [HSLBand]) -> Data {
+        let key = ("mono|" + bands.map { "\(Int($0.l))" }.joined(separator: "|")) as NSString
+        if let cached = cache.object(forKey: key) { return cached as Data }
+
+        let n = dimension
+        var cube = [Float](repeating: 0, count: n * n * n * 4)
+        var offset = 0
+        for b in 0..<n {
+            for g in 0..<n {
+                for r in 0..<n {
+                    let rr = Double(r) / Double(n - 1)
+                    let gg = Double(g) / Double(n - 1)
+                    let bb = Double(b) / Double(n - 1)
+                    let luma = 0.2126 * rr + 0.7152 * gg + 0.0722 * bb
+                    var grey = luma
+                    let (h, s, _) = rgbToHsv(rr, gg, bb)
+                    if s > 0.01 {
+                        var lumGain = 0.0
+                        for (i, band) in bands.enumerated() where band.l != 0 {
+                            let w = weight(hue: h * 360, center: HSLBand.centers[i], halfWidth: halfWidths[i])
+                            guard w > 0 else { continue }
+                            lumGain += w * band.l
+                        }
+                        let confidence = min(1, s * 4)
+                        grey = (luma * (1 + lumGain / 100 * 0.6 * confidence)).clamped(to: 0...1)
+                    }
+                    cube[offset] = Float(grey)
+                    cube[offset + 1] = Float(grey)
+                    cube[offset + 2] = Float(grey)
+                    cube[offset + 3] = 1
+                    offset += 4
+                }
+            }
+        }
+        let data = cube.withUnsafeBufferPointer { Data(buffer: $0) }
+        cache.setObject(data as NSData, forKey: key)
+        return data
+    }
+
     /// Cosine falloff around the band center, ±45° with wraparound — widened
     /// per band so it always reaches the nearest neighboring center. Centers
     /// aren't evenly spaced (30° red↔orange↔yellow, 60° yellow↔green↔aqua↔blue,

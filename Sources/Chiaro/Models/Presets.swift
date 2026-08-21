@@ -25,6 +25,7 @@ struct Preset: Codable, Identifiable, Equatable {
         }
         subset.curve = edit.curve
         subset.hsl = edit.hsl
+        subset.monochrome = edit.monochrome
         return Preset(name: name, edit: subset)
     }
 
@@ -36,6 +37,7 @@ struct Preset: Codable, Identifiable, Equatable {
         }
         result.curve = self.edit.curve
         result.hsl = self.edit.hsl
+        result.monochrome = self.edit.monochrome
         return result
     }
 
@@ -44,6 +46,7 @@ struct Preset: Codable, Identifiable, Equatable {
         Self.carried.allSatisfy { $0.value(in: edit) == $0.value(in: self.edit) }
             && edit.curve == self.edit.curve
             && edit.hsl == self.edit.hsl
+            && edit.monochrome == self.edit.monochrome
     }
 }
 
@@ -66,7 +69,13 @@ final class PresetStore {
         }()),
         .init(name: "Silver", edit: {
             var e = EditState()
-            e.saturation = -100; e.contrast = 15; e.whites = 10; e.blacks = -10; e.clarity = 10
+            e.monochrome = true
+            e.contrast = 15; e.whites = 10; e.blacks = -10; e.clarity = 10
+            // Real tonal separation, not a flat grey: darken the sky, lift skin.
+            e.hsl[HSLBand.names.firstIndex(of: "blue")!].l = -35
+            e.hsl[HSLBand.names.firstIndex(of: "aqua")!].l = -20
+            e.hsl[HSLBand.names.firstIndex(of: "orange")!].l = 20
+            e.hsl[HSLBand.names.firstIndex(of: "red")!].l = 10
             return e
         }()),
         .init(name: "Golden hour", edit: {
