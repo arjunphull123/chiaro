@@ -87,7 +87,7 @@ enum AutoEnhance {
         // and only when enough of the frame is actually neutral.
         if wbCount > total * 0.12 {
             let meanR = sumR / wbCount, meanG = sumG / wbCount, meanB = sumB / wbCount
-            edit.temp = (((meanB - meanR) / meanG) * 200).clamped(to: -20...20)
+            edit.temp = (((meanB - meanR) / meanG) * 300).clamped(to: -30...30)
             // Excess R+B over G is a magenta cast; positive tint pushes magenta, so cancel with negative.
             edit.tint = (((meanG - (meanR + meanB) / 2) / meanG) * 160).clamped(to: -10...10)
         }
