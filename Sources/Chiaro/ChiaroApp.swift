@@ -347,18 +347,36 @@ struct RootView: View {
         // The title strip is WINDOW-level chrome, drawn here rather than inside
         // any of the views above, so it's identical in position for the
         // library, the editor, and the start screen. It holds only
-        // window-level state — agent status today, an available-update notice
-        // or export progress later. View controls (filters, view mode, zoom,
-        // search) belong in their own view's header, not here.
-        // Trailing, not centred: centre is the document-title slot on macOS, and
-        // a status pill sitting there reads as the window's identity. Trailing is
-        // where window accessories belong, and in the editor it lands above the
-        // rail, where agent state already belongs.
-        .overlay(alignment: .topTrailing) {
-            AgentStatusStrip(library: library)
-                .padding(.trailing, 16)
-                .padding(.top, 9) // centres it on the traffic lights
-                .ignoresSafeArea()
+        // window-level state: the open folder's name in the centre — the
+        // document-title slot on macOS — with agent status trailing, above
+        // where it lands in the editor's own rail. View controls (filters,
+        // view mode, zoom, search) belong in their own view's header, not here.
+        .overlay(alignment: .top) {
+            ZStack {
+                if library.folderURL != nil {
+                    Text(library.folderName)
+                        .font(Theme.serif(13, .medium))
+                        .foregroundStyle(Theme.ink2)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        // AgentStatusStrip caps at 440pt plus its own 16pt of
+                        // trailing padding; the traffic lights need far less.
+                        // Reserving this much on BOTH sides keeps the title
+                        // centred in the full window instead of centred in
+                        // whatever's left over, while guaranteeing it can never
+                        // reach either one, even at the 1080pt minimum width.
+                        .padding(.horizontal, 470)
+                        .frame(maxWidth: .infinity)
+                }
+                HStack {
+                    Spacer()
+                    AgentStatusStrip(library: library)
+                        .padding(.trailing, 16)
+                }
+            }
+            .frame(height: 24) // the pill's own height, so both share one centre
+            .padding(.top, 9) // centres the row on the traffic lights
+            .ignoresSafeArea()
         }
         .sheet(isPresented: $exporting) {
             ExportSheet(

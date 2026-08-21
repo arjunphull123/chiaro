@@ -60,8 +60,10 @@ struct AgentStatusStrip: View {
         }
         // Caps growth so a long intent truncates instead of pushing the strip
         // toward the traffic lights or the window edge; short states just size
-        // to fit under this.
-        .frame(maxWidth: 440)
+        // to fit under this. Trailing-aligned so the pill's own trailing edge
+        // stays pinned to the window edge at any width — it grows leftward
+        // rather than floating centred in the 440pt ceiling.
+        .frame(maxWidth: 440, alignment: .trailing)
         .popoverTip(AgentTip.isEligible ? agentTip : nil, arrowEdge: .bottom)
         .popover(isPresented: $showing, arrowEdge: .bottom) { AgentConnectPopover() }
     }

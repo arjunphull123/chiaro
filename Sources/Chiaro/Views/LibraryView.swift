@@ -289,7 +289,9 @@ struct LibraryView: View {
         )
     }
 
-    /// Pinned frosted header: title, zoom slider, and the real actions.
+    /// Pinned frosted header: filters, view controls, zoom slider, and the
+    /// real actions. The folder's name is window-level identity now, shown
+    /// centred in the title strip (see RootView) rather than here.
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
             HStack(spacing: 6) {
@@ -300,7 +302,6 @@ struct LibraryView: View {
                     .foregroundStyle(Theme.ink)
                     .fixedSize() // the wordmark never wraps
             }
-            Rectangle().fill(Theme.hairline).frame(width: 1, height: 18)
             Button {
                 library.close()
             } label: {
@@ -313,10 +314,6 @@ struct LibraryView: View {
             .buttonStyle(.plain)
             .clickCursor()
             .help("Back to the start screen (⌘W)")
-            Text(library.folderName)
-                .font(Theme.ui(18, .semibold))
-                .foregroundStyle(Theme.ink)
-                .lineLimit(1) // truncates on a long name; never wraps
             Spacer()
             HStack(spacing: 3) {
                 allChip()
