@@ -605,6 +605,9 @@ final class MCPServer {
                 guard let parameter = EditParameter(rawValue: key) else {
                     throw ToolError("unknown parameter \(key); valid: \(EditParameter.allCases.map(\.rawValue).joined(separator: ", "))")
                 }
+                if (parameter == .colorNoiseReduction || parameter == .moireReduction) && !p.isRAW {
+                    throw ToolError("\(key) is RAW-only; \(p.name) is not a RAW photo")
+                }
                 guard let number = value as? Double ?? (value as? Int).map(Double.init) else {
                     throw ToolError("\(key) must be a number")
                 }
