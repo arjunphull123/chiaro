@@ -9,19 +9,9 @@ import CoreImage
 enum AutoEnhance {
     static func compute(base: CIImage, subjectMask: CIImage?, onto current: EditState) -> EditState? {
         let n = 96
-        let context = RawEngine.shared.context
 
         func bitmap(_ source: CIImage) -> [UInt8] {
-            var bytes = [UInt8](repeating: 0, count: n * n * 4)
-            let scaled = source
-                .transformed(by: .init(translationX: -source.extent.origin.x, y: -source.extent.origin.y))
-                .transformed(by: .init(scaleX: CGFloat(n) / source.extent.width, y: CGFloat(n) / source.extent.height))
-            context.render(
-                scaled, toBitmap: &bytes, rowBytes: n * 4,
-                bounds: CGRect(x: 0, y: 0, width: n, height: n),
-                format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)
-            )
-            return bytes
+            PixelStats.readRGBA(source, width: n, height: n, colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
         }
 
         let pixels = bitmap(base)
@@ -33,21 +23,27 @@ enum AutoEnhance {
         var subjectLumaSum = 0.0, subjectWeight = 0.0
         var highlightClipped = 0.0, shadowCrushed = 0.0
 
+        // Soft "about to clip" gate for the recovery sliders, not a literal
+        // 0/255 rail check — deliberately looser than StatsSampler's clip
+        // thresholds, which report whether a channel actually hit the rail.
+        let highlightGate = 0.98, shadowGate = 0.02
+
         for i in 0..<(n * n) {
             let r = Double(pixels[i * 4]) / 255
             let g = Double(pixels[i * 4 + 1]) / 255
             let b = Double(pixels[i * 4 + 2]) / 255
-            let luma = 0.2126 * r + 0.7152 * g + 0.0722 * b
+            let luma = PixelStats.luminance(r, g, b)
             lumas.append(luma)
             let hi = max(r, g, b), lo = min(r, g, b)
-            if hi > 0.98 { highlightClipped += 1 }
-            if hi < 0.02 { shadowCrushed += 1 }
-            if hi < 0.98, lo > 0.01 {
-                saturationSum += hi > 0 ? (hi - lo) / hi : 0
+            if hi > highlightGate { highlightClipped += 1 }
+            if hi < shadowGate { shadowCrushed += 1 }
+            if hi < highlightGate, lo > 0.01 {
+                let saturation = PixelStats.saturation(hi: hi, lo: lo)
+                saturationSum += saturation
                 saturationCount += 1
                 // Robust gray-world: only near-neutral pixels vote, so a
                 // vegetation-heavy frame can't drag skin toward magenta.
-                if hi > 0, (hi - lo) / hi < 0.25 {
+                if saturation < 0.25 {
                     sumR += r; sumG += g; sumB += b; wbCount += 1
                 }
             }

@@ -7,19 +7,16 @@ import CoreImage
 enum StatsSampler {
     private static let fineBins = 256
     private static let bucketCount = 32
+    // Literal 8-bit rail check — a channel is reported clipped only if it
+    // actually hit 0/255 or 255/255, unlike AutoEnhance's looser recovery
+    // gate. This is a diagnostic readout an agent trusts to mean what it says.
     private static let floorThreshold = 1.0 / 255.0
     private static let ceilingThreshold = 254.0 / 255.0
 
     static func sample(_ image: CIImage) -> [String: Any] {
         let extent = image.extent
         let w = max(1, Int(extent.width.rounded())), h = max(1, Int(extent.height.rounded()))
-        var bytes = [UInt8](repeating: 0, count: w * h * 4)
-        let shifted = image.transformed(by: .init(translationX: -extent.origin.x, y: -extent.origin.y))
-        RawEngine.shared.context.render(
-            shifted, toBitmap: &bytes, rowBytes: w * 4,
-            bounds: CGRect(x: 0, y: 0, width: w, height: h),
-            format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.displayP3)
-        )
+        let bytes = PixelStats.readRGBA(image, width: w, height: h, colorSpace: CGColorSpace(name: CGColorSpace.displayP3))
 
         var redFloor = 0.0, redCeiling = 0.0
         var greenFloor = 0.0, greenCeiling = 0.0
@@ -36,7 +33,7 @@ enum StatsSampler {
             let o = i * 4
             let r = Double(bytes[o]) / 255, g = Double(bytes[o + 1]) / 255, b = Double(bytes[o + 2]) / 255
             let hi = max(r, g, b), lo = min(r, g, b)
-            let luma = 0.2126 * r + 0.7152 * g + 0.0722 * b
+            let luma = PixelStats.luminance(r, g, b)
 
             if r <= floorThreshold { redFloor += 1 }
             if r >= ceilingThreshold { redCeiling += 1 }
@@ -52,7 +49,7 @@ enum StatsSampler {
 
             // Near-black pixels are excluded: sensor noise there has near-random
             // hue and would drag the mean saturation down without meaning anything.
-            let saturation = hi > 0 ? (hi - lo) / hi : 0
+            let saturation = PixelStats.saturation(hi: hi, lo: lo)
             if luma > 0.02 { saturationSum += saturation; saturationCount += 1 }
             // Gray-world sample, same pool AutoEnhance uses for white balance:
             // low-saturation midtones should be neutral, so their average reveals
