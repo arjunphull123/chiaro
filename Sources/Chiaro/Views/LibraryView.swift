@@ -389,11 +389,9 @@ struct LibraryView: View {
                     .help("Opens the releases page — Chiaro doesn't update itself")
             }
             // Actions never wrap; the zoom slider gives up width instead.
-            Button("Open folder…") { openFolder() }
-                .buttonStyle(OutlineButtonStyle())
-                .clickCursor()
-                .fixedSize()
-                .help("⌘O")
+            // Opening a folder is already ⌘O / File > Open folder… and the
+            // start screen exists for it — this toolbar keeps only what's
+            // reached for while a folder is already open.
             Button("Open in editor") { openSelectedInEditor() }
                 .buttonStyle(AmberButtonStyle())
                 .clickCursor()
