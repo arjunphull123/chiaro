@@ -71,9 +71,19 @@ enum ColorGradeKernel {
                     + chromaOf(midHue, lumaWeights) * (wM * midAmt)
                     + chromaOf(highlightHue, lumaWeights) * (wH * highlightAmt);
 
+        // Protect colour that is already there. Tinting is mostly a subtraction
+        // from one channel, so applied flat it strips the red out of bark and
+        // brick and leaves them muddy. Neutral pixels take the full tint,
+        // already-saturated ones barely any, which is how vibrance differs from
+        // saturation.
+        float mx = max(c.r, max(c.g, c.b));
+        float mn = min(c.r, min(c.g, c.b));
+        float existing = mx > 0.004 ? (mx - mn) / mx : 0.0;
+        float protect = (1.0 - existing) * (1.0 - existing);
+
         // A fixed chroma offset is a large *relative* shift on a dark pixel, so
         // this stays low: at 0.6 a shadow strength of 16 landed like 40.
-        vec3 result = clamp(c + chroma * 0.3, 0.0, 1.0);
+        vec3 result = clamp(c + chroma * 0.3 * protect, 0.0, 1.0);
         return vec4(result, s.a);
     }
     """
