@@ -20,16 +20,22 @@ final class Library {
     /// manual input. Clears 3s after the last call.
     var agentActive = false
     var agentIntent: String?
+    /// The photo an agent tool call most recently named — the library lights
+    /// that tile briefly so a folder-wide pass can be followed visually.
+    /// Clears with the rest of agent presence, 3s after the last call.
+    var agentTouchedPhoto: URL?
     private var agentClearItem: DispatchWorkItem?
 
-    func noteAgentActivity(intent: String? = nil) {
+    func noteAgentActivity(intent: String? = nil, photo: URL? = nil) {
         agentActive = true
         if let intent { agentIntent = intent }
+        if let photo { agentTouchedPhoto = photo }
         activeEditor?.armed = nil
         agentClearItem?.cancel()
         let item = DispatchWorkItem { [weak self] in
             self?.agentActive = false
             self?.agentIntent = nil
+            self?.agentTouchedPhoto = nil
         }
         agentClearItem = item
         DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: item)

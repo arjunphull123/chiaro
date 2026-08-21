@@ -467,8 +467,8 @@ final class MCPServer {
                   let preset = PresetStore.shared.all.first(where: { $0.name == presetName }) else {
                 throw ToolError("unknown preset; valid: \(PresetStore.shared.all.map(\.name).joined(separator: ", "))")
             }
+            library.noteAgentActivity(intent: "applying \(presetName)", photo: p.url)
             if let editor = library.activeEditor, editor.photo.url == p.url {
-                library.noteAgentActivity(intent: "applying \(presetName)")
                 editor.edit = preset.applied(to: editor.edit)
             } else {
                 p.edit = preset.applied(to: p.edit)
@@ -482,6 +482,7 @@ final class MCPServer {
             }
             p.starred = starred
             Sidecar.write(for: p)
+            library.noteAgentActivity(photo: p.url)
             return try text(["applied": true, "name": p.name, "starred": starred])
         case "set_edit":
             let p = try photo(args)
@@ -578,8 +579,8 @@ final class MCPServer {
                 }
                 parameter.set(number, in: &edit)
             }
+            library.noteAgentActivity(intent: args["intent"] as? String, photo: p.url)
             if let editor = library.activeEditor, editor.photo.url == p.url {
-                library.noteAgentActivity(intent: args["intent"] as? String)
                 Self.revealSections(for: Array(params.keys))
                 editor.edit = edit // renders live in the UI
             } else {
@@ -590,7 +591,7 @@ final class MCPServer {
         case "open_photo":
             let p = try photo(args)
             library.edit(p)
-            library.noteAgentActivity(intent: args["intent"] as? String)
+            library.noteAgentActivity(intent: args["intent"] as? String, photo: p.url)
             NSApp.activate(ignoringOtherApps: true)
             return try text(["opened": p.name])
         case "get_preview":

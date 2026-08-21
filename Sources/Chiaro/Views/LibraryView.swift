@@ -305,6 +305,10 @@ struct LibraryView: View {
                     .layoutPriority(-1) // the count yields before the folder name does
             }
             Spacer()
+            // Same presence pill and live intent as the edit rail (ADR 0008) —
+            // a folder-wide pass happens with the library open, not the editor.
+            AgentRailStatus(library: library)
+                .fixedSize()
             HStack(spacing: 3) {
                 allChip()
                 toggleChip(active: library.filterStarred, help: "Starred only", toggle: { library.filterStarred.toggle() }) {
@@ -565,6 +569,22 @@ struct LibraryView: View {
 
     @State private var hoveredTile: URL?
 
+    private func agentTouched(_ photo: Photo) -> Bool {
+        library.agentTouchedPhoto == photo.url
+    }
+
+    /// Soft amber halo, outside the tile's own edge so it never reads as the
+    /// selection border — marks whichever tile an agent last named, and fades
+    /// on its own once `agentTouchedPhoto` moves on or clears.
+    private func agentTouchGlow(_ photo: Photo, cornerRadius: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: cornerRadius)
+            .stroke(Theme.amber.opacity(0.8), lineWidth: 3)
+            .blur(radius: 5)
+            .opacity(agentTouched(photo) ? 1 : 0)
+            .allowsHitTesting(false)
+            .animation(.easeOut(duration: 0.8), value: library.agentTouchedPhoto)
+    }
+
     /// RAW chip + star + Chiaro mark, bottom-right, sitting in the caption scrim.
     /// The chip carries the format when filenames are toggled off.
     @ViewBuilder private func badgePair(_ photo: Photo) -> some View {
@@ -662,6 +682,7 @@ struct LibraryView: View {
         }
         // Only when the caption isn't already carrying them.
         .overlay(alignment: .bottomTrailing) { if !showCaption { badgePair(photo) } }
+        .overlay(agentTouchGlow(photo, cornerRadius: 7))
         .modifier(PhotoInteractions(photo: photo, library: library, hoveredTile: $hoveredTile, onExport: onExport))
     }
 
@@ -713,6 +734,7 @@ struct LibraryView: View {
                 RoundedRectangle(cornerRadius: 7)
                     .stroke(selected ? Theme.amber : .clear, lineWidth: 2)
             )
+            .overlay(agentTouchGlow(photo, cornerRadius: 7))
             .modifier(PhotoInteractions(photo: photo, library: library, hoveredTile: $hoveredTile, onExport: onExport))
     }
 
@@ -1056,6 +1078,7 @@ struct LibraryView: View {
                     : hoveredTile == photo.url ? Color.white.opacity(0.05)
                     : alternate ? Color.white.opacity(0.03) : .clear)
         )
+        .overlay(agentTouchGlow(photo, cornerRadius: 5))
         .modifier(PhotoInteractions(photo: photo, library: library, hoveredTile: $hoveredTile, onExport: onExport))
     }
 
