@@ -16,7 +16,7 @@ enum RenderPipeline {
             let f = CIFilter.temperatureAndTint()
             f.inputImage = image
             f.neutral = CIVector(x: 6500, y: 0)
-            f.targetNeutral = CIVector(x: 6500 + edit.temp * 28, y: edit.tint * 0.9)
+            f.targetNeutral = CIVector(x: 6500 - edit.temp * 28, y: -edit.tint * 0.9)
             image = f.outputImage ?? image
         }
         if edit.exposure != 0 {
@@ -270,7 +270,7 @@ enum RenderPipeline {
             let f = CIFilter.temperatureAndTint()
             f.inputImage = adjusted
             f.neutral = CIVector(x: 6500, y: 0)
-            f.targetNeutral = CIVector(x: 6500 + local.temp * 28, y: local.tint * 0.9)
+            f.targetNeutral = CIVector(x: 6500 - local.temp * 28, y: -local.tint * 0.9)
             adjusted = f.outputImage ?? adjusted
         }
         if local.exposure != 0 {

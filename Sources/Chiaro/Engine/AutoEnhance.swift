@@ -92,7 +92,8 @@ enum AutoEnhance {
         if wbCount > total * 0.12 {
             let meanR = sumR / wbCount, meanG = sumG / wbCount, meanB = sumB / wbCount
             edit.temp = (((meanB - meanR) / meanG) * 200).clamped(to: -20...20)
-            edit.tint = ((((meanR + meanB) / 2 - meanG) / meanG) * 160).clamped(to: -10...10)
+            // Excess R+B over G is a magenta cast; positive tint pushes magenta, so cancel with negative.
+            edit.tint = (((meanG - (meanR + meanB) / 2) / meanG) * 160).clamped(to: -10...10)
         }
         if saturationCount > 0 {
             let meanSaturation = saturationSum / saturationCount
