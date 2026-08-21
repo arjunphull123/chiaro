@@ -121,6 +121,17 @@ struct EditState: Codable, Equatable {
     var blurMode: BlurMode = .subject
     var focusDepth: Double = 0.5  // the focus plane, 0 = nearest, 1 = farthest —
                                   // everything nearer stays sharp, blur ramps beyond
+
+    /// Reads ƒ4 (see EditParameter.blurF.format) — the amount a mode chip
+    /// dials in when blur is off, so picking a mode is never a no-op.
+    static let defaultBlurAmount = 0.5692
+
+    /// Choosing a mode is a real edit: land on a visible amount if blur is
+    /// off, but never stomp an amount already dialed in when switching modes.
+    mutating func selectBlurMode(_ mode: BlurMode) {
+        blurMode = mode
+        if blurF <= 0.001 { blurF = EditState.defaultBlurAmount }
+    }
     // Local adjustments: masked corrections, applied after global ones
     var locals: [LocalAdjustment] = []
     // Color mixer: 8 hue bands (see HSLBand.names)

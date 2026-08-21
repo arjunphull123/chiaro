@@ -336,7 +336,7 @@ final class EditViewModel {
         if mode == .depth {
             enableDepthBlur()
         } else {
-            edit.blurMode = mode
+            edit.selectBlurMode(mode)
             depthSceneVisible = false
         }
     }
@@ -345,7 +345,7 @@ final class EditViewModel {
     /// the person mask becomes the focus plane, so the first render is sharp
     /// where it should be instead of blurring the person (focus defaults mid-scene).
     func enableDepthBlur() {
-        edit.blurMode = .depth
+        edit.selectBlurMode(.depth)
         // Auto-focus only on first use — switching Subject ↔ Depth must not
         // stomp a focus the user already set.
         guard edit.focusDepth == EditParameter.focusDepth.defaultValue, let basePreview else { return }
