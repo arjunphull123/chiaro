@@ -39,9 +39,13 @@ Hue is 0–360 and wraps; strength is 0–100 and defaults to 0, so the whole
 feature is inert until asked for. A seventh value, `gradeBalance` (-100…100),
 shifts where shadows end and highlights begin.
 
-Rendering is one custom `CIColorKernel`: compute luminance, weight each zone by
-a smooth falloff of that luminance, blend each zone's hue in at its strength.
-One pass, Metal-backed, no new dependency.
+Rendering computes luminance, weights each zone by a smooth falloff of that
+luminance, and blends each zone's hue in at its strength — a pure function of
+a pixel's RGB, so (like the HSL mixer) it's baked into a `CIColorCube` rather
+than run per-pixel. An initial `CIColorKernel(source:)` version was reverted:
+CIKL has been deprecated since macOS 10.14, and its C-like source silently
+failed to compile from a one-character typo, doing nothing for as long as it
+shipped. One pass, Metal-backed, no new dependency.
 
 **Monochrome as an explicit mode, not a pipeline reorder.** Add
 `monochrome: Bool`. When true, the pipeline converts to grey *using the HSL

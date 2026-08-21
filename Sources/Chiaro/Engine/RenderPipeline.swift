@@ -65,7 +65,7 @@ enum RenderPipeline {
         // then grading, then locals. Deliberately not guarded by !edit.monochrome:
         // a warm highlight / cool shadow tint on a grey image is toned black and
         // white, the way sepia and selenium prints work.
-        image = ColorGradeKernel.apply(image, edit: edit)
+        image = ColorGradeCube.apply(image, edit: edit)
         for local in edit.locals where !local.isNeutral {
             image = applyLocal(local, to: image, personMask: personMask, scale: scale)
         }
