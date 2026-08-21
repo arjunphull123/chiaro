@@ -414,6 +414,18 @@ final class MCPServer {
             ],
         ],
         [
+            "name": "get_stats",
+            "description": "Measure the photo as currently edited (same render as get_preview) and return decision-oriented numbers instead of an image to eyeball. clipping: percent of pixels (0-100) pinned at the floor and ceiling, per channel and for luminance — is detail actually gone, not just dark or bright. luminance: p05/p50/p95 percentiles plus mean, each 0 (black) to 1 (white) — a low p50 means underexposed, a narrow p05-p95 spread with a normal p50 means flat; those are different faults with different fixes. saturation.mean: 0 (grey) to 1 (fully saturated), averaged over non-near-black pixels — answers whether the photo reads dull. neutralCast: mean r/g/b (each 0-1) over low-saturation midtone pixels only (saturation under 0.15, luminance 0.25-0.75) — those pixels should be neutral, so equal r/g/b means no cast and a skew reveals one and its direction; pixelCount is the sample size behind the average, so a small pixelCount means treat the reading with caution. histogram: 32 buckets spanning luminance 0 to 1 left to right, each the fraction of pixels in that bucket (sums to ~1).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "name": ["type": "string"],
+                    "maxDimension": ["type": "number", "description": "longest edge in px, default 1024 — stats don't need full resolution"],
+                ],
+                "required": ["name"],
+            ],
+        ],
+        [
             "name": "export",
             "description": "Export a photo at full resolution through its current edit. Returns the written file path.",
             "inputSchema": [
@@ -428,6 +440,25 @@ final class MCPServer {
             ],
         ],
     ]
+
+    /// Shared by get_preview and get_stats: mask/depth generation and downsampling
+    /// must stay identical between them, since get_stats's whole premise is that
+    /// it measures the same pixels get_preview shows.
+    private static func renderedForInspection(url: URL, edit: EditState, isRAW: Bool, maxDimension: Double) -> CIImage? {
+        guard let base = RawEngine.shared.preview(for: url, decode: RawEngine.DecodeParams(edit)) else { return nil }
+        var mask: CIImage?
+        if edit.blurF > 0 || edit.relight != 0 {
+            mask = PortraitEngine.shared.mask(
+                for: url, image: base,
+                kind: edit.blurMode == .person ? .person : .subject)
+        }
+        let depth = edit.blurMode == .depth && edit.blurF > 0
+            ? DepthEngine.shared.depthMap(for: url, image: base) : nil
+        var out = RenderPipeline.render(base: base, edit: edit, personMask: mask, depthMap: depth, isRAW: isRAW)
+        let scale = maxDimension / Double(max(out.extent.width, out.extent.height))
+        if scale < 1 { out = out.transformed(by: .init(scaleX: scale, y: scale)) }
+        return out
+    }
 
     @MainActor
     private func callTool(_ name: String, args: [String: Any]) async throws -> [[String: Any]] {
@@ -599,18 +630,7 @@ final class MCPServer {
             let maxDim = args["maxDimension"] as? Double ?? 768
             let url = p.url, edit = p.edit, isRAW = p.isRAW
             let jpeg = await Offload.on(Offload.render) { () -> Data? in
-                guard let base = RawEngine.shared.preview(for: url, decode: RawEngine.DecodeParams(edit)) else { return nil }
-                var mask: CIImage?
-                if edit.blurF > 0 || edit.relight != 0 {
-                    mask = PortraitEngine.shared.mask(
-                        for: url, image: base,
-                        kind: edit.blurMode == .person ? .person : .subject)
-                }
-                let depth = edit.blurMode == .depth && edit.blurF > 0
-                    ? DepthEngine.shared.depthMap(for: url, image: base) : nil
-                var out = RenderPipeline.render(base: base, edit: edit, personMask: mask, depthMap: depth, isRAW: isRAW)
-                let scale = maxDim / Double(max(out.extent.width, out.extent.height))
-                if scale < 1 { out = out.transformed(by: .init(scaleX: scale, y: scale)) }
+                guard let out = Self.renderedForInspection(url: url, edit: edit, isRAW: isRAW, maxDimension: maxDim) else { return nil }
                 return RawEngine.shared.context.jpegRepresentation(
                     of: out, colorSpace: CGColorSpace(name: CGColorSpace.displayP3)!,
                     options: [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: 0.85]
@@ -618,6 +638,17 @@ final class MCPServer {
             }
             guard let jpeg else { throw ToolError("could not render \(url.lastPathComponent)") }
             return [["type": "image", "data": jpeg.base64EncodedString(), "mimeType": "image/jpeg"]]
+        case "get_stats":
+            let p = try photo(args)
+            let maxDim = args["maxDimension"] as? Double ?? 1024
+            let url = p.url, edit = p.edit, isRAW = p.isRAW
+            let stats = await Offload.on(Offload.render) { () -> [String: Any]? in
+                guard let out = Self.renderedForInspection(url: url, edit: edit, isRAW: isRAW, maxDimension: maxDim) else { return nil }
+                return StatsSampler.sample(out)
+            }
+            guard var stats else { throw ToolError("could not render \(url.lastPathComponent)") }
+            stats["name"] = p.name
+            return try text(stats)
         case "export":
             let p = try photo(args)
             var options = ExportOptions()
@@ -652,6 +683,7 @@ final class MCPServer {
         case "list_photos": text = "surveyed the library"
         case "get_edit": text = "read the settings of \(name)"
         case "get_preview": text = "looked at \(name)"
+        case "get_stats": text = "measured \(name)"
         case "open_photo": text = "opened \(name)"
         case "set_edit": text = (args["intent"] as? String).map { "\(name) — \($0)" } ?? "adjusted \(name)"
         case "set_starred": text = (args["starred"] as? Bool == true) ? "starred \(name)" : "unstarred \(name)"
