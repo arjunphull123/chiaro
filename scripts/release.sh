@@ -13,8 +13,7 @@ V=${1:?usage: scripts/release.sh <version>}
 
 sed -i '' "s/^VERSION=.*/VERSION=\"$V\"/" scripts/bundle.sh
 scripts/bundle.sh
-( cd dist && rm -f "Chiaro-$V.zip" && ditto -c -k --keepParent Chiaro.app "Chiaro-$V.zip" )
-# The DMG is the human install path: mount, drag Chiaro into Applications.
+# The DMG is the install path: mount, drag Chiaro into Applications.
 (
   cd dist && rm -rf dmg-stage "Chiaro-$V.dmg" && mkdir dmg-stage
   cp -R Chiaro.app dmg-stage/ && ln -s /Applications dmg-stage/Applications
@@ -28,14 +27,14 @@ sed -i '' "s/^  sha256 \".*\"/  sha256 \"$SHA\"/" docs/homebrew/chiaro.rb
 git add scripts/bundle.sh docs/homebrew/chiaro.rb
 git commit -m "Release $V"
 git tag "v$V"
-echo "Built dist/Chiaro-$V.dmg (cask sha256 $SHA) and dist/Chiaro-$V.zip"
+echo "Built dist/Chiaro-$V.dmg (cask sha256 $SHA)"
 
 if command -v gh >/dev/null 2>&1; then
   git push && git push --tags
-  gh release create "v$V" "dist/Chiaro-$V.dmg" "dist/Chiaro-$V.zip" --title "Chiaro $V" --generate-notes
+  gh release create "v$V" "dist/Chiaro-$V.dmg" --title "Chiaro $V" --generate-notes
   echo "Release v$V published."
 else
-  echo "gh is not installed: push, then create release v$V on GitHub and attach the zip."
+  echo "gh is not installed: push, then create release v$V on GitHub and attach the DMG."
 fi
 
 cat <<NOTE

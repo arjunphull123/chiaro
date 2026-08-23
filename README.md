@@ -28,8 +28,8 @@ Requires **macOS 26** or later on Apple silicon.
 
 ### Download
 
-Grab `Chiaro-1.0.0.zip` from [the latest release](https://github.com/arjunphull123/chiaro/releases/latest),
-unzip it, and drag `Chiaro.app` to your Applications folder.
+Download `Chiaro-1.0.0.dmg` from [the latest release](https://github.com/arjunphull123/chiaro/releases/latest),
+open it, and drag Chiaro into Applications.
 
 **The first launch needs one extra step.** Chiaro is signed ad hoc rather than
 with a paid Apple Developer certificate, so macOS quarantines it and refuses to
