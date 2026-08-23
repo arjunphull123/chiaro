@@ -799,17 +799,31 @@ struct LibraryView: View {
             let isHero = position == 0
             Task {
                 let image = await Offload.on(Offload.render) {
-                    // The hero says "Edited 2 minutes ago", so it should show the
-                    // edit — a file thumbnail would show the untouched original.
-                    // Strip thumbnails stay cheap.
-                    guard isHero else {
+                    // "Recent edits" must show the edits — a file thumbnail
+                    // would show the untouched original. Unedited thumbs stay
+                    // cheap file scans.
+                    let edit = Sidecar.read(for: url)?.edit ?? .neutral
+                    guard isHero || !edit.isNeutral else {
                         return Library.scan(url, maxPixelSize: 480).image
                     }
-                    let edit = Sidecar.read(for: url)?.edit ?? .neutral
                     guard let base = RawEngine.shared.preview(for: url, decode: RawEngine.DecodeParams(edit)) else {
-                        return Library.scan(url, maxPixelSize: 1600).image
+                        return Library.scan(url, maxPixelSize: isHero ? 1600 : 480).image
                     }
-                    let rendered = RenderPipeline.render(base: base, edit: edit, personMask: nil, isRAW: Photo.isRAW(url))
+                    // Blur needs its mask or it silently no-ops. Depth blur
+                    // is the exception: it would need the model and a map,
+                    // so those thumbs render without the blur.
+                    var mask: CIImage?
+                    if edit.blurF > 0, edit.blurMode != .depth {
+                        mask = PortraitEngine.shared.mask(
+                            for: url, image: base,
+                            kind: edit.blurMode == .person ? .person : .subject
+                        )
+                    }
+                    var rendered = RenderPipeline.render(base: base, edit: edit, personMask: mask, isRAW: Photo.isRAW(url))
+                    if !isHero {
+                        let s = 480 / max(rendered.extent.width, rendered.extent.height)
+                        if s < 1 { rendered = rendered.transformed(by: CGAffineTransform(scaleX: s, y: s)) }
+                    }
                     return RawEngine.shared.context.createCGImage(rendered, from: rendered.extent)
                         ?? Library.scan(url, maxPixelSize: 1600).image
                 }
@@ -839,7 +853,7 @@ struct LibraryView: View {
         return first.isEmpty ? salutation : "\(salutation), \(first)"
     }
 
-    private var emptyState: some View {
+    private var emptyStateContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer(minLength: 10)
 
@@ -912,9 +926,18 @@ struct LibraryView: View {
             Spacer(minLength: 10)
         }
         .padding(.horizontal, 28)
-        // The window honors contentMinSize, so this keeps the wordmark from
-        // clipping off the top at short heights while the start screen shows.
-        .frame(maxWidth: .infinity, minHeight: 930, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
+    }
+
+    /// Centered when it fits; scrolls when the window is shorter than the
+    /// content, so the wordmark can never clip off the top. The window's own
+    /// minimum also rises while the start screen shows (ChiaroApp).
+    private var emptyState: some View {
+        ViewThatFits(in: .vertical) {
+            emptyStateContent
+            ScrollView(showsIndicators: false) { emptyStateContent }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
         .onAppear {
             refreshSources()
