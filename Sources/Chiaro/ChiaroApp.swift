@@ -253,7 +253,10 @@ struct ChiaroApp: App {
     }
 
     var body: some Scene {
-        WindowGroup {
+        // One window, always: the library and editor are one shared state,
+        // and a second view over them is incoherent (the Lightroom posture).
+        // Window (not WindowGroup) also removes File > New Window.
+        Window("Chiaro", id: "main") {
             RootView(library: library, exporting: $exporting)
                 .preferredColorScheme(.dark)
                 // The start screen hugs its content (LibraryView resizes the
