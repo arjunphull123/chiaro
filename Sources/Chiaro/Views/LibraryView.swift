@@ -43,6 +43,11 @@ struct LibraryView: View {
         64 + CGFloat(library.zoomLevel) * 190
     }
 
+    /// The start screen is a fixed composition, so the window hugs it; the
+    /// height a library session had is put back when one opens.
+    private static let startScreenHeight: CGFloat = 620
+    @State private var libraryHeight: CGFloat?
+
     var body: some View {
         Group {
             if library.photos.isEmpty {
@@ -52,6 +57,28 @@ struct LibraryView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear { if library.photos.isEmpty { hugStartScreen() } }
+        .onChange(of: library.photos.isEmpty) { _, empty in
+            if empty { hugStartScreen() } else { restoreLibraryHeight() }
+        }
+    }
+
+    private func hugStartScreen() {
+        guard let window = NSApp.windows.first(where: { $0.isVisible }) else { return }
+        if window.frame.height > Self.startScreenHeight + 40 { libraryHeight = window.frame.height }
+        setWindowHeight(window, Self.startScreenHeight)
+    }
+
+    private func restoreLibraryHeight() {
+        guard let window = NSApp.windows.first(where: { $0.isVisible }) else { return }
+        setWindowHeight(window, max(libraryHeight ?? 900, 760))
+    }
+
+    private func setWindowHeight(_ window: NSWindow, _ height: CGFloat) {
+        var frame = window.frame
+        frame.origin.y += frame.height - height // keep the top edge where it is
+        frame.size.height = height
+        window.setFrame(frame, display: true, animate: true)
     }
 
     private var gallery: some View {

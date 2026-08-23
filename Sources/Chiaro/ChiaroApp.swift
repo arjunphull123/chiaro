@@ -256,9 +256,9 @@ struct ChiaroApp: App {
         WindowGroup {
             RootView(library: library, exporting: $exporting)
                 .preferredColorScheme(.dark)
-                // The two-column start screen fits the same floor as the
-                // editor; if it ever outgrows a window it scrolls instead.
-                .frame(minWidth: 1080, minHeight: 700)
+                // The start screen hugs its content (LibraryView resizes the
+                // window to it); the editor needs the taller floor.
+                .frame(minWidth: 1080, minHeight: library.photos.isEmpty ? 560 : 700)
         }
         .windowStyle(.hiddenTitleBar)
         // Without this the window resizes past the content's minWidth and the
