@@ -1,5 +1,11 @@
 # Chiaro v0.1 — Build Spec
 
+> Historical document. This is the original v0.1 build spec, kept for the
+> record; the current state of the app is described by `ROADMAP.md`,
+> `DESIGN.md`, and the ADRs in `docs/adr/`. Where this file and those
+> disagree, they win (ratings became a starred flag, and the edit surface
+> has grown well past this table).
+
 Native macOS 26 app, Swift 6 / SwiftUI, built with SPM (`swift run` for development,
 `scripts/bundle.sh` assembles `Chiaro.app`). Everything below follows ADRs 0001–0006
 and DESIGN.md.

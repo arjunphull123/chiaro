@@ -1,5 +1,7 @@
 .DS_Store
 .build/
+.claude/worktrees/
+.claude/settings.local.json
 *.xcodeproj
 xcuserdata/
 DerivedData/

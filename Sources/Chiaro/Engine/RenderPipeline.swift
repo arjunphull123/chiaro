@@ -128,7 +128,9 @@ enum RenderPipeline {
                     "inputBiasVector": CIVector(x: -farEdge * 12, y: -farEdge * 12, z: -farEdge * 12, w: 0),
                 ])
                 .applyingFilter("CIColorClamp")
-            let amber = CIImage(color: CIColor(red: 0.91, green: 0.64, blue: 0.24, alpha: 0.45))
+            // 0.2 tints without erasing a dark subject; 0.45 read as a solid
+            // amber cutout on the shoot's cat frame.
+            let amber = CIImage(color: CIColor(red: 0.91, green: 0.64, blue: 0.24, alpha: 0.2))
                 .cropped(to: image.extent)
                 .composited(over: image)
             let blend = CIFilter.blendWithMask()
