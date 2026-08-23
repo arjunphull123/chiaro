@@ -63,8 +63,14 @@ struct LibraryView: View {
         }
     }
 
-    private func hugStartScreen() {
-        guard let window = NSApp.windows.first(where: { $0.isVisible }) else { return }
+    private func hugStartScreen(attempt: Int = 0) {
+        // onAppear can run before the window is ordered in — wait for it.
+        guard let window = NSApp.windows.first(where: { $0.isVisible }) else {
+            if attempt < 8 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { hugStartScreen(attempt: attempt + 1) }
+            }
+            return
+        }
         if window.frame.height > Self.startScreenHeight + 40 { libraryHeight = window.frame.height }
         setWindowHeight(window, Self.startScreenHeight)
     }
@@ -825,42 +831,50 @@ struct LibraryView: View {
         for (position, url) in urls.enumerated() {
             let isHero = position == 0
             Task {
-                let image = await Offload.on(Offload.render) {
-                    // "Recent edits" must show the edits — a file thumbnail
-                    // would show the untouched original. Unedited thumbs stay
-                    // cheap file scans.
-                    let edit = Sidecar.read(for: url)?.edit ?? .neutral
-                    guard isHero || !edit.isNeutral else {
-                        return Library.scan(url, maxPixelSize: 480).image
-                    }
-                    guard let base = RawEngine.shared.preview(for: url, decode: RawEngine.DecodeParams(edit)) else {
-                        return Library.scan(url, maxPixelSize: isHero ? 1600 : 480).image
-                    }
-                    // Blur needs its mask (or map) or it silently no-ops.
-                    // Depth needs the model; when it isn't downloaded the
-                    // thumb just renders without the blur.
-                    var mask: CIImage?
-                    var depth: CIImage?
-                    if edit.blurF > 0 {
-                        if edit.blurMode == .depth {
-                            depth = DepthEngine.shared.normalizedMap(for: url, image: base)
-                        } else {
-                            mask = PortraitEngine.shared.mask(
-                                for: url, image: base,
-                                kind: edit.blurMode == .person ? .person : .subject
-                            )
+                // "Recent edits" must show the edits — a file thumbnail would
+                // show the untouched original. Unedited thumbs stay cheap file
+                // scans. A depth-blurred edit needs the on-demand model, which
+                // is still loading when this runs at launch — wait for it a
+                // few beats before rendering without the blur.
+                func renderOnce(requireDepth: Bool) async -> CGImage?? {
+                    await Offload.on(Offload.render) { () -> CGImage?? in
+                        let edit = Sidecar.read(for: url)?.edit ?? .neutral
+                        guard isHero || !edit.isNeutral else {
+                            return Library.scan(url, maxPixelSize: 480).image
                         }
+                        guard let base = RawEngine.shared.preview(for: url, decode: RawEngine.DecodeParams(edit)) else {
+                            return Library.scan(url, maxPixelSize: isHero ? 1600 : 480).image
+                        }
+                        var mask: CIImage?
+                        var depth: CIImage?
+                        if edit.blurF > 0 {
+                            if edit.blurMode == .depth {
+                                depth = DepthEngine.shared.normalizedMap(for: url, image: base)
+                                if depth == nil && requireDepth { return CGImage??.none } // model not up yet
+                            } else {
+                                mask = PortraitEngine.shared.mask(
+                                    for: url, image: base,
+                                    kind: edit.blurMode == .person ? .person : .subject
+                                )
+                            }
+                        }
+                        var rendered = RenderPipeline.render(base: base, edit: edit, personMask: mask, depthMap: depth, isRAW: Photo.isRAW(url))
+                        if !isHero {
+                            let s = 480 / max(rendered.extent.width, rendered.extent.height)
+                            if s < 1 { rendered = rendered.transformed(by: CGAffineTransform(scaleX: s, y: s)) }
+                        }
+                        return RawEngine.shared.context.createCGImage(rendered, from: rendered.extent)
                     }
-                    var rendered = RenderPipeline.render(base: base, edit: edit, personMask: mask, depthMap: depth, isRAW: Photo.isRAW(url))
-                    if !isHero {
-                        let s = 480 / max(rendered.extent.width, rendered.extent.height)
-                        if s < 1 { rendered = rendered.transformed(by: CGAffineTransform(scaleX: s, y: s)) }
-                    }
-                    return RawEngine.shared.context.createCGImage(rendered, from: rendered.extent)
-                        ?? Library.scan(url, maxPixelSize: 1600).image
                 }
+                var image: CGImage??
+                for _ in 0..<5 {
+                    image = await renderOnce(requireDepth: true)
+                    if image != nil { break }
+                    try? await Task.sleep(for: .seconds(1))
+                }
+                if image == nil { image = await renderOnce(requireDepth: false) }
                 if let index = recentEdits.firstIndex(where: { $0.id == url }) {
-                    recentEdits[index].image = image
+                    recentEdits[index].image = image ?? nil
                 }
             }
         }
@@ -950,7 +964,6 @@ struct LibraryView: View {
             Text("Sources")
                 .font(Theme.ui(12, .medium))
                 .foregroundStyle(Theme.ink2)
-                .padding(.top, 8)
             VStack(spacing: 6) {
                 ForEach(sources) { source in
                     sourceRow(

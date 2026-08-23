@@ -39,8 +39,13 @@ final class Updater {
         Task {
             let latest: String
             do { latest = try await fetchLatest() } catch {
+                // A DecodingError is the API answering without a release —
+                // its own description ("the data is missing") helps nobody.
+                let reason = error is DecodingError
+                    ? "GitHub has no published release to compare against."
+                    : error.localizedDescription
                 alert("Couldn't check for updates",
-                      "\(error.localizedDescription)\n\nYou can always check the releases page directly.",
+                      "\(reason)\n\nYou can always check the releases page directly.",
                       confirm: "Open releases")
                 return
             }
