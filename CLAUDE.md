@@ -39,8 +39,9 @@ via Apple's RAW engine.
 
 While Chiaro runs it serves MCP at `http://127.0.0.1:24242/mcp` (ADR 0008; repo
 `.mcp.json` preconfigures Claude Code; discovery at `~/.chiaro/mcp.json`). Tools:
-list_photos, get_edit, set_edit (renders live if the photo is open), open_photo,
-get_preview, export. Prefer driving the running app over spawning new instances.
+list_photos, get_edit, set_edit (renders live if the photo is open), set_starred,
+list_presets, apply_preset, open_photo, get_preview, get_stats, export. Prefer
+driving the running app over spawning new instances.
 
 ## Dev harness
 

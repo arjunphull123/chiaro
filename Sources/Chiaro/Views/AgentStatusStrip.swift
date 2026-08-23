@@ -151,7 +151,7 @@ struct AgentConnectPopover: View {
             }
         }
         // One fixed size for every state: animated popover resizes crash NSPopover.
-        .frame(width: 380, height: 312)
+        .frame(width: 340, height: 312)
         .presentationBackground(.ultraThinMaterial)
     }
 

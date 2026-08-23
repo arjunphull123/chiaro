@@ -11,7 +11,12 @@ enum HistogramSampler {
     static let bins = 64
 
     static func sample(_ image: CIImage) -> HistogramData {
-        let histogram = image.applyingFilter("CIAreaHistogram", parameters: [
+        // The working space is linear; bin display-referred values so the
+        // histogram matches what the eye (and get_stats) sees. Without this,
+        // mid-grey lands 21% from the left and every correct exposure reads
+        // as crushed shadows.
+        let display = image.applyingFilter("CIGammaAdjust", parameters: ["inputPower": 1.0 / 2.2])
+        let histogram = display.applyingFilter("CIAreaHistogram", parameters: [
             kCIInputExtentKey: CIVector(cgRect: image.extent),
             "inputCount": bins,
             "inputScale": 1.0,

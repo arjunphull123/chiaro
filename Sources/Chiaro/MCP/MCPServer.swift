@@ -174,13 +174,35 @@ final class MCPServer {
             Task { @MainActor in AgentStatus.shared.clientName = client }
             reply(rpcResult(id: id, [
                 "protocolVersion": version,
-                "capabilities": ["tools": [:] as [String: Any]],
+                "capabilities": [
+                    "tools": [:] as [String: Any],
+                    "prompts": [:] as [String: Any],
+                ],
                 "serverInfo": ["name": "Chiaro", "version": "0.1"],
             ]))
         case "ping":
             reply(rpcResult(id: id, [:]))
         case "tools/list":
             reply(rpcResult(id: id, ["tools": Self.toolDefinitions]))
+        case "prompts/list":
+            reply(rpcResult(id: id, ["prompts": [[
+                "name": "chiaro-editing",
+                "title": "Chiaro editing skill",
+                "description": "How to edit well in Chiaro: the working method, every control with its range and traps, and the look recipes. Load this before grading anything.",
+            ] as [String: Any]]]))
+        case "prompts/get":
+            let params = message["params"] as? [String: Any]
+            guard params?["name"] as? String == "chiaro-editing" else {
+                reply(rpcError(id: id, code: -32602, message: "unknown prompt; available: chiaro-editing"))
+                return
+            }
+            reply(rpcResult(id: id, [
+                "description": "The Chiaro editing skill",
+                "messages": [[
+                    "role": "user",
+                    "content": ["type": "text", "text": Self.editingSkill],
+                ] as [String: Any]],
+            ]))
         case "tools/call":
             let params = message["params"] as? [String: Any] ?? [:]
             let name = params["name"] as? String ?? ""
@@ -296,12 +318,49 @@ final class MCPServer {
             "type": "number",
             "description": "range 0...100 — grain coarseness, fine at 0 to coarse at 100, default 50 is an ordinary film-speed grain. Only visible once grain > 0",
         ]
+        // Grading needs prose, not just ranges — an agent without the skill
+        // has no other way to learn what these move.
+        let zones = [("shadow", "shadows"), ("mid", "midtones"), ("highlight", "highlights")]
+        for (prefix, zone) in zones {
+            props["\(prefix)Strength"] = [
+                "type": "number",
+                "description": "range 0...100 — how much of \(prefix)Hue's tint is pushed into the \(zone); 0 is off",
+            ] as [String: Any]
+            props["\(prefix)Hue"] = [
+                "type": "number",
+                "description": "range 0...360 — degrees on the color wheel (0 red, 60 yellow, 120 green, 180 cyan, 240 blue, 300 magenta) tinting the \(zone) once \(prefix)Strength > 0. Clamped, not wrapped: for a hue below 0, add 360",
+            ] as [String: Any]
+        }
+        props["gradeBalance"] = [
+            "type": "number",
+            "description": "range -100...100 — shifts the shadow/highlight crossover: negative treats more of the frame as shadows, positive as highlights",
+        ] as [String: Any]
         props["curve"] = [
             "type": "array",
             "items": ["type": "array", "items": ["type": "number"]],
             "description": "tone curve control points [[x,y],...], each 0-1, sorted by x, including endpoints — e.g. a gentle S: [[0,0],[0.25,0.2],[0.75,0.8],[1,1]]",
         ] as [String: Any]
         return props
+    }()
+
+    /// The editing skill, served whole over the MCP prompts primitive so any
+    /// connecting agent can pull the method without installing anything.
+    /// The bundled copy is the same files as `.claude/skills/chiaro` (which
+    /// symlinks into Resources/Skill).
+    static let editingSkill: String = {
+        guard let dir = Bundle.module.url(forResource: "Skill", withExtension: nil) else {
+            return "The bundled editing skill is missing from this build."
+        }
+        func read(_ path: String) -> String {
+            (try? String(contentsOf: dir.appendingPathComponent(path), encoding: .utf8)) ?? ""
+        }
+        return [
+            read("SKILL.md"),
+            "\n\n---\n\n",
+            read("references/controls.md"),
+            "\n\n---\n\n",
+            read("references/looks.md"),
+        ].joined()
     }()
 
     /// Onboarding prompt for the Connect-agent popover. Lives beside
@@ -321,13 +380,15 @@ final class MCPServer {
 
         Working notes: get_edit reads a photo's settings. get_preview returns the photo rendered \
         with its current edit — look before and after every change. set_edit changes only the \
-        parameters you send and accepts an `intent` string that is shown to the user live. \
-        open_photo displays a photo in the editor so the user can watch. export writes the \
-        finished file. All edits are non-destructive and render live.
+        parameters you send and requires an `intent` string, one short clause shown to the user \
+        live. open_photo displays a photo in the editor so the user can watch. export writes \
+        the finished file. All edits are non-destructive and render live.
 
-        The full editing method, the look recipes, and this app's traps live in the chiaro \
-        skill: `npx skills add arjunphull123/chiaro`. Install it and follow it. Until then, \
-        four rules carry most of the weight:
+        The full editing method, the look recipes, and this app's traps are served by Chiaro \
+        itself: fetch the `chiaro-editing` prompt from this server (MCP prompts/get) and follow \
+        it. If your client cannot read MCP prompts, the same skill lives in the repo at \
+        github.com/arjunphull123/chiaro under .claude/skills/chiaro. Either way, four rules \
+        carry most of the weight:
         1. Look before and after every change, and pass maxDimension 1400 or more to \
         get_preview. The 768 default is too small to judge tone; crushed shadows are invisible \
         at that size.
@@ -397,7 +458,7 @@ final class MCPServer {
                     "reset": ["type": "boolean", "description": "reset to neutral before applying"],
                     "intent": ["type": "string", "description": "short description of what you're doing (e.g. 'warming skin tones') — shown live in the app UI"],
                 ],
-                "required": ["name", "edit"],
+                "required": ["name", "edit", "intent"],
             ],
         ],
         [
@@ -529,13 +590,29 @@ final class MCPServer {
         case "set_edit":
             let p = try photo(args)
             guard let params = args["edit"] as? [String: Any] else { throw ToolError("missing edit object") }
+            guard let intent = args["intent"] as? String,
+                  !intent.trimmingCharacters(in: .whitespaces).isEmpty else {
+                throw ToolError("send an intent: one short clause describing this change, shown to the user live, e.g. \"warming the highlights\"")
+            }
             var edit = (args["reset"] as? Bool == true) ? EditState.neutral : p.edit
+            // Mode before the loop, whatever the dictionary's order:
+            // selectBlurMode seeds a default blurF, and an explicit blurF in
+            // the same payload must win.
+            if let value = params["blurMode"] ?? params["depthBlur"] {
+                if let raw = value as? String, let mode = BlurMode(rawValue: raw) {
+                    edit.selectBlurMode(mode)
+                } else if let flag = value as? Bool {
+                    edit.selectBlurMode(flag ? .depth : .subject)
+                } else {
+                    throw ToolError("blurMode must be one of subject, person, depth")
+                }
+            }
             for (key, value) in params {
                 if key == "crop" {
                     guard let dict = value as? [String: Any],
                           let x = dict["x"] as? Double, let y = dict["y"] as? Double,
                           let w = dict["w"] as? Double, let h = dict["h"] as? Double,
-                          w > 0.05, h > 0.05
+                          w >= 0.05, h >= 0.05
                     else { throw ToolError("crop must be {x,y,w,h} normalized 0-1") }
                     edit.crop = CropRect(
                         x: x.clamped(to: 0...0.95), y: y.clamped(to: 0...0.95),
@@ -543,16 +620,7 @@ final class MCPServer {
                     )
                     continue
                 }
-                if key == "blurMode" || key == "depthBlur" {
-                    if let raw = value as? String, let mode = BlurMode(rawValue: raw) {
-                        edit.selectBlurMode(mode)
-                    } else if let flag = value as? Bool {
-                        edit.selectBlurMode(flag ? .depth : .subject)
-                    } else {
-                        throw ToolError("blurMode must be one of subject, person, depth")
-                    }
-                    continue
-                }
+                if key == "blurMode" || key == "depthBlur" { continue } // handled above
                 if key == "hsl" {
                     guard let bandsDict = value as? [String: [String: Any]] else {
                         throw ToolError("hsl must be {band: {h,s,l}} — bands: \(HSLBand.names.joined(separator: ", "))")
@@ -594,8 +662,14 @@ final class MCPServer {
                     if let empty = value as? [Any], empty.isEmpty { edit.locals = []; continue }
                     guard let raw = value as? [[String: Any]],
                           let data = try? JSONSerialization.data(withJSONObject: raw),
-                          let decoded = try? JSONDecoder().decode([LocalAdjustment].self, from: data) else {
+                          var decoded = try? JSONDecoder().decode([LocalAdjustment].self, from: data) else {
                         throw ToolError("locals must be [{kind, ax, ay, bx, by, feather, ...adjustments}] — kind is radial, linear, or subject")
+                    }
+                    // Ids are session identity (gizmo selection, the armed
+                    // dial) — keep them positionally so an agent resending
+                    // the array doesn't detach the UI mid-drag.
+                    for i in decoded.indices where i < edit.locals.count {
+                        decoded[i].id = edit.locals[i].id
                     }
                     edit.locals = decoded
                     continue
@@ -676,7 +750,7 @@ final class MCPServer {
             default: options.format = .jpeg
             }
             if let maxDim = args["maxDimension"] as? Double { options.maxDimension = maxDim }
-            if let q = args["quality"] as? Double { options.quality = q }
+            if let q = args["quality"] as? Double { options.quality = q.clamped(to: 0.5...1.0) }
             if Self.volumeIsRemovable(p.url) {
                 options.destination = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask)[0]
                     .appendingPathComponent("Chiaro Exports")

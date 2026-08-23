@@ -24,8 +24,9 @@ Two independent systems, and choosing the right one is most of the skill:
 **By tonal zone**, which is the grading section: `shadowHue` and
 `shadowStrength`, `midHue` and `midStrength`, `highlightHue` and
 `highlightStrength`, plus `gradeBalance` to move where shadows end and
-highlights begin. Hues are degrees, 0 to 360. Strengths are 0 to 100 and
-default to 0, so grading is inert until you ask for it.
+highlights begin. Hues are degrees 0 to 360 and clamp at the ends; to reach a
+hue below zero, add 360 yourself (a -20 red-magenta is 340). Strengths are 0
+to 100 and default to 0, so grading is inert until you ask for it.
 
 This is real split toning: it adds a chroma shift at the luminance you target
 while preserving both brightness and the pixel's own hue, so tinting the

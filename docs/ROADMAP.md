@@ -3,7 +3,7 @@
 ## Status
 
 Feature phase complete (2026-08-19). Tiers 1 and 2 shipped; Tier 3 is the MCP
-surface, which is built. ADRs current through 0014.
+surface, which is built. ADRs current through 0016.
 
 Everything below is the record of what got built and — as usefully — what got
 cut and why.
@@ -50,17 +50,17 @@ cut and why.
 - Auto-culling: not an in-app feature — an agent workflow over MCP
   (get_preview + set_starred; agent picks the keepers)
 
-## Tier 4 — Grading (in progress, ADR 0015)
+## Tier 4 — Grading (shipped, ADR 0015)
 
 Both were found by auditing the render pipeline while writing the editing
 skill, not by feature comparison.
 
-- [ ] Colour grading by tonal zone: shadow/mid/highlight hue and strength plus
+- [x] Colour grading by tonal zone: shadow/mid/highlight hue and strength plus
       balance, as scalar rail rows rather than wheels, since a wheel is a
       two-dimensional control and ADR 0005 committed to one value at a time
-- [ ] Monochrome mixer: converts using the colour mixer's per-band luminance as
+- [x] Monochrome mixer: converts using the colour mixer's per-band luminance as
       channel weights, which the old pipeline order made unreachable
-- [ ] RAW decode parameters: `CIRAWFilter` already exposes `detailAmount`,
+- [x] RAW decode parameters: `CIRAWFilter` already exposes `detailAmount`,
       `moireReductionAmount` and split luminance/colour noise reduction, and we
       set none of them. Decode-time detail and noise handling beats the
       post-demosaic filters we ship today, and moiré is unfixable afterwards.
@@ -78,25 +78,26 @@ skill, not by feature comparison.
 
 Ranked, with the reasoning that put them here rather than in a tier.
 
-- **Luminance-range masking on existing locals.** Two scalars added to a local,
-  so "only the shadows inside this radial" becomes expressible. Composes with
-  the masks already built instead of adding a concept, and stays agent-drivable.
-  The highest-value item left.
-- **Grain.** One or two values in Effects. The missing piece for a film look;
-  the skill currently has to admit it cannot deliver one.
+- **Luminance-range masking on existing locals — shipped.** Two scalars
+  (`lumaLow`/`lumaHigh`) added to a local, so "only the shadows inside this
+  radial" is expressible. Composed with the masks already built instead of
+  adding a concept, and stays agent-drivable.
+- **Grain — shipped.** `grain` and `grainSize` in Effects. The missing piece
+  for a film look; the skill no longer has to admit it cannot deliver one.
 - **Healing and clone.** Wanted by every photographer, and a real gap. Note
   ADR 0012 already cut generative inpainting on quality evidence, so this means
   classical patch-based healing, not a model.
-- **Share pixel-statistics primitives between AutoEnhance and StatsSampler.**
-  Both walk pixels to compute percentiles, clip fractions, saturation means and
-  a gray-world average, with constants that have already diverged: 96x96 sRGB
-  versus full-resolution Display P3, clip thresholds of 0.98/0.02 versus
-  254/255, and different neutral-pool gates. Nothing cross-checks one against
-  the other, which is precisely why the inverted white balance in `temp`
-  survived from the first commit until `f19516d`. Full unification is wrong,
-  since AutoEnhance needs a fast downsample for interactive latency, but the
-  percentile helper and the clip and saturation predicates should be one
-  implementation with one set of constants.
+- **Share pixel-statistics primitives between AutoEnhance and StatsSampler —
+  shipped (`PixelStats`).** Both walked pixels to compute percentiles, clip
+  fractions, saturation means and a gray-world average, with constants that
+  had already diverged: 96x96 sRGB versus full-resolution Display P3, clip
+  thresholds of 0.98/0.02 versus 254/255, and different neutral-pool gates.
+  Nothing cross-checked one against the other, which is precisely why the
+  inverted white balance in `temp` survived from the first commit until
+  `f19516d`. Full unification was skipped, since AutoEnhance needs a fast
+  downsample for interactive latency, but the percentile helper and the clip
+  and saturation predicates are now one implementation with one set of
+  constants.
 - **Re-tune AutoEnhance's `temp` strength.** Its multiplier and clamp were
   hand-tuned while the pipeline rendered temperature backwards, so they have
   never been validated under the correct sign. Note the clamps are load-bearing
@@ -104,12 +105,12 @@ Ranked, with the reasoning that put them here rather than in a tier.
   clamp of ±20, and a 5% channel imbalance already asks for half the maximum
   correction, so do not raise the multiplier without rechecking where the clamp
   bites.
-- **Move the grading kernel off Core Image Kernel Language.**
-  `CIColorKernel(source:)` has been deprecated since macOS 10.14 and it fails
-  *silently*: a source typo returns nil, and grading shipped as a permanent
-  no-op because of exactly that. There is now an assert, but the clean fix is a
-  computed `CIColorCube`, matching what `HSLCube` already does, since zone
-  grading is a pure function of RGB and expresses fine as a 3D LUT.
+- **Move the grading kernel off Core Image Kernel Language — shipped
+  (`ColorGradeCube`).** `CIColorKernel(source:)` had been deprecated since
+  macOS 10.14 and failed *silently*: a source typo returned nil, and grading
+  shipped as a permanent no-op because of exactly that. The fix is a computed
+  `CIColorCube`, matching what `HSLCube` already does, since zone grading is a
+  pure function of RGB and expresses fine as a 3D LUT.
 
 Considered and deliberately not planned:
 

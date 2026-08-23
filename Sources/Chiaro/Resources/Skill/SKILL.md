@@ -169,8 +169,9 @@ Each of these has produced a bad photo in practice.
   coarseness, and it does nothing at all while `grain` is 0.
 - **Do not exceed 2 stops of `exposure`** without saying why. RAW tolerates
   about 3, and a JPEG about 2, before noise and banding take over.
-- **Never apply a preset after refining.** `chiaro:apply_preset` overwrites
-  `curve` and the whole `hsl` block. Preset first as a base, then refine.
+- **Never apply a preset after refining.** `chiaro:apply_preset` writes every
+  carried parameter unconditionally: `curve`, the whole `hsl` block, all seven
+  grading values, `grain`, and `monochrome`. Preset first as a base, then refine.
 - **Never report blur you have not seen.** Background blur has two silent
   failure modes, below.
 - **Never apply a look nobody asked for.**

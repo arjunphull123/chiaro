@@ -1,6 +1,7 @@
 # ADR 0008: MCP-native; no embedded agent
 
-**Status:** Accepted · 2026-08-18 · Supersedes the embedded-chat plan in ADR 0003
+**Status:** Accepted · 2026-08-18 · Supersedes the embedded-chat plan in ADR 0003 ·
+Tool list amended 2026-08-23
 
 ## Context
 
@@ -17,6 +18,9 @@ Chiaro ships an MCP server, on whenever the app runs:
   discovery file at `~/.chiaro/mcp.json`; repo `.mcp.json` preconfigures Claude Code.
 - Tools: `list_photos`, `get_edit`, `set_edit`, `open_photo`, `get_preview` (rendered
   JPEG so agents can see their work), `export`.
+  Amended 2026-08-23: the surface has grown to: `list_photos`, `get_edit`,
+  `set_edit`, `set_starred`, `list_presets`, `apply_preset`, `open_photo`,
+  `get_preview`, `get_stats`, `export`.
 - Tool calls mutate the same EditState as every other input (ADR 0003). If the photo
   is open in the editor, agent edits render live in the UI.
 - **Agent presence**: while set_edit/open_photo calls arrive, the edit view shows an

@@ -55,11 +55,13 @@ enum RenderPipeline {
         if edit.monochrome {
             image = HSLCube.applyMonochrome(image, bands: edit.hsl)
         }
-        if edit.contrast != 0 || (edit.saturation != 0 && !edit.monochrome) {
+        if edit.contrast != 0 {
+            image = displayContrast(image, amount: edit.contrast)
+        }
+        if edit.saturation != 0 && !edit.monochrome {
             let f = CIFilter.colorControls()
             f.inputImage = image
-            f.contrast = Float(1 + edit.contrast / 100 * 0.35)
-            f.saturation = edit.monochrome ? 1 : Float(1 + edit.saturation / 100)
+            f.saturation = Float(1 + edit.saturation / 100)
             image = f.outputImage ?? image
         }
         if edit.vibrance != 0 && !edit.monochrome {
@@ -141,23 +143,27 @@ enum RenderPipeline {
         }
         // Blinkies (preview only): red where any channel blows past ~250,
         // blue where all channels crush under ~5 — the Lightroom convention.
+        // Thresholds are display values; this image is linear, so they map
+        // through the transfer function: 0.98 display ≈ 0.955 linear, and
+        // 0.02 display ≈ 0.0015 linear (the sRGB toe). The shadow slope is
+        // steep because a whole display stop near black spans ~0.001 linear.
         if clippingWarnings {
             let maxComponent = image.applyingFilter("CIMaximumComponent")
             let highlight = maxComponent.applyingFilter("CIColorMatrix", parameters: [
                 "inputRVector": CIVector(x: 60, y: 0, z: 0, w: 0),
                 "inputGVector": CIVector(x: 60, y: 0, z: 0, w: 0),
                 "inputBVector": CIVector(x: 60, y: 0, z: 0, w: 0),
-                "inputBiasVector": CIVector(x: -58.8, y: -58.8, z: -58.8, w: 0), // 0.98 * 60
+                "inputBiasVector": CIVector(x: -57.3, y: -57.3, z: -57.3, w: 0), // 0.955 * 60
             ]).applyingFilter("CIColorClamp")
             let minComponent = image
                 .applyingFilter("CIColorInvert")
                 .applyingFilter("CIMaximumComponent")
                 .applyingFilter("CIColorInvert")
             let shadow = minComponent.applyingFilter("CIColorMatrix", parameters: [
-                "inputRVector": CIVector(x: -60, y: 0, z: 0, w: 0),
-                "inputGVector": CIVector(x: -60, y: 0, z: 0, w: 0),
-                "inputBVector": CIVector(x: -60, y: 0, z: 0, w: 0),
-                "inputBiasVector": CIVector(x: 1.2, y: 1.2, z: 1.2, w: 0), // 0.02 * 60
+                "inputRVector": CIVector(x: -1200, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: -1200, y: 0, z: 0, w: 0),
+                "inputBVector": CIVector(x: -1200, y: 0, z: 0, w: 0),
+                "inputBiasVector": CIVector(x: 1.86, y: 1.86, z: 1.86, w: 0), // 0.00155 * 1200
             ]).applyingFilter("CIColorClamp")
             let red = CIImage(color: CIColor(red: 1, green: 0.1, blue: 0.1)).cropped(to: image.extent)
             let blue = CIImage(color: CIColor(red: 0.15, green: 0.3, blue: 1)).cropped(to: image.extent)
@@ -174,6 +180,23 @@ enum RenderPipeline {
             image = warned.cropped(to: image.extent)
         }
         return image
+    }
+
+    /// Contrast pivoted at display mid-grey. The working space is linear,
+    /// where 0.5 is display 73%: scaling there darkens everything below the
+    /// bright quarter and crushes shadows to true black by +18. Encoding,
+    /// scaling about 0.5, and decoding keeps the operator but moves its
+    /// fixed point to perceptual mid-grey (the same trick userCurve relies
+    /// on via its display-referred color space).
+    private static func displayContrast(_ image: CIImage, amount: Double) -> CIImage {
+        let display = image
+            .applyingFilter("CIColorClamp") // pow needs non-negative input
+            .applyingFilter("CIGammaAdjust", parameters: ["inputPower": 1.0 / 2.2])
+        let f = CIFilter.colorControls()
+        f.inputImage = display
+        f.contrast = Float(1 + amount / 100 * 0.35)
+        let scaled = f.outputImage ?? display
+        return scaled.applyingFilter("CIGammaAdjust", parameters: ["inputPower": 2.2])
     }
 
     // MARK: - Geometry (straighten + crop, first stage)
@@ -308,8 +331,11 @@ enum RenderPipeline {
 
         // Desaturate: CIRandomGenerator draws independent noise per channel
         // (alpha included), so average R/G/B into one grey value and force
-        // alpha to 1, discarding the generator's own random alpha.
-        let mono = noiseField.applyingFilter("CIColorMatrix", parameters: [
+        // alpha to 1. The alpha MUST be pinned before the matrix:
+        // CIColorMatrix unpremultiplies first, and dividing by the
+        // generator's random near-zero alphas blows the grey past 1.
+        let opaqueNoise = noiseField.cropped(to: extent).settingAlphaOne(in: extent)
+        let mono = opaqueNoise.applyingFilter("CIColorMatrix", parameters: [
             "inputRVector": CIVector(x: 1.0 / 3, y: 1.0 / 3, z: 1.0 / 3, w: 0),
             "inputGVector": CIVector(x: 1.0 / 3, y: 1.0 / 3, z: 1.0 / 3, w: 0),
             "inputBVector": CIVector(x: 1.0 / 3, y: 1.0 / 3, z: 1.0 / 3, w: 0),
@@ -462,10 +488,12 @@ enum RenderPipeline {
             f.radius = Float(3 * scale)
             adjusted = f.outputImage ?? adjusted
         }
-        if local.contrast != 0 || local.saturation != 0 {
+        if local.contrast != 0 {
+            adjusted = displayContrast(adjusted, amount: local.contrast)
+        }
+        if local.saturation != 0 {
             let f = CIFilter.colorControls()
             f.inputImage = adjusted
-            f.contrast = Float(1 + local.contrast / 100 * 0.35)
             f.saturation = Float(1 + local.saturation / 100)
             adjusted = f.outputImage ?? adjusted
         }

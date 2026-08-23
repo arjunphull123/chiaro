@@ -104,6 +104,19 @@ struct LocalAdjustment: Codable, Equatable, Identifiable {
     /// read the real default instead of hardcoding 0, which is wrong for
     /// `lumaHigh` (100).
     static let defaults = LocalAdjustment(kind: .radial)
+
+    /// id is session identity, never persisted, so equality must skip it:
+    /// otherwise a decoded EditState never equals the one that was encoded,
+    /// and every agent resend of `locals` reads as a phantom edit.
+    static func == (a: Self, b: Self) -> Bool {
+        a.kind == b.kind && a.ax == b.ax && a.ay == b.ay && a.bx == b.bx && a.by == b.by
+            && a.feather == b.feather && a.invert == b.invert
+            && a.exposure == b.exposure && a.contrast == b.contrast
+            && a.highlights == b.highlights && a.shadows == b.shadows
+            && a.temp == b.temp && a.tint == b.tint
+            && a.saturation == b.saturation && a.clarity == b.clarity
+            && a.lumaLow == b.lumaLow && a.lumaHigh == b.lumaHigh
+    }
 }
 
 /// The complete, serializable description of one photo's edit (ADR 0003).

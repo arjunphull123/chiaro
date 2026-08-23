@@ -182,9 +182,10 @@ with a local carrying a luminance range.
 
 ## Grading by tonal zone
 
-Three zones, two values each, plus a balance. Hues are degrees on the colour
-wheel and wrap; strengths are 0 to 100 and default to 0, so grading is inert
-until asked for.
+Three zones, two values each, plus a balance. Hues are degrees 0 to 360 and
+clamp at the ends; to reach a hue below zero, add 360 yourself (a -20
+red-magenta is 340). Strengths are 0 to 100 and default to 0, so grading is
+inert until asked for.
 
 | Field | Meaning |
 | --- | --- |
@@ -257,12 +258,16 @@ Propose rather than apply unless asked directly.
 
 ## Presets
 
-`apply_preset` carries tone and colour only: the light and colour sliders,
-`clarity`, `vignette`, `sharpness`, `noiseReduction`, plus `curve` and `hsl`
-wholesale. It never touches geometry, locals, or the portrait controls.
+`apply_preset` carries tone and colour: the light and colour sliders,
+`clarity`, `vignette`, `sharpness`, `noiseReduction`, `colorNoiseReduction`,
+`moireReduction`, plus `curve` and `hsl` wholesale. It also carries all seven
+grading parameters (`shadowStrength`, `shadowHue`, `midStrength`, `midHue`,
+`highlightStrength`, `highlightHue`, `gradeBalance`), `grain`, `grainSize`,
+and `monochrome`. It never touches geometry, locals, or the portrait
+controls.
 
-Because `curve` and `hsl` are overwritten wholesale, a preset applied after
-manual colour work destroys that work. Preset first, refine second.
+Because every carried parameter is written unconditionally, a preset applied
+after manual colour work destroys that work. Preset first, refine second.
 
 The built-ins, for reference:
 
@@ -279,8 +284,9 @@ Silver is a real channel-mixer conversion, not a desaturation: it darkens sky an
 lifts skin through the mixer's luminance values. Portrait glow's negative
 `clarity` is the softening path, so it is a genuine glow rather than a no-op.
 
-None of the built-ins use grading or grain, so both are yours to add on top of a
-preset without anything being overwritten.
+Presets carry grading, grain, and monochrome, and every built-in holds them at
+zero. That means applying a preset *after* hand-grading zeroes the grade, the
+grain, and any monochrome flag. Grade after choosing a preset, not before.
 
 `list_presets` also returns the user's saved presets, mixed in with these and
 not distinguishable in the response.
