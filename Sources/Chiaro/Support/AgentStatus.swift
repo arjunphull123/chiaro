@@ -37,7 +37,11 @@ final class AgentStatus {
     /// just means a long name loses its own tail rather than the sentence losing
     /// "is editing".
     var displayName: String {
-        let name = brand.name == "Agent" ? (clientName ?? "Agent") : brand.name
+        var name = brand.name == "Agent" ? (clientName ?? "Agent") : brand.name
+        // Client names arrive verbatim and render mid-sentence ("x is
+        // connected") — capitalize so an all-lowercase client can't put
+        // lowercase copy in the UI.
+        name = name.prefix(1).uppercased() + name.dropFirst()
         return name.count > 14 ? name.prefix(13) + "…" : name
     }
 
