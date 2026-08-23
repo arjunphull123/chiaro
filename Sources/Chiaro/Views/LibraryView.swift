@@ -844,11 +844,13 @@ struct LibraryView: View {
             Spacer(minLength: 10)
 
             VStack(alignment: .leading, spacing: 11) {
+                // Same scale as the library header: the wordmark is a signature
+                // here, not a headline — that job belongs to the greeting.
                 HStack(spacing: 6) {
-                    AppMark(size: 23)
+                    AppMark(size: 18)
                     Text("Chiaro")
-                        .font(Theme.serif(26, .semibold))
-                        .kerning(-0.8)
+                        .font(Theme.serif(19, .semibold))
+                        .kerning(-0.5)
                         .foregroundStyle(Theme.ink)
                         .fixedSize()
                 }
