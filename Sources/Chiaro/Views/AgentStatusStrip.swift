@@ -144,7 +144,9 @@ struct AgentConnectPopover: View {
 
     var body: some View {
         Group {
-            if AgentStatus.shared.actions.isEmpty {
+            // Connected is what flips the popover, not activity: a connected
+            // agent that hasn't acted yet should not be pitched the setup.
+            if AgentStatus.shared.actions.isEmpty && !AgentStatus.shared.isConnected {
                 connectContent
             } else {
                 historyContent
@@ -166,6 +168,11 @@ struct AgentConnectPopover: View {
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 7) {
+                    if AgentStatus.shared.actions.isEmpty {
+                        Text("Connected. Activity will appear here")
+                            .font(Theme.ui(11))
+                            .foregroundStyle(Theme.ink3)
+                    }
                     ForEach(AgentStatus.shared.actions) { action in
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             Text(action.date.formatted(date: .omitted, time: .shortened))
@@ -196,7 +203,7 @@ struct AgentConnectPopover: View {
             Text("Drive Chiaro with any agent")
                 .font(Theme.ui(14, .semibold))
                 .foregroundStyle(Theme.ink)
-            Text("Paste this into any MCP-capable agent — Claude Code, Cursor, whatever you run — and it can see, edit, and export your photos, live in this window. It will confirm once connected.")
+            Text("Paste this into any MCP-capable agent (Claude Code, Cursor, whatever you run) and it can see, edit, and export your photos, live in this window. It will confirm once connected.")
                 .font(Theme.ui(11.5))
                 .foregroundStyle(Theme.ink2)
                 .fixedSize(horizontal: false, vertical: true)
