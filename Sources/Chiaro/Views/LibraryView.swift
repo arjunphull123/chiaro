@@ -809,17 +809,22 @@ struct LibraryView: View {
                     guard let base = RawEngine.shared.preview(for: url, decode: RawEngine.DecodeParams(edit)) else {
                         return Library.scan(url, maxPixelSize: isHero ? 1600 : 480).image
                     }
-                    // Blur needs its mask or it silently no-ops. Depth blur
-                    // is the exception: it would need the model and a map,
-                    // so those thumbs render without the blur.
+                    // Blur needs its mask (or map) or it silently no-ops.
+                    // Depth needs the model; when it isn't downloaded the
+                    // thumb just renders without the blur.
                     var mask: CIImage?
-                    if edit.blurF > 0, edit.blurMode != .depth {
-                        mask = PortraitEngine.shared.mask(
-                            for: url, image: base,
-                            kind: edit.blurMode == .person ? .person : .subject
-                        )
+                    var depth: CIImage?
+                    if edit.blurF > 0 {
+                        if edit.blurMode == .depth {
+                            depth = DepthEngine.shared.normalizedMap(for: url, image: base)
+                        } else {
+                            mask = PortraitEngine.shared.mask(
+                                for: url, image: base,
+                                kind: edit.blurMode == .person ? .person : .subject
+                            )
+                        }
                     }
-                    var rendered = RenderPipeline.render(base: base, edit: edit, personMask: mask, isRAW: Photo.isRAW(url))
+                    var rendered = RenderPipeline.render(base: base, edit: edit, personMask: mask, depthMap: depth, isRAW: Photo.isRAW(url))
                     if !isHero {
                         let s = 480 / max(rendered.extent.width, rendered.extent.height)
                         if s < 1 { rendered = rendered.transformed(by: CGAffineTransform(scaleX: s, y: s)) }
@@ -874,59 +879,78 @@ struct LibraryView: View {
                     .foregroundStyle(Theme.ink)
                     .padding(.top, 14)
                     .padding(.bottom, 4)
-                if let hero = recentEdits.first {
-                    heroCard(hero)
-                }
-                if recentEdits.count > 1 {
-                    Text("Recent edits")
-                        .font(Theme.ui(12, .medium))
-                        .foregroundStyle(Theme.ink2)
-                        .padding(.top, 8)
-                    HStack(spacing: 8) {
-                        ForEach(recentEdits.dropFirst()) { item in
-                            recentThumb(item)
+                if recentEdits.isEmpty {
+                    // Nothing to resume: one column, sources are the show.
+                    startColumn
+                } else {
+                    // Two jobs, two columns: continue on the left, start on
+                    // the right — the window is wide, not tall.
+                    HStack(alignment: .top, spacing: 36) {
+                        VStack(alignment: .leading, spacing: 11) {
+                            if let hero = recentEdits.first {
+                                heroCard(hero)
+                            }
+                            if recentEdits.count > 1 {
+                                Text("Recent edits")
+                                    .font(Theme.ui(12, .medium))
+                                    .foregroundStyle(Theme.ink2)
+                                    .padding(.top, 8)
+                                HStack(spacing: 8) {
+                                    ForEach(recentEdits.dropFirst().prefix(5)) { item in
+                                        recentThumb(item)
+                                    }
+                                }
+                            }
                         }
+                        .frame(width: 580, alignment: .leading)
+                        startColumn
+                            .frame(width: 380)
                     }
                 }
-                Text("Sources")
-                    .font(Theme.ui(12, .medium))
-                    .foregroundStyle(Theme.ink2)
-                    .padding(.top, 8)
-                VStack(spacing: 6) {
-                    ForEach(sources) { source in
-                        sourceRow(
-                            icon: source.icon, tint: source.tint,
-                            title: source.title, subtitle: source.subtitle, url: source.id
-                        )
-                    }
-                }
-                HStack(spacing: 12) {
-                    // Primary only when there's nothing to resume.
-                    if recentEdits.isEmpty {
-                        Button("Open folder…") { openFolder() }
-                            .buttonStyle(AmberButtonStyle())
-                            .clickCursor()
-                            .keyboardShortcut("o")
-                    } else {
-                        Button("Open folder…") { openFolder() }
-                            .buttonStyle(OutlineButtonStyle())
-                            .clickCursor()
-                            .keyboardShortcut("o")
-                    }
-                    Text("Or drop a folder anywhere")
-                        .font(Theme.ui(11))
-                        .foregroundStyle(Theme.ink3)
-                }
-                .padding(.top, 8)
             }
-            .frame(width: 620)
-            .frame(maxWidth: .infinity)
+            .frame(width: 996)
+            .frame(maxWidth: .infinity, alignment: .center)
 
             Spacer(minLength: 10)
             Spacer(minLength: 10)
         }
         .padding(.horizontal, 28)
         .frame(maxWidth: .infinity)
+    }
+
+    private var startColumn: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            Text("Sources")
+                .font(Theme.ui(12, .medium))
+                .foregroundStyle(Theme.ink2)
+                .padding(.top, 8)
+            VStack(spacing: 6) {
+                ForEach(sources) { source in
+                    sourceRow(
+                        icon: source.icon, tint: source.tint,
+                        title: source.title, subtitle: source.subtitle, url: source.id
+                    )
+                }
+            }
+            HStack(spacing: 12) {
+                // Primary only when there's nothing to resume.
+                if recentEdits.isEmpty {
+                    Button("Open folder…") { openFolder() }
+                        .buttonStyle(AmberButtonStyle())
+                        .clickCursor()
+                        .keyboardShortcut("o")
+                } else {
+                    Button("Open folder…") { openFolder() }
+                        .buttonStyle(OutlineButtonStyle())
+                        .clickCursor()
+                        .keyboardShortcut("o")
+                }
+                Text("Or drop a folder anywhere")
+                    .font(Theme.ui(11))
+                    .foregroundStyle(Theme.ink3)
+            }
+            .padding(.top, 8)
+        }
     }
 
     /// Centered when it fits; scrolls when the window is shorter than the
@@ -956,7 +980,7 @@ struct LibraryView: View {
         // True to the photo's aspect, capped by height.
         let aspect = item.image.map { Double($0.width) / Double($0.height) } ?? 1.5
         let height: CGFloat = 300
-        let width = min(620, height * CGFloat(aspect))
+        let width = min(580, height * CGFloat(aspect))
         return Button {
             openRecentEdit(item.id)
         } label: {
