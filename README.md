@@ -181,7 +181,7 @@ covers the visual language, [`docs/ROADMAP.md`](docs/ROADMAP.md) covers what's n
 
 GPL-3.0. See [LICENSE](LICENSE).
 
-The bundled fonts (Fraunces, Geist, and Geist Mono) are used under the SIL Open
+The bundled fonts (Fraunces, Archivo, Geist, and Geist Mono) are used under the SIL Open
 Font License 1.1 and keep their own terms; see
 [`Sources/Chiaro/Resources/Fonts/OFL.txt`](Sources/Chiaro/Resources/Fonts/OFL.txt).
 Agent brand marks come from [Simple Icons](https://simpleicons.org) (CC0).

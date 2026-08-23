@@ -853,8 +853,8 @@ struct LibraryView: View {
                         .fixedSize()
                 }
                 Text(greeting)
-                    .font(Theme.serif(34))
-                    .kerning(-1.1)
+                    .font(Theme.headline(31))
+                    .kerning(31 * -0.032)
                     .foregroundStyle(Theme.ink)
                     .padding(.top, 14)
                     .padding(.bottom, 4)
@@ -910,7 +910,9 @@ struct LibraryView: View {
             Spacer(minLength: 10)
         }
         .padding(.horizontal, 28)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // The window honors contentMinSize, so this keeps the wordmark from
+        // clipping off the top at short heights while the start screen shows.
+        .frame(maxWidth: .infinity, minHeight: 930, maxHeight: .infinity)
         .contentShape(Rectangle())
         .onAppear {
             refreshSources()
@@ -950,7 +952,7 @@ struct LibraryView: View {
                         .font(Theme.ui(13.5, .semibold))
                         .foregroundStyle(.white)
                     Text(heroSubtitle(item))
-                        .font(Theme.mono(9.5))
+                        .font(Theme.ui(10.5))
                         .foregroundStyle(.white.opacity(0.65))
                 }
                 .padding(13)
@@ -1001,7 +1003,7 @@ struct LibraryView: View {
                     .frame(width: 20)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title).font(Theme.ui(12.5, .medium)).foregroundStyle(Theme.ink)
-                    Text(subtitle).font(Theme.mono(9.5)).foregroundStyle(Theme.ink3).lineLimit(1)
+                    Text(subtitle).font(Theme.ui(10.5)).foregroundStyle(Theme.ink3).lineLimit(1)
                 }
                 Spacer()
                 Image(systemName: "chevron.right")

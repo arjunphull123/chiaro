@@ -43,13 +43,20 @@ enum Theme {
         .custom(weight == .medium ? "Geist Mono Medium" : "Geist Mono Regular", size: size)
     }
 
-    /// Fraunces: the header/brand voice. Sentence case, never uppercase.
+    /// Fraunces: the wordmark voice. Sentence case, never uppercase.
     /// Two bundled static instances — variable axes don't survive Google's TTF export.
     static func serif(_ size: CGFloat, _ weight: Font.Weight = .semibold) -> Font {
         switch weight {
         case .semibold, .bold: .custom("Fraunces-SemiBold", size: size)
         default: .custom("Fraunces-Regular", size: size)
         }
+    }
+
+    /// Archivo ExtraBold: display headlines, the same voice as the site's
+    /// hero. Pair with kerning at -0.032em (size × -0.032), the site's
+    /// tracking, at the call site.
+    static func headline(_ size: CGFloat) -> Font {
+        .custom("Archivo-ExtraBold", size: size)
     }
 }
 
