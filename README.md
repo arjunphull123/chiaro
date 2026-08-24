@@ -1,4 +1,11 @@
 <p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/lockup-dark.svg" />
+    <img src="docs/screenshots/lockup-light.svg" alt="Chiaro" width="190" />
+  </picture>
+</p>
+
+<p align="center">
   <a href="https://chiaro.arjunphull.dev"><img src="docs/screenshots/banner.jpg" alt="The RAW editor your agent can drive" width="100%" /></a>
 </p>
 
