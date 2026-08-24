@@ -1,7 +1,6 @@
-# 0014 — Distribution: ad-hoc signing, a personal tap, and no Sparkle
+# ADR 0014: Distribution: ad-hoc signing, a personal tap, and no Sparkle
 
-## Status
-Accepted
+**Status:** Accepted · 2026-08-19
 
 ## Context
 v1.0.0 ships as a downloadable Mac app. Three questions had to be settled

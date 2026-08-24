@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The frosted adjustments rail (ADR 0006): photo header, histogram on a solid
-/// plate, grouped adjustments, built-in Looks.
+/// plate, grouped adjustments.
 struct RailView: View {
     @Bindable var model: EditViewModel
     let library: Library
@@ -63,7 +63,7 @@ struct RailView: View {
                         "Grading",
                         [.shadowStrength, .shadowHue, .midStrength, .midHue,
                          .highlightStrength, .highlightHue, .gradeBalance],
-                        help: "Colour by tonal zone — a hue for shadows, midtones, and highlights"
+                        help: "Color by tonal zone — a hue for shadows, midtones, and highlights"
                     )
                     section(
                         "Light", [.exposure, .contrast, .highlights, .shadows, .whites, .blacks],
@@ -198,23 +198,22 @@ struct RailView: View {
         VStack(alignment: .leading, spacing: 3) {
             sectionLabel("Background blur", help: "What stays sharp: the lifted subject, detected people, or everything nearer than the focus plane")
             if !isCollapsed("Background blur") {
-            HStack(spacing: 5) {
-                modePill("Subject", .subject)
-                modePill("Person", .person)
-                modePill("Depth", .depth)
-            }
-            .padding(.bottom, 4)
-            depthSceneAccess
-                .padding(.bottom, 6)
-            if model.edit.blurMode == .depth {
-                depthContent
-            } else {
-                subjectContent
-            }
+                HStack(spacing: 5) {
+                    modePill("Subject", .subject)
+                    modePill("Person", .person)
+                    modePill("Depth", .depth)
+                }
+                .padding(.bottom, 4)
+                depthSceneAccess
+                    .padding(.bottom, 6)
+                if model.edit.blurMode == .depth {
+                    depthContent
+                } else {
+                    subjectContent
+                }
             }
         }
     }
-
 
     @ViewBuilder private var subjectContent: some View {
         switch model.hasPerson {
@@ -317,46 +316,46 @@ struct RailView: View {
         VStack(alignment: .leading, spacing: 6) {
             sectionLabel("Color mix", help: "Per-hue adjustments — pick a band, then shift its hue, saturation, and luminance")
             if !isCollapsed("Color mix") {
-            // Spacing is 6, not 8, and there is no divider: the chip plus eight
-            // swatches has to fit the rail's 236pt of inner width, and at 8 it
-            // overflowed and ate the rail's right padding.
-            HStack(spacing: 6) {
-                // In the band row, because it changes what the bands mean: in
-                // black and white the luminance row becomes each hue's grey.
-                Chip(title: "B&W", selected: model.edit.monochrome) {
-                    model.edit.monochrome.toggle()
-                }
-                .fixedSize() // Chip fills its container by default; the row's spacers would crush the label
-                .help("Black and white. The luminance row sets each colour's grey value")
-                Spacer(minLength: 0)
-                ForEach(0..<8, id: \.self) { i in
-                    let active = !model.edit.hsl[i].isNeutral
-                    Button {
-                        selectedBand = i
-                        if let armed = model.armedHSL { model.armedHSL = (i, armed.component) }
-                    } label: {
-                        Circle()
-                            .fill(Color(hue: HSLBand.centers[i] / 360, saturation: 0.75, brightness: 0.85))
-                            .frame(width: 16, height: 16)
-                            .overlay(
-                                Circle().stroke(
-                                    selectedBand == i ? Theme.amber : (active ? Theme.ink2 : .clear),
-                                    lineWidth: selectedBand == i ? 2 : 1.5
-                                )
-                            )
+                // Spacing is 6, not 8, and there is no divider: the chip plus eight
+                // swatches has to fit the rail's 236pt of inner width, and at 8 it
+                // overflowed and ate the rail's right padding.
+                HStack(spacing: 6) {
+                    // In the band row, because it changes what the bands mean: in
+                    // black and white the luminance row becomes each hue's grey.
+                    Chip(title: "B&W", selected: model.edit.monochrome) {
+                        model.edit.monochrome.toggle()
                     }
-                    .buttonStyle(.plain)
-                    .clickCursor()
-                    .help(HSLBand.names[i].prefix(1).uppercased() + HSLBand.names[i].dropFirst())
+                    .fixedSize() // Chip fills its container by default; the row's spacers would crush the label
+                    .help("Black and white. The luminance row sets each color's gray value")
+                    Spacer(minLength: 0)
+                    ForEach(0..<8, id: \.self) { i in
+                        let active = !model.edit.hsl[i].isNeutral
+                        Button {
+                            selectedBand = i
+                            if let armed = model.armedHSL { model.armedHSL = (i, armed.component) }
+                        } label: {
+                            Circle()
+                                .fill(Color(hue: HSLBand.centers[i] / 360, saturation: 0.75, brightness: 0.85))
+                                .frame(width: 16, height: 16)
+                                .overlay(
+                                    Circle().stroke(
+                                        selectedBand == i ? Theme.amber : (active ? Theme.ink2 : .clear),
+                                        lineWidth: selectedBand == i ? 2 : 1.5
+                                    )
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .clickCursor()
+                        .help(HSLBand.names[i].prefix(1).uppercased() + HSLBand.names[i].dropFirst())
+                    }
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
-            }
-            .padding(.bottom, 2)
-            if !model.edit.monochrome {
-                bandRow(.h)
-                bandRow(.s)
-            }
-            bandRow(.l)
+                .padding(.bottom, 2)
+                if !model.edit.monochrome {
+                    bandRow(.h)
+                    bandRow(.s)
+                }
+                bandRow(.l)
             }
         }
     }
@@ -471,71 +470,71 @@ struct RailView: View {
             }
             .padding(.top, 10)
             if !isCollapsed("Masking") {
-            ForEach(Array(model.edit.locals.enumerated()), id: \.element.id) { index, local in
-                let selected = model.selectedLocalID == local.id
-                HStack(spacing: 6) {
-                    Image(systemName: local.kind == .radial ? "circle.dashed"
-                        : local.kind == .linear ? "line.diagonal" : "person.crop.square.badge.camera")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(selected ? Theme.amber : Theme.ink3)
-                    Text("\(local.kind.rawValue.prefix(1).uppercased() + local.kind.rawValue.dropFirst()) \(index + 1)")
-                        .font(Theme.ui(11.5, selected ? .medium : .regular))
-                        .foregroundStyle(selected ? Theme.amber : Theme.ink2)
-                    Spacer()
-                    Button {
-                        model.edit.locals.removeAll { $0.id == local.id }
-                        if selected { model.selectedLocalID = nil }
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(Theme.ink3)
+                ForEach(Array(model.edit.locals.enumerated()), id: \.element.id) { index, local in
+                    let selected = model.selectedLocalID == local.id
+                    HStack(spacing: 6) {
+                        Image(systemName: local.kind == .radial ? "circle.dashed"
+                            : local.kind == .linear ? "line.diagonal" : "person.crop.square.badge.camera")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(selected ? Theme.amber : Theme.ink3)
+                        Text("\(local.kind.rawValue.prefix(1).uppercased() + local.kind.rawValue.dropFirst()) \(index + 1)")
+                            .font(Theme.ui(11.5, selected ? .medium : .regular))
+                            .foregroundStyle(selected ? Theme.amber : Theme.ink2)
+                        Spacer()
+                        Button {
+                            model.edit.locals.removeAll { $0.id == local.id }
+                            if selected { model.selectedLocalID = nil }
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(Theme.ink3)
+                        }
+                        .buttonStyle(.plain)
+                        .clickCursor()
+                        .help("Delete this mask")
                     }
-                    .buttonStyle(.plain)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7)
+                            .fill(selected ? Theme.amber.opacity(0.1) : Color.white.opacity(0.03))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 7)
+                            .stroke(selected ? Theme.amber.opacity(0.5) : .clear)
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture { model.selectedLocalID = selected ? nil : local.id }
                     .clickCursor()
-                    .help("Delete this mask")
                 }
-                .padding(.horizontal, 9)
-                .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 7)
-                        .fill(selected ? Theme.amber.opacity(0.1) : Color.white.opacity(0.03))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 7)
-                        .stroke(selected ? Theme.amber.opacity(0.5) : .clear)
-                )
-                .contentShape(Rectangle())
-                .onTapGesture { model.selectedLocalID = selected ? nil : local.id }
-                .clickCursor()
-            }
-            if let index = model.edit.locals.firstIndex(where: { $0.id == model.selectedLocalID }) {
-                localRow("Exposure", index: index, keyPath: \.exposure, range: -3...3)
-                localRow("Contrast", index: index, keyPath: \.contrast, range: -100...100)
-                localRow("Highlights", index: index, keyPath: \.highlights, range: -100...100)
-                localRow("Shadows", index: index, keyPath: \.shadows, range: -100...100)
-                localRow("Temp", index: index, keyPath: \.temp, range: -100...100)
-                localRow("Tint", index: index, keyPath: \.tint, range: -100...100)
-                localRow("Saturation", index: index, keyPath: \.saturation, range: -100...100)
-                localRow("Clarity", index: index, keyPath: \.clarity, range: -100...100)
-                localRow("Luma low", index: index, keyPath: \.lumaLow, range: 0...100)
-                localRow("Luma high", index: index, keyPath: \.lumaHigh, range: 0...100)
-                if model.edit.locals[index].kind != .linear {
-                    localRow("Feather", index: index, keyPath: \.feather, range: 0...100)
+                if let index = model.edit.locals.firstIndex(where: { $0.id == model.selectedLocalID }) {
+                    localRow("Exposure", index: index, keyPath: \.exposure, range: -3...3)
+                    localRow("Contrast", index: index, keyPath: \.contrast, range: -100...100)
+                    localRow("Highlights", index: index, keyPath: \.highlights, range: -100...100)
+                    localRow("Shadows", index: index, keyPath: \.shadows, range: -100...100)
+                    localRow("Temp", index: index, keyPath: \.temp, range: -100...100)
+                    localRow("Tint", index: index, keyPath: \.tint, range: -100...100)
+                    localRow("Saturation", index: index, keyPath: \.saturation, range: -100...100)
+                    localRow("Clarity", index: index, keyPath: \.clarity, range: -100...100)
+                    localRow("Luma low", index: index, keyPath: \.lumaLow, range: 0...100)
+                    localRow("Luma high", index: index, keyPath: \.lumaHigh, range: 0...100)
+                    if model.edit.locals[index].kind != .linear {
+                        localRow("Feather", index: index, keyPath: \.feather, range: 0...100)
+                    }
+                    Toggle(isOn: Binding(
+                        get: { model.edit.locals[index].invert },
+                        set: { model.edit.locals[index].invert = $0 }
+                    )) {
+                        Text("Invert")
+                            .font(Theme.ui(11.5))
+                            .foregroundStyle(Theme.ink2)
+                    }
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .tint(Theme.amber)
+                    .padding(.horizontal, 9)
+                    .padding(.top, 2)
                 }
-                Toggle(isOn: Binding(
-                    get: { model.edit.locals[index].invert },
-                    set: { model.edit.locals[index].invert = $0 }
-                )) {
-                    Text("Invert")
-                        .font(Theme.ui(11.5))
-                        .foregroundStyle(Theme.ink2)
-                }
-                .toggleStyle(.switch)
-                .controlSize(.mini)
-                .tint(Theme.amber)
-                .padding(.horizontal, 9)
-                .padding(.top, 2)
-            }
             }
         }
         .help("Masked corrections — a radial or linear region, or the detected subject")
@@ -790,5 +789,4 @@ struct RailView: View {
             .padding(.top, 6)
     }
 }
-
 

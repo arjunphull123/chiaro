@@ -1,7 +1,6 @@
-# 0011 — 3D focus scene on SceneKit
+# ADR 0011: 3D focus scene on SceneKit
 
-## Status
-Accepted
+**Status:** Accepted · 2026-08-19
 
 ## Context
 Depth-mode blur is controlled by a focus plane in disparity space. Sliders

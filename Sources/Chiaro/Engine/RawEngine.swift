@@ -21,7 +21,7 @@ final class RawEngine {
         let decode: DecodeParams
     }
 
-    /// The RAW decode-time controls (Tier 4, ADR: RAW decode parameters),
+    /// The RAW decode-time controls (ROADMAP Tier 4: RAW decode parameters),
     /// isolated from the rest of EditState so a cache lookup only misses when
     /// a decode-relevant slider actually moved. Sliders are 0...100, matching
     /// the app's convention; `apply` maps that into CIRAWFilter's 0...1.

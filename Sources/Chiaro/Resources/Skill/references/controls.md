@@ -109,7 +109,7 @@ Three modes, and each one can fail differently:
 - `person` uses person segmentation. People only.
 - `depth` uses a monocular depth model and blurs by distance from
   `focusDepth`. **Requires a roughly 50 MB model the user must download from
-  the Portrait section of the app.** Nothing you can call triggers that
+  the Background blur section of the app.** Nothing you can call triggers that
   download.
 
 **Choosing between them.** Ask what the photograph is: a figure against a

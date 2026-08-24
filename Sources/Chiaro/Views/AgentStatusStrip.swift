@@ -1,7 +1,6 @@
 import SwiftUI
 import TipKit
 
-
 /// The window's agent-status card, cycling through the agent lifecycle:
 /// "Connect your agent" → "<client> is connected" → "🔒 <client> is editing…",
 /// with the agent's live intent wrapping underneath while it works.

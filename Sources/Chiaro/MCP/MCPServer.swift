@@ -9,6 +9,7 @@ import CoreImage
 /// http://127.0.0.1:<port>/mcp, discovery file at ~/.chiaro/mcp.json.
 final class MCPServer {
     static let shared = MCPServer()
+    private static let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
     static let preferredPort: UInt16 = 24242
 
     private nonisolated(unsafe) var listener: NWListener?
@@ -64,7 +65,7 @@ final class MCPServer {
     private func writeDiscoveryFile() {
         let info: [String: Any] = [
             "app": "Chiaro",
-            "version": "0.1",
+            "version": Self.appVersion,
             "transport": "http",
             "url": "http://127.0.0.1:\(port)/mcp",
             "pid": ProcessInfo.processInfo.processIdentifier,
@@ -178,7 +179,7 @@ final class MCPServer {
                     "tools": [:] as [String: Any],
                     "prompts": [:] as [String: Any],
                 ],
-                "serverInfo": ["name": "Chiaro", "version": "0.1"],
+                "serverInfo": ["name": "Chiaro", "version": Self.appVersion],
             ]))
         case "ping":
             reply(rpcResult(id: id, [:]))
@@ -333,7 +334,7 @@ final class MCPServer {
         }
         props["gradeBalance"] = [
             "type": "number",
-            "description": "range -100...100 — shifts the shadow/highlight crossover: negative treats more of the frame as shadows, positive as highlights",
+            "description": "range -100...100 — shifts both zone crossovers: positive treats more of the frame as shadows and less as highlights, negative the reverse",
         ] as [String: Any]
         props["curve"] = [
             "type": "array",
@@ -431,6 +432,7 @@ final class MCPServer {
                 "properties": [
                     "name": ["type": "string"],
                     "preset": ["type": "string"],
+                    "intent": ["type": "string", "description": "short description shown live in the app UI; optional"],
                 ],
                 "required": ["name", "preset"],
             ],
@@ -466,7 +468,10 @@ final class MCPServer {
             "description": "Open a photo in Chiaro's edit view (brings the editing UI to that photo).",
             "inputSchema": [
                 "type": "object",
-                "properties": ["name": ["type": "string"]],
+                "properties": [
+                    "name": ["type": "string"],
+                    "intent": ["type": "string", "description": "short description shown live in the app UI; optional"],
+                ],
                 "required": ["name"],
             ],
         ],
@@ -484,7 +489,7 @@ final class MCPServer {
         ],
         [
             "name": "get_stats",
-            "description": "Measure the photo as currently edited (same render as get_preview) and return decision-oriented numbers instead of an image to eyeball. clipping: percent of pixels (0-100) pinned at the floor and ceiling, per channel and for luminance — is detail actually gone, not just dark or bright. luminance: p05/p50/p95 percentiles plus mean, each 0 (black) to 1 (white) — a low p50 means underexposed, a narrow p05-p95 spread with a normal p50 means flat; those are different faults with different fixes. saturation.mean: 0 (grey) to 1 (fully saturated), averaged over non-near-black pixels — answers whether the photo reads dull. neutralCast: mean r/g/b (each 0-1) over low-saturation midtone pixels only (saturation under 0.30, luminance 0.25-0.75) — those pixels should be neutral, so equal r/g/b means no cast and a skew reveals one and its direction; pixelCount is the sample size behind the average, so a small pixelCount means treat the reading with caution. grayWorld: same r/g/b/pixelCount shape but over ALL midtone pixels (luminance 0.25-0.75), no saturation filter — the classic gray-world estimator. Read the two together: neutralCast is precise but a strong cast pushes its own evidence out of the sample (fewer, more self-selected pixels — the stronger the cast, the more confidently it can read as none), while grayWorld can't lose its sample that way but will misread a genuinely colour-dominated scene (a red wall, dense foliage) as a cast when it isn't. Agreement between them is a strong signal either way; disagreement usually means a real cast that neutralCast's sample missed. histogram: 32 buckets spanning luminance 0 to 1 left to right, each the fraction of pixels in that bucket (sums to ~1).",
+            "description": "Measure the photo as currently edited (same render as get_preview) and return decision-oriented numbers instead of an image to eyeball. clipping: percent of pixels (0-100) pinned at the floor and ceiling, per channel and for luminance — is detail actually gone, not just dark or bright. luminance: p05/p50/p95 percentiles plus mean, each 0 (black) to 1 (white) — a low p50 means underexposed, a narrow p05-p95 spread with a normal p50 means flat; those are different faults with different fixes. saturation.mean: 0 (gray) to 1 (fully saturated), averaged over non-near-black pixels — answers whether the photo reads dull. neutralCast: mean r/g/b (each 0-1) over low-saturation midtone pixels only (saturation under 0.30, luminance 0.25-0.75) — those pixels should be neutral, so equal r/g/b means no cast and a skew reveals one and its direction; pixelCount is the sample size behind the average, so a small pixelCount means treat the reading with caution. grayWorld: same r/g/b/pixelCount shape but over ALL midtone pixels (luminance 0.25-0.75), no saturation filter — the classic gray-world estimator. Read the two together: neutralCast is precise but a strong cast pushes its own evidence out of the sample (fewer, more self-selected pixels — the stronger the cast, the more confidently it can read as none), while grayWorld can't lose its sample that way but will misread a genuinely color-dominated scene (a red wall, dense foliage) as a cast when it isn't. Agreement between them is a strong signal either way; disagreement usually means a real cast that neutralCast's sample missed. histogram: 32 buckets spanning luminance 0 to 1 left to right, each the fraction of pixels in that bucket (sums to ~1).",
             "inputSchema": [
                 "type": "object",
                 "properties": [

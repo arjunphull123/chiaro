@@ -4,7 +4,7 @@ cask "chiaro" do
   version "1.0.0"
   sha256 "6bf2a1dfd0e757c56007778aa9185e135fd1a5d126b71be3694aa8ca7b5540f2"
 
-  url "https://github.com/arjunphull123/chiaro/releases/download/v#{version}/Chiaro-#{version}.zip"
+  url "https://github.com/arjunphull123/chiaro/releases/download/v#{version}/Chiaro-#{version}.dmg"
   name "Chiaro"
   desc "Native RAW photo editor with a built-in MCP server"
   homepage "https://github.com/arjunphull123/chiaro"

@@ -92,7 +92,7 @@ struct AdjustmentRow: View {
                 cursorPushed = false
             }
         }
-        .help("Click to adjust — drag the photo or the dial, scroll sideways, or click the value to type. Double-click resets.")
+        .help("Click to adjust — drag the photo or the dial, scroll sideways, or click the value to type. Double-click resets")
     }
 
     /// Typed values arrive in display units — ƒ-stops for blur, EV, degrees.
@@ -132,10 +132,5 @@ enum HapticDetents {
         } else if floor(from / (span / 48)) != floor(to / (span / 48)) {
             NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
         }
-    }
-
-    static func tickIfCrossed(parameter: EditParameter, from: Double, to: Double) {
-        ticks(span: parameter.range.upperBound - parameter.range.lowerBound,
-              from: from, to: to, detent: parameter.defaultValue)
     }
 }

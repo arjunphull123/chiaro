@@ -1,7 +1,6 @@
-# 0012 — On-demand ML models: the pattern, and what got cut
+# ADR 0012: On-demand ML models: the pattern, and what got cut
 
-## Status
-Accepted
+**Status:** Accepted · 2026-08-19
 
 ## Context
 ML features need weights the app shouldn't bundle. ADR 0010 set the pattern

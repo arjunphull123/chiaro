@@ -471,7 +471,7 @@ struct DepthSceneView: NSViewRepresentable {
 
         /// Screen-space drag projected onto the depth axis, so the plane
         /// tracks the cursor from any camera angle. Moving the plane moves
-        /// the whole sharp zone (focus); Range stays put.
+        /// the whole sharp zone (focus).
         private func dragPlane(translation: NSPoint) {
             guard let view else { return }
             let a = view.projectPoint(SCNVector3(0, DepthScene.sceneLift, 0))

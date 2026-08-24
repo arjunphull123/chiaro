@@ -217,7 +217,7 @@ Four behaviours that will fool you. Full detail in `references/controls.md`.
 - **Depth blur degrades silently.** If the depth model is not downloaded,
   `blurMode: "depth"` falls back to ordinary subject blur with no error. If the
   user asked for a focus plane, verify in a preview and tell them to download
-  the model from the Portrait section if it looks wrong.
+  the model from the Background blur section if it looks wrong.
 - **Subject detection can find nothing** and then blur and relight are silent
   no-ops. Vision returns nothing when there is no clear foreground, or when the
   subject covers under about 3% of the frame. "I applied blur and nothing

@@ -12,9 +12,8 @@ Two views, one window:
   appears on hover only. Double-click or ⏎ enters Edit.
 - **Edit** — photo fills the window; heavy-frost Liquid Glass right rail floats over it
   (ADR 0006): histogram on a solid graphite plate, then grouped adjustments:
-  Light / Color / Portrait / Effects / Detail. Liquid Glass filmstrip pill and floating
-  tool palette overlay the photo and fade when idle; filmstrip and tool palette share one
-  GlassEffectContainer. Esc returns to Library.
+  Light / Color / Portrait / Effects / Detail. The Liquid Glass nav pill and toolbar
+  float over the photo. Esc returns to Library.
 
 Material rule: **everything floats on glass except what you judge color against — the
 histogram plate is solid, and rail frost is heavy enough to read as material, not photo.**
@@ -30,9 +29,11 @@ photo's colors).
 - Primary text: white at 85% · secondary: white at 50%
 - **Accent — safelight amber `#E8A33D`**: active slider fills, selection borders,
   edited badge, focused control. Used sparingly; never on large surfaces.
-- Typography: **Fraunces** for headers and the wordmark ("Chiaro", sentence case,
-  never uppercase); **Geist** for all UI text; **Geist Mono** sparingly, for data only
-  (values, ƒ-stops, EXIF, counts) with tabular figures. All bundled (SIL OFL 1.1).
+- Typography: **Fraunces** for the wordmark ("Chiaro", sentence case, never
+  uppercase); **Archivo ExtraBold** for display headlines (the start-screen
+  greeting, kerned -0.032em, matching the site's hero); **Geist** for all UI
+  text; **Geist Mono** sparingly, for data only (values, ƒ-stops, EXIF, counts)
+  with tabular figures. All bundled (SIL OFL 1.1).
 - UI copy is sentence case with no trailing periods on labels and tips.
 - Components live in DesignSystem.swift: AmberButtonStyle (one primary per surface),
   OutlineButtonStyle (secondary), GlassButtonStyle/GlassIconButtonStyle (canvas
@@ -52,8 +53,7 @@ photo's colors).
   haptic tick at each grouping change), Connect Agent, amber Export / Open Folder.
   Sections newest-first.
 - Before/after: hold `\` (press-and-hold, like Lightroom).
-- Filmstrip thumbs: amber border = selected; small amber dot = has edits.
-- Ratings: 1–5 keys in Library and Edit.
+- Starred: `P` toggles the flag in Library and Edit; the library filters by it.
 
 ## Feel
 

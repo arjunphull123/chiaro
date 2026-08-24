@@ -1,19 +1,35 @@
-// Generates the installer backdrop (scripts/dmg-bg.tiff comes from this
-// via sips resampling and tiffutil -cathidpicheck at 1x and 2x).
-// Run: swift scripts/dmg-bg.swift  (expects the painting on the Desktop)
+// Generates the installer backdrop master PNG (2x). scripts/dmg-bg.tiff is
+// then cut from it:
+//   swift scripts/dmg-bg.swift <painting.jpg> [out.png]
+//   sips -z 1000 1320 out.png --out /tmp/bg-2x.png
+//   sips -z 500 660 out.png --out /tmp/bg-1x.png
+//   sips -s dpiHeight 72 -s dpiWidth 72 /tmp/bg-1x.png
+//   sips -s dpiHeight 144 -s dpiWidth 144 /tmp/bg-2x.png
+//   tiffutil -cathidpicheck /tmp/bg-1x.png /tmp/bg-2x.png -out scripts/dmg-bg.tiff
+// The shipped artwork uses Caravaggio's The Calling of Saint Matthew (public
+// domain); any sufficiently dark painting works.
 import AppKit
 import CoreText
 
-let painting = NSImage(contentsOf: URL(fileURLWithPath: NSString(string: "~/Desktop/caravaggios/1_the calling.jpg").expandingTildeInPath))!
-for f in ["Archivo-ExtraBold.ttf"] {
-    let url = URL(fileURLWithPath: "/Users/arjun/Documents/GitHub/chiaro/Sources/Chiaro/Resources/Fonts/\(f)")
-    CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+let args = CommandLine.arguments
+guard args.count >= 2 else {
+    fputs("usage: swift scripts/dmg-bg.swift <painting.jpg> [out.png]\n", stderr)
+    exit(1)
+}
+let repoRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+let outPath = args.count >= 3 ? args[2] : "/tmp/dmg-bg-master.png"
+guard let painting = NSImage(contentsOf: URL(fileURLWithPath: args[1])) else {
+    fputs("could not read painting at \(args[1])\n", stderr)
+    exit(1)
+}
+let fontsDir = repoRoot.appendingPathComponent("Sources/Chiaro/Resources/Fonts")
+for f in ["Archivo-ExtraBold.ttf", "Geist-Regular.otf"] {
+    CTFontManagerRegisterFontsForURL(fontsDir.appendingPathComponent(f) as CFURL, .process, nil)
 }
 
-// Window content 660x500pt at 2x. Icons sit at y=250 with Finder's own
-// labels under them (the convention); the labels land on baked plates whose
-// mid-warm tone keeps both black (light mode) and white (dark mode) label
-// text near 4.5:1.
+// Window content 660x500pt, drawn 2x. Icons sit at y=250 in the window with
+// Finder's own labels under them; every word here is in the artwork so it
+// stays white in either appearance.
 let W: CGFloat = 1320, H: CGFloat = 1000
 let out = NSImage(size: NSSize(width: W, height: H))
 out.lockFocus()
@@ -21,11 +37,11 @@ out.lockFocus()
 let pw = painting.size.width, ph = painting.size.height
 let scale = max(W / pw, H / ph)
 let dw = pw * scale, dh = ph * scale
-painting.draw(in: NSRect(x: (W - dw) / 2, y: (H - dh) * 0.4, width: dw, height: dh))
+painting.draw(in: NSRect(x: (W - dw) / 2, y: (H - dh) * 0.40, width: dw, height: dh))
 NSColor(red: 0x10/255, green: 0x0C/255, blue: 0x09/255, alpha: 0.70).setFill()
 NSRect(x: 0, y: 0, width: W, height: H).fill()
 
-// Lit well behind the drop target: macOS 26 folder icons are dark adaptive
+// Lit well behind the drop target: macOS folder icons are dark adaptive
 // glass and vanish on a dark ground without one.
 let well = NSBezierPath(roundedRect: NSRect(x: 870, y: 280, width: 240, height: 240), xRadius: 44, yRadius: 44)
 NSColor(white: 1, alpha: 0.11).setFill()
@@ -34,9 +50,7 @@ NSColor(white: 1, alpha: 0.22).setStroke()
 well.lineWidth = 2
 well.stroke()
 
-// The claim up top, two lines like the site hero, then the drag hint —
-// Finder paints its labels dark over background pictures in both modes,
-// so those clip below the window and the artwork carries all the words.
+// The claim, two lines like the site hero, then the drag hint.
 let font = NSFont(name: "Archivo-ExtraBold", size: 56) ?? NSFont.systemFont(ofSize: 56, weight: .heavy)
 let style = NSMutableParagraphStyle()
 style.alignment = .center
@@ -50,7 +64,7 @@ let hs = NSAttributedString(string: "The RAW editor\nyour agent can drive", attr
 let hSize = hs.size()
 hs.draw(in: NSRect(x: (W - hSize.width) / 2, y: H - 130 - hSize.height, width: hSize.width, height: hSize.height))
 
-let hintFont = NSFont(name: "Geist", size: 27) ?? NSFont.systemFont(ofSize: 27)
+let hintFont = NSFont(name: "Geist Regular", size: 27) ?? NSFont.systemFont(ofSize: 27)
 let hint = NSAttributedString(string: "Drag Chiaro into Applications to install", attributes: [
     .font: hintFont,
     .foregroundColor: NSColor(red: 0xF0/255, green: 0xE8/255, blue: 0xDE/255, alpha: 0.62),
@@ -74,5 +88,5 @@ arrow.stroke()
 
 out.unlockFocus()
 let rep = NSBitmapImageRep(data: out.tiffRepresentation!)!
-try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: "/private/tmp/claude-501/-Users-arjun-Documents-GitHub-chiaro/a3268362-d019-4067-9e46-82107e01db7b/scratchpad/dmg-bg.png"))
-print("ok")
+try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: outPath))
+print("wrote \(outPath)")

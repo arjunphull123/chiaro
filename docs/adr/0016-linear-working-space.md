@@ -1,7 +1,6 @@
-# 0016 — Working in Core Image's linear space
+# ADR 0016: Working in Core Image's linear space
 
-## Status
-Accepted
+**Status:** Accepted · 2026-08-21
 
 ## Context
 `RawEngine` creates its `CIContext` with

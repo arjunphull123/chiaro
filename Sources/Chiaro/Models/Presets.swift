@@ -122,7 +122,8 @@ final class PresetStore {
         try? FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try? (try? encoder.encode(preset))?.write(to: url(for: preset.name))
+        guard let data = try? encoder.encode(preset) else { return }
+        try? data.write(to: url(for: preset.name))
         load()
     }
 

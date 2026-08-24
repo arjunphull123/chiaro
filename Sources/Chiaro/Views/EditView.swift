@@ -158,7 +158,6 @@ struct EditView: View {
         }
     }
 
-
     private var navPill: some View {
         HStack(spacing: 12) {
             Button { step(-1) } label: { chevron("chevron.left") }

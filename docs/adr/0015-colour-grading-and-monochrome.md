@@ -1,7 +1,7 @@
-# 0015 — Colour grading by tonal zone, and a real monochrome mixer
+# ADR 0015: Colour grading by tonal zone, and a real monochrome mixer
 
-## Status
-Accepted
+**Status:** Accepted · 2026-08-20
+
 
 ## Context
 Two gaps surfaced while writing the editing skill (`.claude/skills/chiaro/`),
@@ -35,7 +35,7 @@ belong here. Three zones, two values each:
 - `midHue`, `midStrength`
 - `highlightHue`, `highlightStrength`
 
-Hue is 0–360 and wraps; strength is 0–100 and defaults to 0, so the whole
+Hue is 0–360 and clamps at the ends; strength is 0–100 and defaults to 0, so the whole
 feature is inert until asked for. A seventh value, `gradeBalance` (-100…100),
 shifts where shadows end and highlights begin.
 

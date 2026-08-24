@@ -2,7 +2,7 @@ import CoreImage
 import Foundation
 
 /// Color-mixer LUT: the 8 hue bands baked into a CIColorCube, cached per
-/// band configuration (LUT generation walks 64³ entries on the CPU).
+/// band configuration (LUT generation walks 32³ entries on the CPU).
 enum HSLCube {
     static let dimension = 32
     private static let cache = NSCache<NSString, NSData>()

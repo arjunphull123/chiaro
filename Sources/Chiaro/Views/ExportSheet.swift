@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Export sheet in the rail's design language: format rows with plain-language
 /// blurbs, a live size estimate, long-edge sizing, color space, and an advanced
-/// disclosure. Layout follows the two-tier convention (research: docs/adr/0009 era).
+/// disclosure. Layout follows the two-tier convention.
 struct ExportSheet: View {
     let photos: [Photo]
     @Binding var isPresented: Bool
@@ -68,7 +68,7 @@ struct ExportSheet: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.06)))
-                        Text("px long edge").font(Theme.ui(10)).foregroundStyle(Theme.ink3)
+                        Text("Long edge, px").font(Theme.ui(10)).foregroundStyle(Theme.ink3)
                     }
                 }
 
@@ -102,7 +102,7 @@ struct ExportSheet: View {
                                 .frame(width: 40)
                                 .padding(.horizontal, 6).padding(.vertical, 3)
                                 .background(RoundedRectangle(cornerRadius: 5).fill(Color.white.opacity(0.06)))
-                            Text("ppi · metadata only").font(Theme.ui(10)).foregroundStyle(Theme.ink3)
+                            Text("PPI · metadata only").font(Theme.ui(10)).foregroundStyle(Theme.ink3)
                         }
                         Toggle("Strip metadata (camera info, GPS)", isOn: $options.stripMetadata)
                             .toggleStyle(.switch).controlSize(.mini).tint(Theme.amber)

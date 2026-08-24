@@ -4,7 +4,7 @@ import CoreImage
 import Observation
 
 /// Monocular depth for depth-map blur, via Apple's Core ML build of
-/// Depth Anything V2 (small, fp16). The model is not bundled — it's a 50 MB
+/// Depth Anything V2 (small, fp16). The model is not bundled — it's a 49.8 MB
 /// download the user opts into from the Portrait section; weights live in
 /// Application Support and compile once on first use.
 final class DepthEngine: @unchecked Sendable {
@@ -231,7 +231,7 @@ final class DepthModelStore {
                 guard let compiled else { throw URLError(.cannotParseResponse) }
                 _ = try? FileManager.default.removeItem(at: Self.compiledURL)
                 try FileManager.default.moveItem(at: compiled, to: Self.compiledURL)
-                // The source package is redundant once compiled — reclaim the 48 MB.
+                // The source package is redundant once compiled — reclaim the 49.8 MB.
                 try? FileManager.default.removeItem(at: Self.packageURL)
                 loadCompiled()
             } catch {

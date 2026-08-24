@@ -45,6 +45,6 @@ struct HistogramView: View {
             .foregroundStyle(Theme.ink3)
             .padding(.horizontal, 2)
         }
-        .help("The photo's tones, dark to bright. A pile against the left edge means crushed shadows; against the right, blown highlights.")
+        .help("The photo's tones, dark to bright. A pile against the left edge means crushed shadows; against the right, blown highlights")
     }
 }

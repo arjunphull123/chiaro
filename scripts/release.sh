@@ -1,10 +1,10 @@
 #!/bin/zsh
 # One command from clean tree to published release:
 #   scripts/release.sh 1.0.1
-# Stamps the version, builds and zips, updates the cask's version and sha256,
-# commits, tags, and (when gh is installed) pushes and creates the GitHub
-# release with the zip attached. The tap copy is the one manual step, printed
-# at the end.
+# Stamps the version, builds the app and the themed DMG, updates the cask's
+# version and sha256, commits, tags, and (when gh is installed) pushes and
+# creates the GitHub release with the DMG attached. The tap copy is the one
+# manual step, printed at the end.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -13,13 +13,7 @@ V=${1:?usage: scripts/release.sh <version>}
 
 sed -i '' "s/^VERSION=.*/VERSION=\"$V\"/" scripts/bundle.sh
 scripts/bundle.sh
-# The DMG is the install path: mount, drag Chiaro into Applications.
-(
-  cd dist && rm -rf dmg-stage "Chiaro-$V.dmg" && mkdir dmg-stage
-  cp -R Chiaro.app dmg-stage/ && ln -s /Applications dmg-stage/Applications
-  hdiutil create -volname "Chiaro" -srcfolder dmg-stage -ov -format ULFO -quiet "Chiaro-$V.dmg"
-  rm -rf dmg-stage
-)
+scripts/dmg.sh "$V"
 SHA=$(shasum -a 256 "dist/Chiaro-$V.dmg" | cut -d' ' -f1)
 sed -i '' "s/^  version \".*\"/  version \"$V\"/" docs/homebrew/chiaro.rb
 sed -i '' "s/^  sha256 \".*\"/  sha256 \"$SHA\"/" docs/homebrew/chiaro.rb

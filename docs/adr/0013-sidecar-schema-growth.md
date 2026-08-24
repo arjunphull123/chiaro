@@ -1,7 +1,6 @@
-# 0013 — Sidecar schema growth and the compatibility contract
+# ADR 0013: Sidecar schema growth and the compatibility contract
 
-## Status
-Accepted
+**Status:** Accepted · 2026-08-19
 
 ## Context
 The sidecar began as {edit, rating}. The edit model grew (HSL bands, local

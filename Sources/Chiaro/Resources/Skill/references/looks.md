@@ -19,7 +19,7 @@ Apply, look at a preview of 1400px or more, then adjust to the photograph.
 
 ## How Chiaro grades
 
-Two independent systems, and choosing the right one is most of the skill:
+Three independent systems, and choosing the right one is most of the skill:
 
 **By tonal zone**, which is the grading section: `shadowHue` and
 `shadowStrength`, `midHue` and `midStrength`, `highlightHue` and
@@ -132,8 +132,8 @@ preset is a good base; this is the same idea by hand.
 }
 ```
 
-Then, optionally, a little colour infidelity, which is what actually reads as
-film rather than as a vintage filter: greens toward olive, skin toward peach.
+Then, optionally, a little colour infidelity: greens drift toward olive, skin
+toward peach — the small dishonesties film stocks were loved for.
 
 ```json
 {"hsl": {"green": {"h": -8, "s": -12}, "orange": {"h": 4}}}

@@ -20,7 +20,6 @@ struct CanvasView: View {
     @State private var lastScrubX: CGFloat?
     @State private var lastDialX: CGFloat?
 
-
     var body: some View {
         GeometryReader { geo in
             let fitRegion = CGSize(width: geo.size.width - Theme.railWidth, height: geo.size.height)
@@ -205,7 +204,6 @@ struct CanvasView: View {
     }
 
     /// Whether a dial card (readout or depth focus) is on screen.
-    private var dialActive: Bool { model.armed != nil || model.armedHSL != nil || model.armedLocal != nil }
 
     /// Crop mode controls: aspect dropdown, straighten arc, reset, done.
     /// Same grammar as the dial cards — the value being set sits centered up top.
@@ -557,7 +555,6 @@ struct CanvasView: View {
         .transition(.opacity)
     }
 }
-
 
 /// Curved rotation ruler (the Photos-style arc): the degree scale slides
 /// under a fixed center marker, following the finger.

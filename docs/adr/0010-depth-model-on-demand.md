@@ -1,7 +1,12 @@
-# 0010 — Depth-map blur via an on-demand Core ML model
+# ADR 0010: Depth-map blur via an on-demand Core ML model
 
-## Status
-Accepted
+**Status:** Accepted · 2026-08-19
+
+> Amended by ADR 0011 and ADR 0013: `depthBlur: Bool` became `blurMode`, the
+> blur mask is one-sided past the focus plane with gain 2.4, the rail section
+> is named Background blur, and the in-memory caches are bounded at 12 entries
+> (arbitrary eviction, not strictly LRU).
+
 
 ## Context
 Subject-mask blur (Vision person segmentation) is binary: person sharp,

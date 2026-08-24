@@ -32,7 +32,10 @@ Chiaro ships an MCP server, on whenever the app runs:
 ## Consequences
 
 - "AI editing" costs Chiaro no model integration; capability rides on the user's agents.
-- The server trusts localhost. Fine for a personal tool; authentication is required
-  work before any public distribution.
+- The server trusts localhost. Accepted for 1.0 as shipped: the listener binds
+  loopback only, Origin is validated against 127.0.0.1/localhost (DNS-rebinding
+  defense), and the surface holds no secrets — it reads and edits the photos of
+  the user already at the keyboard. Authentication becomes required work only if
+  the server ever binds beyond loopback.
 - Sidecar writes triggered by background (MCP) edits must not rely on nappable timers
   (see ADR 0007).
