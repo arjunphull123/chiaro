@@ -23,8 +23,8 @@ icon_size = 116
 text_size = 12
 arrange_by = None
 icon_locations = {
-    appname: (165, 250),
-    "Applications": (495, 250),
+    appname: (165, 265),
+    "Applications": (495, 265),
     ".background.tiff": (165, 900),
     ".VolumeIcon.icns": (495, 900),
     ".DS_Store": (330, 900),
