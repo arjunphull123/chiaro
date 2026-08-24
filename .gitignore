@@ -9,3 +9,4 @@ DerivedData/
 dist/
 # Launch planning — not part of the shipped project
 docs/landing-brief.md
+.playwright-cli/
