@@ -2,11 +2,13 @@
 
 ![License](https://img.shields.io/badge/license-GPL--3.0-E8A33D) ![Platform](https://img.shields.io/badge/macOS_26+-Apple_silicon-1A1A1C) ![Release](https://img.shields.io/github/v/release/arjunphull123/chiaro?color=E8A33D)
 
+[![The RAW editor your agent can drive](docs/screenshots/card.jpg)](https://chiaro.arjunphull.dev)
+
 A native macOS RAW photo editor. Dark, glassy, fast. Full-quality RAW editing
 with no subscription, and an MCP server built in so the coding agent you already
 run can edit alongside you.
 
-![Chiaro's edit view](docs/screenshots/edit.jpg)
+![A recorded session: the photographer asks for a deeper black point and Claude drives Chiaro's controls to land it](docs/screenshots/hero.gif)
 
 Named for the light half of *chiaroscuro*: composing with light against dark.
 
@@ -62,8 +64,8 @@ Add `--no-quarantine` to skip the Privacy & Security step above.
 ```
 git clone https://github.com/arjunphull123/chiaro.git
 cd chiaro
-swift run Chiaro                # debug build, straight to the app
-scripts/bundle.sh               # release build → dist/Chiaro.app
+swift build && .build/debug/Chiaro   # debug build, straight to the app
+scripts/bundle.sh                     # release build → dist/Chiaro.app
 ```
 
 ## Editing
@@ -99,7 +101,7 @@ and press Return to edit.
 - **Presets:** six built in, plus anything you save
 - **Export:** full-resolution JPEG, HEIF, or 16-bit TIFF
 
-![Background blur lifting a portrait off the room behind it](docs/screenshots/portrait.png)
+![Exposure armed in the rail, the dial floating over the photograph](docs/screenshots/edit.jpg)
 
 The depth map isn't a black box: open it as a 3D scene, orbit it, and drag the
 focus plane through the point cloud to see exactly what's sharp and what isn't.
