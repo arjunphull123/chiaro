@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/github/v/release/arjunphull123/chiaro?color=E8A33D" alt="Latest release" />
 </p>
 
-A native macOS RAW photo editor. Dark, glassy, fast. Full-quality RAW editing
+Chiaro is a native macOS RAW photo editor. Dark, glassy, fast. Full-quality RAW editing
 with no subscription, and an MCP server built in so the coding agent you already
 run can edit alongside you.
 
