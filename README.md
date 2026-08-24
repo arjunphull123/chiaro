@@ -1,8 +1,12 @@
-# Chiaro
+<p align="center">
+  <a href="https://chiaro.arjunphull.dev"><img src="docs/screenshots/banner.jpg" alt="The RAW editor your agent can drive" width="100%" /></a>
+</p>
 
-![License](https://img.shields.io/badge/license-GPL--3.0-E8A33D) ![Platform](https://img.shields.io/badge/macOS_26+-Apple_silicon-1A1A1C) ![Release](https://img.shields.io/github/v/release/arjunphull123/chiaro?color=E8A33D)
-
-[![The RAW editor your agent can drive](docs/screenshots/card.jpg)](https://chiaro.arjunphull.dev)
+<p align="center">
+  <img src="https://img.shields.io/badge/license-GPL--3.0-E8A33D" alt="License: GPL-3.0" />
+  <img src="https://img.shields.io/badge/macOS_26+-Apple_silicon-1A1A1C" alt="Platform: macOS 26 and later, Apple silicon" />
+  <img src="https://img.shields.io/github/v/release/arjunphull123/chiaro?color=E8A33D" alt="Latest release" />
+</p>
 
 A native macOS RAW photo editor. Dark, glassy, fast. Full-quality RAW editing
 with no subscription, and an MCP server built in so the coding agent you already
@@ -113,7 +117,7 @@ image, and feel the detent when you cross neutral. Hold `\` to see the original.
 
 ## Your agent can edit too
 
-![Claude editing a photo in Chiaro](docs/screenshots/agent.jpg)
+![A terminal and Chiaro on one machine, the calls landing in the MCP server on Chiaro's own edge](docs/screenshots/mcp.png)
 
 Chiaro has no chat box and ships no API keys. Instead it serves
 [MCP](https://modelcontextprotocol.io) over HTTP at `http://127.0.0.1:24242/mcp`
