@@ -5,9 +5,7 @@
   </picture>
 </p>
 
-<p align="center">
-  <a href="https://chiaro.arjunphull.dev"><img src="docs/screenshots/banner.jpg" alt="The RAW editor your agent can drive" width="100%" /></a>
-</p>
+<p align="center">The RAW editor your agent can drive · <a href="https://chiaro.arjunphull.dev">chiaro.arjunphull.dev</a></p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-GPL--3.0-E8A33D" alt="License: GPL-3.0" />
