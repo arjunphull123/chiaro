@@ -181,6 +181,10 @@ covers the visual language, [`docs/ROADMAP.md`](docs/ROADMAP.md) covers what's n
 
 GPL-3.0. See [LICENSE](LICENSE).
 
+The paintings behind the screenshots, the share card, and the installer are
+Caravaggio's, in the public domain; the card and installer sit on The Calling
+of Saint Matthew (1600).
+
 The bundled fonts (Fraunces, Archivo, Geist, and Geist Mono) are used under the SIL Open
 Font License 1.1 and keep their own terms; see
 [`Sources/Chiaro/Resources/Fonts/OFL.txt`](Sources/Chiaro/Resources/Fonts/OFL.txt).
