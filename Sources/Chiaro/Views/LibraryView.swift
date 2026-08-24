@@ -887,9 +887,9 @@ struct LibraryView: View {
         }
     }
 
-    /// "Good evening, Ada" — hour-aware, first name from the macOS account.
+    /// "Good evening, Arjun" — hour-aware, first name from the macOS account.
     private var greeting: String {
-        // --greeting "Good afternoon, Ada": the salutation is clock-derived, so
+        // --greeting "Good afternoon, Arjun": the salutation is clock-derived, so
         // capturing the start screen at 2am otherwise reads "Up late".
         let args = CommandLine.arguments
         if let i = args.firstIndex(of: "--greeting"), i + 1 < args.count { return args[i + 1] }
