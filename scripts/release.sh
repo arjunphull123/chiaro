@@ -29,6 +29,16 @@ git commit -m "Release $V"
 git tag "v$V"
 echo "Built dist/Chiaro-$V.dmg (cask sha256 $SHA)"
 
+# The site states the measured size; keep its claim true.
+MB=$(/usr/bin/python3 -c "print(f'{$(stat -f%z "dist/Chiaro-$V.dmg")/1e6:.1f}')")
+SITE=../chiaro-site/index.html
+if [[ -f $SITE ]]; then
+  /usr/bin/sed -i '' -E "s/and just [0-9.]+MB\./and just ${MB}MB./g" "$SITE"
+  echo "Stamped ${MB}MB into chiaro-site — rebuild and deploy the site."
+else
+  echo "DMG is ${MB}MB — update the site's close line if it changed."
+fi
+
 if command -v gh >/dev/null 2>&1; then
   git push && git push --tags
   gh release create "v$V" "dist/Chiaro-$V.dmg" --title "Chiaro $V" --generate-notes

@@ -8,6 +8,8 @@ cd "$(dirname "$0")/.."
 V=${1:?usage: scripts/dmg.sh <version>}
 
 [[ -d dist/Chiaro.app ]] || { echo "dist/Chiaro.app missing — run scripts/bundle.sh first"; exit 1; }
+# The plate under the icon should read "Chiaro", not "Chiaro.app".
+SetFile -a E dist/Chiaro.app 2>/dev/null || true
 rm -f "dist/Chiaro-$V.dmg"
 /usr/bin/python3 -m dmgbuild -s scripts/dmg-settings.py -D app=dist/Chiaro.app "Chiaro" "dist/Chiaro-$V.dmg"
 echo "Built dist/Chiaro-$V.dmg"
