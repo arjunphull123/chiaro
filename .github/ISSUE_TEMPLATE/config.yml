@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Agent connection help
+    url: https://github.com/arjunphull123/chiaro#your-agent-can-edit-too
+    about: How to point Claude Code, Cursor, or any MCP client at the running app

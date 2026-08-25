@@ -52,6 +52,8 @@ driving the running app over spawning new instances.
 [--render-icon <png>] [--render-depth-scene <name> <png>] [--auto-test <name>]
 [--greeting <text> (pins the clock-derived start-screen salutation)]`
 `scripts/bundle.sh` builds dist/Chiaro.app (icns + Info.plist + ad-hoc signing).
+After any app-code change lands, refresh the installed copy the owner runs:
+`scripts/bundle.sh && rm -rf /Applications/Chiaro.app && cp -R dist/Chiaro.app /Applications`.
 
 ## Roadmap
 

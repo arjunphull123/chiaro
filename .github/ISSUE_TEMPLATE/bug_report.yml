@@ -1,0 +1,30 @@
+name: Bug report
+description: Something in Chiaro looks or behaves wrong
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got. A screenshot helps enormously.
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: macOS 26.1
+    validations:
+      required: true
+  - type: input
+    id: file
+    attributes:
+      label: File type and camera
+      description: If the bug involves a specific photo
+      placeholder: .ARW from a Sony RX100 IV
+  - type: textarea
+    id: sidecar
+    attributes:
+      label: Sidecar
+      description: For rendering bugs, paste the photo's sidecar file (the .json next to the photo) so the edit can be reproduced exactly
+      render: json
