@@ -276,9 +276,18 @@ struct CanvasView: View {
         )
     }
 
+    /// Every fixed ratio in both orientations, portrait beside its landscape.
     private var aspectOptions: [(name: String, ratio: Double?)] {
-        [("Free", nil), ("Original", originalAspect), ("1:1", 1), ("4:5", 0.8), ("3:2", 1.5), ("16:9", 16.0 / 9)]
+        [("Free", nil), ("Original", originalAspect),
+         ("1:1", 1),
+         ("4:5", 0.8), ("5:4", 1.25),
+         ("2:3", 2.0 / 3), ("3:2", 1.5),
+         ("9:16", 9.0 / 16), ("16:9", 16.0 / 9)]
     }
+
+    @State private var customAspectPrompt = false
+    @State private var customW = ""
+    @State private var customH = ""
 
     private var aspectMenu: some View {
         let currentName = model.cropAspectName ?? "Free"
@@ -295,9 +304,17 @@ struct CanvasView: View {
                     }
                 }
             }
+            Divider()
+            Button(current == nil ? "Custom (\(currentName))…" : "Custom…") {
+                customW = ""
+                customH = ""
+                customAspectPrompt = true
+            }
         } label: {
             HStack(spacing: 6) {
-                aspectGlyph(current?.ratio ?? nil, selected: false)
+                // A custom ratio has no entry in aspectOptions; the glyph
+                // falls back to the locked ratio itself.
+                aspectGlyph(current.map(\.ratio) ?? model.cropAspect, selected: false)
                 Text(currentName)
                     .font(Theme.ui(10.5, .medium))
                     .foregroundStyle(Theme.ink)
@@ -317,6 +334,18 @@ struct CanvasView: View {
         .fixedSize()
         .clickCursor()
         .help("Lock the crop to a ratio")
+        .alert("Custom ratio", isPresented: $customAspectPrompt) {
+            TextField("Width", text: $customW)
+            TextField("Height", text: $customH)
+            Button("Apply") {
+                if let w = Double(customW), let h = Double(customH), w > 0, h > 0 {
+                    model.applyCropAspect(w / h, name: "\(customW):\(customH)")
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Width and height, in any units — 7 and 5 locks the crop to 7:5")
+        }
     }
 
     /// Mini frame preview inside an aspect chip — a dashed square stands

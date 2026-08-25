@@ -10,6 +10,9 @@ struct ExportSheet: View {
     @State private var options = ExportOptions()
     @State private var sizeChoice: SizeChoice = .full
     @State private var customEdge = "2048"
+    /// Output file name (stem only) — single-photo exports; a batch keeps
+    /// each photo's own name.
+    @State private var exportName = ""
     @State private var showAdvanced = false
     @State private var revealInFinder = true
     @State private var progress: (done: Int, total: Int)?
@@ -80,6 +83,22 @@ struct ExportSheet: View {
                         }
                         .help(space.blurb)
                     }
+                }
+            }
+
+            if photos.count == 1 {
+                sectionLabel("File name")
+                HStack(spacing: 6) {
+                    TextField("", text: $exportName)
+                        .textFieldStyle(.plain)
+                        .font(Theme.mono(11))
+                        .foregroundStyle(Theme.amber)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.06)))
+                    Text(".\(options.format.fileExtension(sourceURL: photos[0].url))")
+                        .font(Theme.mono(10))
+                        .foregroundStyle(Theme.ink3)
                 }
             }
 
@@ -173,6 +192,7 @@ struct ExportSheet: View {
         .animation(.easeOut(duration: 0.15), value: options.format)
         .onChange(of: sizeChoice) { syncMaxDimension() }
         .onChange(of: customEdge) { syncMaxDimension() }
+        .onAppear { if photos.count == 1 { exportName = photos[0].name } }
     }
 
     // MARK: - Pieces
@@ -284,7 +304,14 @@ struct ExportSheet: View {
         let reveal = revealInFinder
         // Snapshot url/edit/name on the main actor — Photo is non-Sendable and
         // main-actor-mutated, so the render queue must never touch it directly.
-        let jobs = targets.map { (url: $0.url, edit: $0.edit, name: $0.name) }
+        let renamed = exportName
+            .trimmingCharacters(in: .whitespaces)
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+        let jobs = targets.map {
+            (url: $0.url, edit: $0.edit,
+             name: targets.count == 1 && !renamed.isEmpty ? renamed : $0.name)
+        }
         Task {
             var last: URL?
             var failureCount = 0
