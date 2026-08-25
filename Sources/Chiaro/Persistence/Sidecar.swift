@@ -52,21 +52,32 @@ enum Sidecar {
         return nil
     }
 
-    static func write(for photo: Photo) {
+    /// Returns false only on total failure — both the beside-file location and
+    /// the Application Support fallback rejected the write (disk full, unwritable
+    /// home). Callers that report success to an agent should check it.
+    @discardableResult
+    static func write(for photo: Photo) -> Bool {
         let doc = Document(edit: photo.edit, starred: photo.starred, versions: photo.snapshots)
         let target = preferredURL(photo.url)
         if doc.edit.isNeutral && !doc.starred && doc.versions.isEmpty {
             try? FileManager.default.removeItem(at: besideURL(photo.url))
             try? FileManager.default.removeItem(at: storeURL(photo.url))
-            return
+            return true
         }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        guard let data = try? encoder.encode(doc) else { return }
+        guard let data = try? encoder.encode(doc) else { return false }
         do {
             try data.write(to: target, options: .atomic)
+            return true
         } catch {
-            try? data.write(to: storeURL(photo.url), options: .atomic)
+            do {
+                try data.write(to: storeURL(photo.url), options: .atomic)
+                return true
+            } catch {
+                NSLog("Chiaro: could not save edits for \(photo.name): \(error.localizedDescription)")
+                return false
+            }
         }
     }
 

@@ -50,17 +50,46 @@ struct LibraryView: View {
 
     var body: some View {
         Group {
-            if library.photos.isEmpty {
+            if library.folderURL == nil {
                 emptyState
+            } else if library.photos.isEmpty {
+                folderStatus
             } else {
                 gallery
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear { if library.photos.isEmpty { hugStartScreen() } }
-        .onChange(of: library.photos.isEmpty) { _, empty in
-            if empty { hugStartScreen() } else { restoreLibraryHeight() }
+        .onAppear { if library.folderURL == nil { hugStartScreen() } }
+        .onChange(of: library.folderURL == nil) { _, atStart in
+            if atStart { hugStartScreen() } else { restoreLibraryHeight() }
         }
+    }
+
+    /// Shown while a folder is opening, and if it turns up empty — which for a
+    /// protected folder is also what a denied permission looks like.
+    private var folderStatus: some View {
+        VStack(spacing: 12) {
+            if library.scanning {
+                ProgressView().controlSize(.small)
+                Text("Reading \(library.folderURL?.lastPathComponent ?? "folder")…")
+                    .font(Theme.ui(12))
+                    .foregroundStyle(Theme.ink3)
+            } else {
+                Text("No photos here")
+                    .font(Theme.ui(14, .semibold))
+                    .foregroundStyle(Theme.ink2)
+                Text("If you expected photos, Chiaro may need permission to read this folder. Check System Settings › Privacy & Security › Files and Folders.")
+                    .font(Theme.ui(11.5))
+                    .foregroundStyle(Theme.ink3)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 340)
+                Button("Back to start") { library.close() }
+                    .buttonStyle(OutlineButtonStyle())
+                    .clickCursor()
+                    .padding(.top, 4)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func hugStartScreen(attempt: Int = 0) {
@@ -180,8 +209,10 @@ struct LibraryView: View {
         GeometryReader { geo in
             let width = geo.size.width - 32
             ScrollView {
-                if sections.isEmpty && !library.searchText.isEmpty {
-                    Text("No photos match \u{201C}\(library.searchText)\u{201D}")
+                if sections.isEmpty {
+                    Text(library.searchText.isEmpty
+                         ? "No photos match this filter"
+                         : "No photos match \u{201C}\(library.searchText)\u{201D}")
                         .font(Theme.ui(12))
                         .foregroundStyle(Theme.ink3)
                         .frame(maxWidth: .infinity)

@@ -41,7 +41,7 @@ Requires **macOS 26** or later on Apple silicon.
 
 ### Download
 
-Download `Chiaro-1.0.0.dmg` from [the latest release](https://github.com/arjunphull123/chiaro/releases/latest),
+Download the DMG from [the latest release](https://github.com/arjunphull123/chiaro/releases/latest),
 open it, and drag Chiaro into Applications.
 
 **The first launch needs one extra step.** Chiaro is signed ad hoc rather than

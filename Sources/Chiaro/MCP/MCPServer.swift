@@ -92,6 +92,9 @@ final class MCPServer {
             guard let self, error == nil else { connection.cancel(); return }
             var buffer = buffer
             if let data { buffer.append(data) }
+            // Drop a connection that keeps sending past any legitimate tool-call
+            // payload rather than buffering it without bound.
+            if buffer.count > 16 << 20 { connection.cancel(); return }
             if let request = Self.parseRequest(buffer) {
                 self.route(request) { status, payload in
                     var head = "HTTP/1.1 \(status)\r\nContent-Type: application/json\r\n"
@@ -113,8 +116,11 @@ final class MCPServer {
     /// MCP streamable-HTTP requirements: validate Origin (DNS-rebinding defense),
     /// POST-only (no SSE stream offered), single /mcp endpoint.
     private func route(_ request: HTTPRequest, reply: @escaping (String, Data) -> Void) {
-        if let origin = request.origin,
-           !(origin.contains("127.0.0.1") || origin.contains("localhost")) {
+        // Exact host equality, not substring: `contains("127.0.0.1")` also
+        // matched `127.0.0.1.evil.com`, so any site with that in its name could
+        // drive tools from the browser. Local tools (curl, Claude Code) send no
+        // Origin and stay allowed; browsers always send one.
+        if let origin = request.origin, !Self.isLoopbackOrigin(origin) {
             reply("403 Forbidden", Data("{\"error\":\"origin not allowed\"}".utf8))
             return
         }
@@ -129,6 +135,15 @@ final class MCPServer {
         handle(body: request.body) { response in
             if let response { reply("200 OK", response) } else { reply("202 Accepted", Data()) }
         }
+    }
+
+    /// The Origin's host, compared exactly against the loopback names. A bare
+    /// host with no scheme (rare, but some clients send it) is read directly;
+    /// "null" and anything else is rejected.
+    static func isLoopbackOrigin(_ origin: String) -> Bool {
+        let allowed: Set<String> = ["127.0.0.1", "::1", "localhost"]
+        if let host = URLComponents(string: origin)?.host { return allowed.contains(host) }
+        return allowed.contains(origin)
     }
 
     /// Returns the request once headers + Content-Length bytes have fully arrived.
@@ -172,7 +187,9 @@ final class MCPServer {
             let requested = params?["protocolVersion"] as? String ?? "2025-03-26"
             let version = supported.contains(requested) ? requested : "2025-06-18"
             let client = (params?["clientInfo"] as? [String: Any])?["name"] as? String
-            Task { @MainActor in AgentStatus.shared.clientName = client }
+            // Only remember a named client: an anonymous reconnect must not
+            // wipe the persisted brand of the agent the user actually uses.
+            if let client { Task { @MainActor in AgentStatus.shared.clientName = client } }
             reply(rpcResult(id: id, [
                 "protocolVersion": version,
                 "capabilities": [
@@ -519,6 +536,9 @@ final class MCPServer {
     /// must stay identical between them, since get_stats's whole premise is that
     /// it measures the same pixels get_preview shows.
     private static func renderedForInspection(url: URL, edit: EditState, isRAW: Bool, maxDimension: Double) -> CIImage? {
+        // Cap what an agent can pull in one buffered HTTP response: a request at
+        // native resolution on a 60MP RAW would base64 the whole frame.
+        let maxDimension = min(maxDimension, 4096)
         guard let base = RawEngine.shared.preview(for: url, decode: RawEngine.DecodeParams(edit)) else { return nil }
         var mask: CIImage?
         if edit.blurF > 0 || edit.relight != 0 {
@@ -589,7 +609,9 @@ final class MCPServer {
                 throw ToolError("starred must be a boolean")
             }
             p.starred = starred
-            Sidecar.write(for: p)
+            guard Sidecar.write(for: p) else {
+                throw ToolError("couldn't save to \(p.name) — the folder may be read-only or the disk full")
+            }
             library.noteAgentActivity(photo: p.url)
             return try text(["applied": true, "name": p.name, "starred": starred])
         case "set_edit":
@@ -619,9 +641,14 @@ final class MCPServer {
                           let w = dict["w"] as? Double, let h = dict["h"] as? Double,
                           w >= 0.05, h >= 0.05
                     else { throw ToolError("crop must be {x,y,w,h} normalized 0-1") }
+                    // Clamp width/height against the origin so the rectangle
+                    // always stays inside the frame — the crop the agent reads
+                    // back then matches what the editor draws, no overhang.
+                    let cx = x.clamped(to: 0...0.95)
+                    let cy = y.clamped(to: 0...0.95)
                     edit.crop = CropRect(
-                        x: x.clamped(to: 0...0.95), y: y.clamped(to: 0...0.95),
-                        w: w.clamped(to: 0.05...1), h: h.clamped(to: 0.05...1)
+                        x: cx, y: cy,
+                        w: w.clamped(to: 0.05...(1 - cx)), h: h.clamped(to: 0.05...(1 - cy))
                     )
                     continue
                 }
@@ -711,7 +738,9 @@ final class MCPServer {
             } else {
                 p.edit = edit
                 target = library.edit(p) // shows the photo in the editor, without activating the app
-                Sidecar.write(for: target)
+                guard Sidecar.write(for: target) else {
+                    throw ToolError("couldn't save to \(target.name) — the folder may be read-only or the disk full")
+                }
             }
             library.noteAgentActivity(intent: args["intent"] as? String, photo: target.url)
             return try text(["applied": true, "name": target.name])

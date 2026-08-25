@@ -105,6 +105,8 @@ struct RailView: View {
                 Text(model.photo.name)
                     .font(Theme.ui(14, .semibold))
                     .foregroundStyle(Theme.ink)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
                 Button {
                     model.photo.starred.toggle()
                     model.saveNow()

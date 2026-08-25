@@ -10,9 +10,19 @@ cd "$(dirname "$0")/.."
 
 V=${1:?usage: scripts/release.sh <version>}
 [[ -z $(git status --porcelain) ]] || { echo "Working tree not clean — commit first"; exit 1; }
+# Fail before doing any build work if the push target isn't wired up (see
+# docs/LAUNCH.md) — better than dying half-committed at the push step.
+git remote get-url origin >/dev/null 2>&1 || { echo "No 'origin' remote — see docs/LAUNCH.md prerequisites"; exit 1; }
 
 sed -i '' "s/^VERSION=.*/VERSION=\"$V\"/" scripts/bundle.sh
+grep -q "VERSION=\"$V\"" scripts/bundle.sh || { echo "Version stamp failed — bundle.sh VERSION line format changed"; exit 1; }
 scripts/bundle.sh
+# Archive the unstripped binary so a stripped-build crash report can still be
+# symbolicated later (bundle.sh strips before signing; .build/release is
+# overwritten on the next build).
+mkdir -p dist/symbols
+cp .build/release/Chiaro "dist/symbols/Chiaro-$V-unstripped"
+
 scripts/dmg.sh "$V"
 SHA=$(shasum -a 256 "dist/Chiaro-$V.dmg" | cut -d' ' -f1)
 sed -i '' "s/^  version \".*\"/  version \"$V\"/" docs/homebrew/chiaro.rb

@@ -193,6 +193,9 @@ struct ExportSheet: View {
         .onChange(of: sizeChoice) { syncMaxDimension() }
         .onChange(of: customEdge) { syncMaxDimension() }
         .onAppear { if photos.count == 1 { exportName = photos[0].name } }
+        // Re-seed if the target changes under an open sheet (an MCP open_photo
+        // can swap library.editing), so the name never describes the old photo.
+        .onChange(of: photos.map(\.url)) { if photos.count == 1 { exportName = photos[0].name } }
     }
 
     // MARK: - Pieces
@@ -233,7 +236,12 @@ struct ExportSheet: View {
         switch sizeChoice {
         case .full: options.maxDimension = nil
         case .web: options.maxDimension = 2048
-        case .custom: options.maxDimension = Double(customEdge.filter(\.isNumber))
+        // Keep the last valid dimension when the field is empty/non-numeric, and
+        // floor it so a stray 0 can't build a scale-by-zero transform.
+        case .custom:
+            if let edge = Double(customEdge.filter(\.isNumber)), edge >= 16 {
+                options.maxDimension = edge
+            }
         }
     }
 

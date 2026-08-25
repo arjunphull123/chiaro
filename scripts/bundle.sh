@@ -16,6 +16,12 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/Chiaro "$APP/Contents/MacOS/Chiaro"
 cp -R .build/release/Chiaro_Chiaro.bundle "$APP/Contents/Resources/"
 
+# Strip the symbol table and debug metadata before signing: swift build -c
+# release leaves them in __LINKEDIT, which grows with the codebase and had the
+# binary at 5.6MB / the DMG at 5.4MB. Stripping takes the binary to ~2MB. Must
+# run before codesign, since stripping invalidates a signature.
+strip -rSTx "$APP/Contents/MacOS/Chiaro"
+
 # .icns from the 1024pt master.
 ICONSET="$(mktemp -d)/AppIcon.iconset"
 mkdir -p "$ICONSET"

@@ -166,16 +166,40 @@ final class Library {
         selection = []
     }
 
+    /// True while open() is enumerating a folder. Lets the view show a loading
+    /// state rather than the start screen for the gap between click and photos.
+    var scanning = false
+
     func open(_ url: URL) {
         folderURL = url
         editing = nil
         selection = []
+        photos = []
+        scanning = true
         var recents = UserDefaults.standard.stringArray(forKey: "recentFolders") ?? []
         recents.removeAll { $0 == url.path }
         recents.insert(url.path, at: 0)
         UserDefaults.standard.set(Array(recents.prefix(5)), forKey: "recentFolders")
-        // Recurse into subfolders (bounded: depth 5, 10k files) so a nested
-        // library — e.g. Chiaro Library/<day>/ — opens as one gallery.
+        // Enumerate off the main thread: a TCC permission prompt for a protected
+        // folder blocks its thread synchronously, and on the main thread that
+        // froze the whole window until the user answered. Off-main, the prompt
+        // appears over an already-painted window and denial degrades to the
+        // empty state instead of a blank one.
+        Task.detached(priority: .userInitiated) {
+            let found = Self.enumeratePhotos(in: url)
+            await MainActor.run {
+                guard self.folderURL == url else { return } // superseded by another open()
+                self.photos = found.map(Photo.init)
+                self.scanning = false
+                self.loadThumbnails()
+            }
+        }
+    }
+
+    /// Recurse into subfolders (bounded: depth 5, 10k files) so a nested library
+    /// — e.g. Chiaro Library/<day>/ — opens as one gallery. A RAW+JPEG pair is
+    /// one photo; prefer the RAW.
+    nonisolated static func enumeratePhotos(in url: URL) -> [URL] {
         let fm = FileManager.default
         var urls: [URL] = []
         if let enumerator = fm.enumerator(
@@ -184,7 +208,6 @@ final class Library {
         ) {
             for case let file as URL in enumerator {
                 if enumerator.level > 5 { enumerator.skipDescendants(); continue }
-                // Never ingest our own export output as library photos.
                 if file.lastPathComponent == "Chiaro Exports" {
                     enumerator.skipDescendants()
                     continue
@@ -194,8 +217,6 @@ final class Library {
                 if urls.count >= 10_000 { break }
             }
         }
-
-        // A RAW+JPEG pair is one photo; prefer the RAW.
         var byStem: [String: URL] = [:]
         for u in urls.sorted(by: { $0.path < $1.path }) {
             let stem = u.deletingPathExtension().path
@@ -205,10 +226,7 @@ final class Library {
             }
             byStem[stem] = u
         }
-        photos = byStem.values
-            .sorted { $0.path < $1.path }
-            .map(Photo.init)
-        loadThumbnails()
+        return byStem.values.sorted { $0.path < $1.path }
     }
 
     struct ScanResult: Sendable {
@@ -262,19 +280,29 @@ final class Library {
     func refreshEditedThumbnails() {
         let stale = photos.filter { $0.hasEdits && $0.thumbEdit != $0.edit }
         guard !stale.isEmpty else { return }
+        KeepAwake.poke(60)
         thumbRenderPass += 1
         let pass = thumbRenderPass
         let jobs = stale.map { ($0.url, $0.edit) }
+        // Only wait on the depth model when it's genuinely still arriving. If it
+        // was never downloaded (or failed, or is already ready), the retry loop
+        // just stalls the whole queue five seconds per photo for nothing.
+        let depthArriving: Bool
+        switch DepthModelStore.shared.availability {
+        case .downloading, .preparing: depthArriving = true
+        default: depthArriving = false
+        }
         Task { [weak self] in
             for (url, edit) in jobs {
                 guard self?.thumbRenderPass == pass else { return }
+                let needsDepth = edit.blurMode == .depth && edit.blurF > 0
                 var image: CGImage??
-                // The depth model loads on demand — give it a few beats before
-                // rendering a depth-blurred edit without its blur.
-                for _ in 0..<5 {
-                    image = await Self.editedThumb(url: url, edit: edit, requireDepth: true)
-                    if image != nil { break }
-                    try? await Task.sleep(for: .seconds(1))
+                if needsDepth && depthArriving {
+                    for _ in 0..<5 {
+                        image = await Self.editedThumb(url: url, edit: edit, requireDepth: true)
+                        if image != nil { break }
+                        try? await Task.sleep(for: .seconds(1))
+                    }
                 }
                 if image == nil { image = await Self.editedThumb(url: url, edit: edit, requireDepth: false) }
                 guard let library = self, library.thumbRenderPass == pass,

@@ -71,7 +71,10 @@ enum Exporter {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         // Two photos with the same stem (different subfolders) must not clobber
         // each other in one batch — number the collision instead of overwriting.
-        let out = uniqueURL(in: folder, stem: name, ext: options.format.fileExtension(sourceURL: url))
+        let ext = options.format.fileExtension(sourceURL: url)
+        // A user-typed name may already carry the extension; don't double it.
+        let stem = name.hasSuffix("." + ext) ? String(name.dropLast(ext.count + 1)) : name
+        let out = uniqueURL(in: folder, stem: stem, ext: ext)
 
         if options.format == .original {
             try FileManager.default.copyItem(at: url, to: out)
@@ -100,25 +103,30 @@ enum Exporter {
 
         let colorSpace = options.colorSpace.cgColorSpace
         let context = engine.context
+        // Write to a sibling temp file and move into place, so a crash or quit
+        // mid-encode never leaves a truncated file under the real name.
+        let temp = folder.appendingPathComponent(".chiaro-export-\(UUID().uuidString).tmp")
+        defer { try? FileManager.default.removeItem(at: temp) }
         switch options.format {
         case .jpeg:
             try context.writeJPEGRepresentation(
-                of: rendered, to: out, colorSpace: colorSpace,
+                of: rendered, to: temp, colorSpace: colorSpace,
                 options: [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: options.quality]
             )
         case .heif:
             try context.writeHEIFRepresentation(
-                of: rendered, to: out, format: .RGBA8, colorSpace: colorSpace,
+                of: rendered, to: temp, format: .RGBA8, colorSpace: colorSpace,
                 options: [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: options.quality]
             )
         case .tiff:
             try context.writeTIFFRepresentation(
-                of: rendered, to: out, format: options.tiff16Bit ? .RGBA16 : .RGBA8,
+                of: rendered, to: temp, format: options.tiff16Bit ? .RGBA16 : .RGBA8,
                 colorSpace: colorSpace, options: [:]
             )
         case .original:
             break
         }
+        try FileManager.default.moveItem(at: temp, to: out)
         applyMetadataPolicy(to: out, options: options)
         return out
     }

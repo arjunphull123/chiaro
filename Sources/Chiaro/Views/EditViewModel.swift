@@ -130,7 +130,11 @@ final class EditViewModel {
         let frameAspect = Double(frame.width) / Double(frame.height)
         let k = aspect / frameAspect
         var c = CropRect.full
-        if k <= 1 { c.w = k; c.x = (1 - k) / 2 } else { c.h = 1 / k; c.y = (1 - 1 / k) / 2 }
+        // Floor each side at the same minimum the drag gesture enforces, so an
+        // extreme ratio (e.g. 999:1) can't collapse the crop to a sliver.
+        let minSide = 0.08
+        if k <= 1 { c.w = max(k, minSide); c.x = (1 - c.w) / 2 }
+        else { c.h = max(1 / k, minSide); c.y = (1 - c.h) / 2 }
         edit.crop = c
     }
     var preview: CGImage?
