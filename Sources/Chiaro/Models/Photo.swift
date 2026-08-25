@@ -9,6 +9,10 @@ final class Photo: Identifiable {
     var aspect: CGFloat = 1.5
     var edit: EditState
     var starred: Bool
+    /// The edit the current `thumbnail` was rendered with — nil means it is
+    /// the file's plain embedded preview. Lets the library re-render only
+    /// tiles whose edits actually changed.
+    var thumbEdit: EditState?
     var snapshots: [Sidecar.Snapshot] = []
     var captureDate: Date?
     var exifSummary: String?

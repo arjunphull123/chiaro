@@ -360,7 +360,10 @@ struct EditView: View {
                     model.canvasPan = .zero
                 }
             } label: {
-                Text("Fit").font(Theme.ui(10.5, .medium))
+                // fixedSize on each label, not the pill: the ViewThatFits below
+                // still drops the slider under real pressure, but no label can
+                // ever be compressed into a vertical wrap.
+                Text("Fit").font(Theme.ui(10.5, .medium)).fixedSize()
             }
             .buttonStyle(.plain)
             .foregroundStyle(model.canvasZoom == 1 ? Theme.amber : Theme.ink2)
@@ -369,7 +372,7 @@ struct EditView: View {
             Button {
                 model.pixelZoomRequested = true
             } label: {
-                Text("1:1").font(Theme.ui(10.5, .medium))
+                Text("1:1").font(Theme.ui(10.5, .medium)).fixedSize()
             }
             .buttonStyle(.plain)
             .foregroundStyle(model.canvasZoom > 1 ? Theme.amber : Theme.ink2)
@@ -404,6 +407,7 @@ struct EditView: View {
     private var zoomReadout: some View {
         Text(String(format: "×%.1f", model.canvasZoom))
             .font(Theme.mono(9))
+            .fixedSize()
             .foregroundStyle(Theme.ink3)
             .monospacedDigit()
             .fixedSize()
@@ -413,7 +417,9 @@ struct EditView: View {
         Button(action: close) {
             HStack(spacing: 6) {
                 Image(systemName: "chevron.left").font(.system(size: 10, weight: .semibold))
-                Text("Library")
+                // fixedSize: when the toolbar grows (paste appearing), the row's
+                // spacer must yield before any label wraps into a column.
+                Text("Library").fixedSize()
             }
         }
         .buttonStyle(GlassButtonStyle())
@@ -432,6 +438,7 @@ struct EditView: View {
         model.saveNow()
         library.activeEditor = nil
         library.editing = nil
+        library.refreshEditedThumbnails()
     }
 
     private func step(_ delta: Int) {

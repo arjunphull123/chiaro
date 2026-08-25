@@ -509,6 +509,16 @@ struct LibraryView: View {
                 .opacity(0)
                 .frame(width: 0, height: 0)
         )
+        .background(
+            // P stars the selection — the editor's same key. A shortcut rather
+            // than a key press so it needs no focus; disabling it while the
+            // search field is focused keeps typing "p" safe.
+            Button("") { toggleStarOnSelection() }
+                .keyboardShortcut("p", modifiers: [])
+                .disabled(searchFocused || library.selection.isEmpty)
+                .opacity(0)
+                .frame(width: 0, height: 0)
+        )
         // A `.background` catcher on the surrounding gallery can't release
         // focus here: it sits behind the scroll view and the photo tiles,
         // which consume a click before a SwiftUI gesture on the background
@@ -613,6 +623,17 @@ struct LibraryView: View {
 
     @State private var hoveredTile: URL?
 
+    /// Multi-select semantics: star all while any is unstarred, unstar only
+    /// once every one of them is — culling never flips stars both ways at once.
+    private func toggleStarOnSelection() {
+        let targets = library.selectedPhotos
+        let value = !targets.allSatisfy(\.starred)
+        for photo in targets {
+            photo.starred = value
+            Sidecar.write(for: photo)
+        }
+    }
+
     private func agentTouched(_ photo: Photo) -> Bool {
         library.agentTouchedPhoto == photo.url
     }
@@ -687,11 +708,11 @@ struct LibraryView: View {
             )
             if showCaption {
                 // One row, so the badges can never land on top of the metadata.
-                // .center, not .bottom: badgePair carries its own uniform padding
-                // for its other life as a corner overlay, which only cancels out
-                // under center alignment — .bottom would count that padding twice
-                // and float the badges above the filename.
-                HStack(alignment: .center, spacing: 8) {
+                // The row adds no trailing or bottom padding of its own: the
+                // badge cluster's uniform 8pt is the only inset, so its corner
+                // position is identical whether the caption is up or not —
+                // hovering must never move the badges.
+                HStack(alignment: .bottom, spacing: 0) {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(photo.filename)
                             .font(Theme.ui(10.5, .semibold))
@@ -704,12 +725,12 @@ struct LibraryView: View {
                                 .lineLimit(1)
                         }
                     }
+                    .padding(.leading, 9)
+                    .padding(.bottom, 8)
                     Spacer(minLength: 4)
                     badgePair(photo)
                 }
-                .padding(.horizontal, 9)
                 .padding(.top, 46)
-                .padding(.bottom, 8)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
                     LinearGradient(
@@ -751,18 +772,20 @@ struct LibraryView: View {
             .clipShape(RoundedRectangle(cornerRadius: 7))
             .overlay(alignment: .bottom) {
                 if showCaption {
-                    // Same single row as the justified tile: name left, badges right.
-                    HStack(alignment: .center, spacing: 6) {
+                    // Same single row as the justified tile, same invariant:
+                    // the badge cluster's own padding is the only trailing and
+                    // bottom inset, so hover never moves the badges.
+                    HStack(alignment: .bottom, spacing: 0) {
                         Text(photo.filename)
                             .font(Theme.ui(9.5, .medium))
                             .foregroundStyle(.white)
                             .lineLimit(1)
+                            .padding(.leading, 7)
+                            .padding(.bottom, 6)
                         Spacer(minLength: 4)
                         badgePair(photo)
                     }
-                        .padding(.horizontal, 7)
                         .padding(.top, 24)
-                        .padding(.bottom, 6)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(
                             LinearGradient(colors: [.clear, .black.opacity(0.8)], startPoint: .top, endPoint: .bottom)

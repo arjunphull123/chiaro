@@ -30,6 +30,9 @@ final class Library {
         agentActive = true
         if let intent { agentIntent = intent }
         if let photo { agentTouchedPhoto = photo }
+        // An agent editing while the user watches the library must update the
+        // tiles it touches. In the editor, tiles are hidden — close() refreshes.
+        if editing == nil { refreshEditedThumbnails() }
         activeEditor?.armed = nil
         agentClearItem?.cancel()
         let item = DispatchWorkItem { [weak self] in
@@ -235,7 +238,8 @@ final class Library {
                 DispatchQueue.main.async {
                     guard let self, self.folderURL == currentFolder,
                           let photo = self.photos.first(where: { $0.url == url }) else { return }
-                    if let image = result.image {
+                    // Never let a plain file scan land on top of an edited render.
+                    if let image = result.image, photo.thumbEdit == nil {
                         photo.thumbnail = image
                         photo.aspect = CGFloat(image.width) / CGFloat(image.height)
                     }
@@ -244,6 +248,69 @@ final class Library {
                     photo.pixelSize = result.pixelSize
                 }
             }
+        }
+        refreshEditedThumbnails()
+    }
+
+    // MARK: - Edited thumbnails
+
+    /// Library tiles show the edit, not the file: any photo whose sidecar
+    /// carries edits gets a real render — masks and depth included — in place
+    /// of the embedded preview. Sequential on purpose: a folder of edited RAWs
+    /// must not fan out into parallel full decodes.
+    private var thumbRenderPass = 0
+    func refreshEditedThumbnails() {
+        let stale = photos.filter { $0.hasEdits && $0.thumbEdit != $0.edit }
+        guard !stale.isEmpty else { return }
+        thumbRenderPass += 1
+        let pass = thumbRenderPass
+        let jobs = stale.map { ($0.url, $0.edit) }
+        Task { [weak self] in
+            for (url, edit) in jobs {
+                guard self?.thumbRenderPass == pass else { return }
+                var image: CGImage??
+                // The depth model loads on demand — give it a few beats before
+                // rendering a depth-blurred edit without its blur.
+                for _ in 0..<5 {
+                    image = await Self.editedThumb(url: url, edit: edit, requireDepth: true)
+                    if image != nil { break }
+                    try? await Task.sleep(for: .seconds(1))
+                }
+                if image == nil { image = await Self.editedThumb(url: url, edit: edit, requireDepth: false) }
+                guard let library = self, library.thumbRenderPass == pass,
+                      let photo = library.photos.first(where: { $0.url == url }),
+                      photo.edit == edit, let rendered = image ?? nil else { continue }
+                photo.thumbnail = rendered
+                photo.aspect = CGFloat(rendered.width) / CGFloat(rendered.height)
+                photo.thumbEdit = edit
+            }
+        }
+    }
+
+    /// Double optional, same contract as the start screen's recent-edit thumbs:
+    /// `.none` = depth model not up yet, retry; `.some(nil)` = failed, give up.
+    nonisolated private static func editedThumb(url: URL, edit: EditState, requireDepth: Bool) async -> CGImage?? {
+        await Offload.on(Offload.render) { () -> CGImage?? in
+            guard let base = RawEngine.shared.preview(for: url, decode: RawEngine.DecodeParams(edit)) else {
+                return CGImage??.some(nil)
+            }
+            var mask: CIImage?
+            var depth: CIImage?
+            if edit.blurF > 0 {
+                if edit.blurMode == .depth {
+                    depth = DepthEngine.shared.normalizedMap(for: url, image: base)
+                    if depth == nil && requireDepth { return CGImage??.none }
+                } else {
+                    mask = PortraitEngine.shared.mask(
+                        for: url, image: base,
+                        kind: edit.blurMode == .person ? .person : .subject
+                    )
+                }
+            }
+            var rendered = RenderPipeline.render(base: base, edit: edit, personMask: mask, depthMap: depth, isRAW: Photo.isRAW(url))
+            let s = 480 / max(rendered.extent.width, rendered.extent.height)
+            if s < 1 { rendered = rendered.transformed(by: CGAffineTransform(scaleX: s, y: s)) }
+            return RawEngine.shared.context.createCGImage(rendered, from: rendered.extent)
         }
     }
 
@@ -427,5 +494,6 @@ final class Library {
                 Sidecar.write(for: photo)
             }
         }
+        refreshEditedThumbnails()
     }
 }
