@@ -74,6 +74,9 @@ struct ChiaroApp: App {
             }
             CommandGroup(replacing: .help) {
                 Button("Chiaro on GitHub") { NSWorkspace.shared.open(Updater.repoPage) }
+                Button("Report a bug…") {
+                    NSWorkspace.shared.open(Updater.repoPage.appending(path: "issues/new/choose"))
+                }
             }
             CommandGroup(replacing: .newItem) {
                 Button("Open folder…") {

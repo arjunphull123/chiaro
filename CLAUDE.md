@@ -23,6 +23,7 @@ via Apple's RAW engine.
   programmatically settable. This is a hard rule: it keeps sidecar persistence, copy/paste
   edits, undo, and future agentic (Claude-driven) editing all trivial.
 - Prefer Apple frameworks over dependencies. Justify any third-party package in an ADR.
+- **Post-release, changes land on feature branches**; main is released history.
 - **Commits are authored by the repo owner.** No `Co-Authored-By` trailers and no
   "Generated with" boilerplate in commits, PRs, code, or docs — an editor or an
   agent is a tool in the chain, and tools don't sign the work.
