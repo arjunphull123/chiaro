@@ -84,6 +84,12 @@ Ranked, with the reasoning that put them here rather than in a tier.
   adding a concept, and stays agent-drivable.
 - **Grain — shipped.** `grain` and `grainSize` in Effects. The missing piece
   for a film look; the skill no longer has to admit it cannot deliver one.
+- **`chiaro` CLI.** A thin client of the same localhost server the app already
+  runs — same EditState, live rendering when the window is open. MCP stays the
+  session surface (presence, typed schemas, in-band previews, agents without a
+  shell); the CLI is the throughput surface: dependent calls chain in one shell
+  invocation and a whole shoot batches in one loop, where MCP costs a model
+  turn per call. Deliberately not in 1.0 — the launch story is MCP.
 - **Healing and clone.** Wanted by every photographer, and a real gap. Note
   ADR 0012 already cut generative inpainting on quality evidence, so this means
   classical patch-based healing, not a model.
