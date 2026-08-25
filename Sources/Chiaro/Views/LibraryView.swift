@@ -846,28 +846,29 @@ struct LibraryView: View {
     @State private var sources: [SourceItem] = []
 
     /// Card/recent discovery stats folders (slow over USB) — computed once, not per frame.
+    /// Off the main thread: reading recent folders and scanning camera cards is
+    /// file I/O, and a first access to a protected location (Desktop, a card)
+    /// pops a TCC prompt that, on the main thread, froze the window before it
+    /// even painted. Gathered on a background queue, the window comes up first.
     private func refreshSources() {
-        var items: [SourceItem] = Library.cameraCardFolders().map { folder in
-            let volume = (folder.lastPathComponent == "DCIM" ? folder : folder.deletingLastPathComponent())
-                .deletingLastPathComponent().lastPathComponent
-            return SourceItem(
-                id: folder, icon: "camera.fill", tint: Theme.amber,
-                title: volume.isEmpty ? "Camera card" : volume,
-                subtitle: cardSummary(folder)
-            )
+        Task {
+            let gathered = await Offload.on(Offload.render) { () -> ([(URL, String, String)], [(URL, String, String)]) in
+                let cards = Library.cameraCardFolders().map { folder -> (URL, String, String) in
+                    let volume = (folder.lastPathComponent == "DCIM" ? folder : folder.deletingLastPathComponent())
+                        .deletingLastPathComponent().lastPathComponent
+                    return (folder, volume.isEmpty ? "Camera card" : volume, Self.cardSummary(folder))
+                }
+                let recents = Library.recentFolders().filter { recent in
+                    !cards.contains { recent == $0.0 || recent.path.hasPrefix($0.0.path + "/") }
+                }.map { folder -> (URL, String, String) in
+                    (folder, folder.lastPathComponent,
+                     folder.deletingLastPathComponent().path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                }
+                return (cards, recents)
+            }
+            sources = gathered.0.map { SourceItem(id: $0.0, icon: "camera.fill", tint: Theme.amber, title: $0.1, subtitle: $0.2) }
+                + gathered.1.map { SourceItem(id: $0.0, icon: "folder", tint: Theme.ink2, title: $0.1, subtitle: $0.2) }
         }
-        // A folder inside a card is already represented by the card's own row.
-        items += Library.recentFolders().filter { recent in
-            !items.contains { $0.id == recent || recent.path.hasPrefix($0.id.path + "/") }
-        }.map { folder in
-            SourceItem(
-                id: folder, icon: "folder", tint: Theme.ink2,
-                title: folder.lastPathComponent,
-                subtitle: folder.deletingLastPathComponent().path
-                    .replacingOccurrences(of: NSHomeDirectory(), with: "~")
-            )
-        }
-        sources = items
     }
 
     // MARK: - Home (start screen): flat rows on the translucent ground
@@ -880,9 +881,15 @@ struct LibraryView: View {
     @State private var recentEdits: [RecentEditItem] = []
 
     private func refreshRecentEdits() {
-        let urls = Array(Library.recentEdits().prefix(7))
-        recentEdits = urls.map { RecentEditItem(id: $0, image: nil, editDate: Sidecar.lastEditDate(for: $0)) }
-        for (position, url) in urls.enumerated() {
+      Task {
+        // Same reason as refreshSources: recentEdits()/lastEditDate() are file
+        // I/O, so gather off-main before the window can be blocked by a prompt.
+        let seed = await Offload.on(Offload.render) { () -> [(URL, Date?)] in
+            Array(Library.recentEdits().prefix(7)).map { ($0, Sidecar.lastEditDate(for: $0)) }
+        }
+        recentEdits = seed.map { RecentEditItem(id: $0.0, image: nil, editDate: $0.1) }
+        for (position, pair) in seed.enumerated() {
+            let url = pair.0
             let isHero = position == 0
             Task {
                 // "Recent edits" must show the edits — a file thumbnail would
@@ -932,6 +939,7 @@ struct LibraryView: View {
                 }
             }
         }
+      }
     }
 
     private func openRecentEdit(_ url: URL) {
@@ -1161,7 +1169,7 @@ struct LibraryView: View {
         .clickCursor()
     }
 
-    private func cardSummary(_ folder: URL) -> String {
+    nonisolated private static func cardSummary(_ folder: URL) -> String {
         let fm = FileManager.default
         // The row may point at DCIM itself when a card holds several subfolders.
         var files = (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []

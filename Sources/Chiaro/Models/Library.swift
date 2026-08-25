@@ -128,13 +128,13 @@ final class Library {
         UserDefaults.standard.set(Array(paths.prefix(12)), forKey: "recentEdits")
     }
 
-    static func recentEdits() -> [URL] {
+    nonisolated static func recentEdits() -> [URL] {
         (UserDefaults.standard.stringArray(forKey: "recentEdits") ?? [])
             .map(URL.init(fileURLWithPath:))
             .filter { FileManager.default.fileExists(atPath: $0.path) }
     }
 
-    static func recentFolders() -> [URL] {
+    nonisolated static func recentFolders() -> [URL] {
         (UserDefaults.standard.stringArray(forKey: "recentFolders") ?? [])
             .map(URL.init(fileURLWithPath:))
             .filter { FileManager.default.fileExists(atPath: $0.path) }
@@ -143,7 +143,7 @@ final class Library {
     /// DCIM folders on mounted camera cards — the "camera just plugged in" path.
     /// One entry per card, not per DCIM subfolder — a card with 100MSDCF and
     /// 101MSDCF is still one card, and folder chips break it out once opened.
-    static func cameraCardFolders() -> [URL] {
+    nonisolated static func cameraCardFolders() -> [URL] {
         let fm = FileManager.default
         let volumes = (try? fm.contentsOfDirectory(at: URL(fileURLWithPath: "/Volumes"), includingPropertiesForKeys: nil)) ?? []
         return volumes.compactMap { volume -> URL? in
