@@ -1,7 +1,7 @@
 # ADR 0008: MCP-native; no embedded agent
 
 **Status:** Accepted · 2026-08-18 · Supersedes the embedded-chat plan in ADR 0003 ·
-Tool list amended 2026-08-23
+Tool list amended 2026-08-23 · Origin check hardened 2026-08-25
 
 ## Context
 
@@ -37,5 +37,12 @@ Chiaro ships an MCP server, on whenever the app runs:
   defense), and the surface holds no secrets — it reads and edits the photos of
   the user already at the keyboard. Authentication becomes required work only if
   the server ever binds beyond loopback.
+  - **Amended 2026-08-25:** the Origin check was a substring match
+    (`origin.contains("127.0.0.1")`), so an attacker-registered host such as
+    `127.0.0.1.evil.com` passed it — a webpage the user merely visited could
+    drive tools from the browser. Now the Origin's host is parsed and compared
+    for exact equality against 127.0.0.1/::1/localhost. Request bodies are also
+    capped (16 MB) and inspection-render dimensions clamped (4096 px) so no
+    single call can exhaust memory. Verified live: a spoofed Origin returns 403.
 - Sidecar writes triggered by background (MCP) edits must not rely on nappable timers
   (see ADR 0007).
