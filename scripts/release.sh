@@ -97,7 +97,10 @@ fi
 
 if command -v gh >/dev/null 2>&1; then
   git push && git push --tags
-  gh release create "v$V" "dist/Chiaro-$V.dmg" --title "Chiaro $V" --notes-file "$NOTES"
+  # Two copies of the DMG: the versioned one Homebrew pins by sha256, and an
+  # unversioned one so the site can link releases/latest/download/Chiaro.dmg.
+  cp "dist/Chiaro-$V.dmg" dist/Chiaro.dmg
+  gh release create "v$V" "dist/Chiaro-$V.dmg" dist/Chiaro.dmg --title "Chiaro $V" --notes-file "$NOTES"
   echo "Release v$V published."
   rm -f "$NOTES"
 else
