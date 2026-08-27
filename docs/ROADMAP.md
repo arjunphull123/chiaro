@@ -90,6 +90,17 @@ Ranked, with the reasoning that put them here rather than in a tier.
   shell); the CLI is the throughput surface: dependent calls chain in one shell
   invocation and a whole shoot batches in one loop, where MCP costs a model
   turn per call. Deliberately not in 1.0 — the launch story is MCP.
+- **Thumbnail virtualization.** `Library.loadThumbnails()` decodes every
+  photo up front and `Photo.thumbnail` never evicts, so a 5,000-photo folder
+  holds several GB. The justified gallery needs every aspect ratio before it
+  can lay out rows, which is why plain laziness does not work. Plan: read
+  aspect from image metadata only (`CGImageSourceCopyProperties`, no decode,
+  milliseconds per file) so layout is complete immediately; decode thumbnails
+  only for rows near the viewport, with a bounded LRU (~500 resident) and
+  eviction. Held out of 1.0 because it touches the gallery the product shots
+  depend on, days before launch, and needs testing on a real large folder.
+- **Accessibility.** VoiceOver labels on icon-only buttons (cheap, an hour)
+  and a decision on Dynamic Type against the fixed-width rail and toolbar.
 - **Healing and clone.** Wanted by every photographer, and a real gap. Note
   ADR 0012 already cut generative inpainting on quality evidence, so this means
   classical patch-based healing, not a model.

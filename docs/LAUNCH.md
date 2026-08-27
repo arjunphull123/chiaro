@@ -52,6 +52,11 @@ download buttons, the badges, the README, the app's Help menu, the site footer:
 gh repo edit arjunphull123/chiaro --visibility public --accept-visibility-change-consequences
 ```
 
+Before flipping it, audit the profile the post will send people to: `gh repo
+list arjunphull123 --visibility public` and make private anything that does not
+need to be public; check the profile README, avatar, bio, and pinned repos
+(pin chiaro). The post links the repo, and the repo links the profile.
+
 ## Verify before posting
 
 - [ ] `https://chiaro.arjunphull.dev` resolves and loads

@@ -74,3 +74,16 @@ photo's colors).
 - Every preview update renders live via Metal — no "processing" spinners on sliders.
 - Animations: fast and few (view transitions ~150ms ease-out); no bounces.
 - No modal dialogs for editing operations; export is a sheet.
+
+## Known limitations at 1.0
+
+Scope lines drawn on purpose for the launch, not omissions. Both are in the
+roadmap backlog.
+
+- **Accessibility.** Icon-only buttons carry no VoiceOver labels and the UI
+  does not follow Dynamic Type. The layout is fixed-width by design (the rail,
+  the toolbar), so Dynamic Type is a layout decision, not a flag.
+- **Very large folders.** Every photo's 480px thumbnail is decoded when a
+  folder opens and stays resident for the session, about 0.7 MB each. A
+  folder of a few hundred photos is the designed case; several thousand works
+  but takes minutes to fill in and holds gigabytes.
