@@ -1,0 +1,45 @@
+# Proves the tree builds in release configuration, the test suite passes,
+# and scripts/bundle.sh can produce a self-contained Chiaro.app (its own
+# guard fails the job if a /Users/ path leaks into the binary). The zipped
+# app is uploaded so a build can be grabbed without re-running everything.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain versions
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: Build (release)
+        run: swift build -c release
+
+      - name: Test
+        run: swift test
+
+      - name: Bundle
+        run: scripts/bundle.sh
+
+      - name: Zip app
+        run: ditto -c -k --keepParent dist/Chiaro.app dist/Chiaro.app.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Chiaro.app
+          path: dist/Chiaro.app.zip
+          retention-days: 14

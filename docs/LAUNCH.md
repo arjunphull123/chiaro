@@ -28,8 +28,10 @@ the DNS all exist. Run top to bottom.
 `scripts/release.sh <version>` stamps the version, builds the stripped app,
 archives the unstripped binary (for later crash symbolication), builds the DMG,
 fills the cask's sha256, measures the real DMG size and stamps it into the
-site's copy, commits, tags, pushes, and creates the GitHub release. Run it while
-the repo is still private — a release lives fine in a private repo:
+site's copy, commits, tags, pushes, and creates the GitHub release. It takes
+the release notes from CHANGELOG.md's `## [Unreleased]` section, so that
+section must be current before running it. Run it while the repo is still
+private — a release lives fine in a private repo:
 
 ```
 scripts/release.sh 1.0.0
