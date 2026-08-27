@@ -42,12 +42,14 @@ photo's colors).
   photos stay put, your agent), Open folder as the one primary with Connect
   your agent beside it; the agent strip hides here. The one place the hero
   line appears inside the app, because whoever clicked the card should land
-  on it. **Returning** is a 1080×640 page: wordmark where the library
-  header keeps it, greeting, the last edit as a fixed 580×300 hero with 3:2
-  recent tiles (cropped around Vision's salient region, never sized by the
-  photo's aspect, cached on disk so the screen is complete at launch), sources
-  and Open folder on the right, a footer. Neither form is resizable; the
-  window becomes resizable again once a folder opens. No artwork behind the
+  on it. **Returning** is a 900-wide page whose height follows its content:
+  wordmark where the library header keeps it, greeting, the last edit as a
+  fixed 450×300 (3:2) hero on the left; on the right, up to three more
+  recents as 3:2 tiles, up to three sources (cards first), Open folder; a
+  footer. Cards are cropped around Vision's salient region, never sized by
+  the photo's aspect, and cached on disk so the screen is complete at launch.
+  A reverted photo leaves the recents. Neither form is resizable; the window
+  becomes resizable again once a folder opens. No artwork behind the
   returning page: the user's own photo is its hero.
 - Components live in DesignSystem.swift: AmberButtonStyle (one primary per surface),
   OutlineButtonStyle (secondary), GlassButtonStyle/GlassIconButtonStyle (canvas

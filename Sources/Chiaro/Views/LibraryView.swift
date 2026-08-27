@@ -48,12 +48,16 @@ struct LibraryView: View {
     /// resizing (as Xcode's welcome window does: stretching it would only add
     /// void); the size a library session had is put back when one opens.
     /// First run is a card, not the editor's form factor.
-    private static let startScreenSize = CGSize(width: 1080, height: 640)
+    /// The returning page's height follows its content (sources and recents
+    /// vary), measured by the page itself; 580 is the estimate used until the
+    /// first measurement lands.
+    private static let startScreenWidth: CGFloat = 900
     private static let welcomeSize = CGSize(width: 640, height: 580)
     /// Before the recents are read, UserDefaults alone (no file access, so no
     /// permission prompt) says which of the two the window is about to show.
     private var startSize: CGSize {
-        (startScreenLoaded ? isFirstRun : !Library.hasRecentEdits) ? Self.welcomeSize : Self.startScreenSize
+        if startScreenLoaded ? isFirstRun : !Library.hasRecentEdits { return Self.welcomeSize }
+        return CGSize(width: Self.startScreenWidth, height: pageHeight > 0 ? pageHeight : 552)
     }
     @State private var librarySize: CGSize?
 
@@ -77,6 +81,10 @@ struct LibraryView: View {
         .onChange(of: isFirstRun) { _, first in
             library.welcome = first
             if library.folderURL == nil { hugStartScreen() }
+        }
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { viewHeight = $0 }
+        .onChange(of: pageHeight) { _, _ in
+            if library.folderURL == nil, !isFirstRun { hugStartScreen() }
         }
     }
 
@@ -131,11 +139,14 @@ struct LibraryView: View {
             }
             return
         }
-        if window.frame.height > Self.startScreenSize.height + 40 { librarySize = window.frame.size }
+        if window.frame.height > 660 { librarySize = window.frame.size } // only a library is that tall
         // Coming back from a library, the window still carries the library's
         // 700pt minimum until SwiftUI's next pass; a frame set now is clamped
         // to it. One turn later the start screen's minimum is in force.
-        let size = startSize
+        var size = startSize
+        // The page height excludes the title bar; the difference between the
+        // window and this view is exactly that chrome.
+        if !isFirstRun, viewHeight > 0 { size.height += window.frame.height - viewHeight }
         DispatchQueue.main.async {
             setWindowSize(window, size)
             window.styleMask.remove(.resizable)
@@ -961,8 +972,9 @@ struct LibraryView: View {
         // a newer sidecar, renders again.
         let memory = Self.recentRenders
         let seed = await Offload.on(Offload.render) { () -> [(URL, Date?, RecentCardStore.Card?)] in
-            Array(Library.recentEdits().prefix(7)).map { url in
-                let date = Sidecar.lastEditDate(for: url)
+            // A reverted photo has no sidecar and is no longer a recent edit.
+            Array(Library.recentEdits().prefix(7)).compactMap { url -> (URL, Date?, RecentCardStore.Card?)? in
+                guard let date = Sidecar.lastEditDate(for: url) else { return nil }
                 if let hit = memory[url], hit.editDate == date {
                     return (url, date, RecentCardStore.Card(image: hit.image, focus: hit.focus))
                 }
@@ -1096,13 +1108,20 @@ struct LibraryView: View {
 
             page
         }
-        .frame(maxWidth: 1080)
+        // The page is content-sized (no flexible spacers), so its height is
+        // what the window should be; hugStartScreen adds the title bar.
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { pageHeight = $0 }
+        .frame(maxWidth: 900)
         .frame(maxWidth: .infinity)
     }
+    @State private var pageHeight: CGFloat = 0
+    @State private var viewHeight: CGFloat = 0
 
     private var page: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Spacer(minLength: 20)
+            // The greeting sits under the wordmark; whatever the window has
+            // spare falls above the footer, where air reads as air.
+            Color.clear.frame(height: 14)
 
             // A title, not a billboard: at this margin a display size fought
             // the hero and looked stranded.
@@ -1117,32 +1136,19 @@ struct LibraryView: View {
                 // flash the wrong layout.
                 Color.clear.frame(height: 220)
             } else {
-                // Two jobs, two columns: continue on the left, start on the
-                // right — the window is wide, not tall.
+                // One thing on the left, the photo you were working on;
+                // everything else on the right: the other recents, sources,
+                // Open folder.
                 HStack(alignment: .top, spacing: 36) {
-                        VStack(alignment: .leading, spacing: 11) {
-                            if let hero = recentEdits.first {
-                                heroCard(hero)
-                            }
-                            if recentEdits.count > 1 {
-                                Text("Recent edits")
-                                    .font(Theme.ui(12, .medium))
-                                    .foregroundStyle(Theme.ink2)
-                                    .padding(.top, 8)
-                                HStack(spacing: 8) {
-                                    ForEach(recentEdits.dropFirst().prefix(5)) { item in
-                                        recentThumb(item)
-                                    }
-                                }
-                            }
-                        }
-                        .frame(width: 580, alignment: .leading)
-                        startColumn
-                            .frame(width: 432)
+                    if let hero = recentEdits.first {
+                        heroCard(hero)
+                    }
+                    startColumn
+                        .frame(width: 382, alignment: .leading)
                 }
             }
 
-            Spacer(minLength: 20)
+            Color.clear.frame(height: 24)
 
             startFooter
         }
@@ -1183,14 +1189,27 @@ struct LibraryView: View {
             .clickCursor()
     }
 
+    /// Sized never to scroll: one row of three recents beyond the hero, at
+    /// most three sources (cards first), then the button.
     private var startColumn: some View {
         VStack(alignment: .leading, spacing: 11) {
+            if recentEdits.count > 1 {
+                Text("Recent edits")
+                    .font(Theme.ui(12, .medium))
+                    .foregroundStyle(Theme.ink2)
+                HStack(spacing: 8) {
+                    ForEach(recentEdits.dropFirst().prefix(3)) { item in
+                        recentThumb(item)
+                    }
+                }
+                .padding(.bottom, 12)
+            }
             if !sources.isEmpty {
                 Text("Sources")
                     .font(Theme.ui(12, .medium))
                     .foregroundStyle(Theme.ink2)
                 VStack(spacing: 6) {
-                    ForEach(sources) { source in
+                    ForEach(sources.prefix(3)) { source in
                         sourceRow(
                             icon: source.icon, tint: source.tint,
                             title: source.title, subtitle: source.subtitle, url: source.id
@@ -1328,7 +1347,7 @@ struct LibraryView: View {
     /// the last edit, and a card that followed the photo's aspect collapsed
     /// the whole column on a portrait. The click opens the real photo.
     private func heroCard(_ item: RecentEditItem) -> some View {
-        let width: CGFloat = 580
+        let width: CGFloat = 450 // 3:2, the shape a camera makes
         let height: CGFloat = 300
         return Button {
             openRecentEdit(item.id)
@@ -1374,12 +1393,12 @@ struct LibraryView: View {
         } label: {
             Group {
                 if let cg = item.image {
-                    focusFilled(cg, focus: item.focus, size: CGSize(width: 100, height: 66), label: item.id.lastPathComponent)
+                    focusFilled(cg, focus: item.focus, size: CGSize(width: 122, height: 81), label: item.id.lastPathComponent)
                 } else {
                     Theme.panel
                 }
             }
-            .frame(width: 100, height: 66) // five 3:2 tiles fill the hero's width
+            .frame(width: 122, height: 81) // three 3:2 tiles fill the right column
             .clipShape(RoundedRectangle(cornerRadius: 7))
         }
         .buttonStyle(.plain)

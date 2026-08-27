@@ -87,9 +87,11 @@ struct ChiaroApp: App {
                 .preferredColorScheme(.dark)
                 // The start screen hugs its content (LibraryView resizes the
                 // window to it); the editor needs the taller floor.
-                // First run is a 640×580 welcome card (LibraryView.welcomeSize).
+                // Start screens are fixed-size windows hugged by LibraryView (the
+                // welcome card, or the 900-wide returning page at its content's
+                // height); the editor's 1080 floor applies once a folder opens.
                 .frame(
-                    minWidth: library.folderURL == nil && !Library.hasRecentEdits ? 640 : 1080,
+                    minWidth: library.folderURL == nil ? (Library.hasRecentEdits ? 900 : 640) : 1080,
                     minHeight: library.folderURL == nil ? 480 : 700
                 )
         }
