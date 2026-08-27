@@ -41,34 +41,15 @@ Built around a Sony RX100 IV workflow, but camera-agnostic: anything on
 
 Requires **macOS 26** or later on Apple silicon.
 
-### Download
-
-Download the DMG from [the latest release](https://github.com/arjunphull123/chiaro/releases/latest),
-open it, and drag Chiaro into Applications.
-
-**The first launch needs one extra step.** Chiaro is signed ad hoc rather than
-with a paid Apple Developer certificate, so macOS quarantines it and refuses to
-open it the first time. To let it through:
-
-1. Double-click Chiaro. macOS says "Apple could not verify Chiaro.app is free
-   of malware". Click **Done** (not Move to Trash).
-2. Open **System Settings → Privacy & Security**, scroll to the Security
-   section, and click **Open Anyway** next to the message about Chiaro.
-3. Confirm with **Open**.
-
-You only do this once. (Control-clicking the app no longer bypasses this on
-modern macOS; the Privacy & Security route is the one that works.)
-
-Prefer the terminal? `xattr -d com.apple.quarantine /Applications/Chiaro.app`
-does the same thing in one line.
-
 ### Homebrew
 
 ```
-brew install --cask arjunphull123/tap/chiaro
+brew install --cask --no-quarantine arjunphull123/tap/chiaro
 ```
 
-Add `--no-quarantine` to skip the Privacy & Security step above.
+Chiaro is signed ad hoc rather than with a paid Apple Developer certificate,
+so a copy macOS sees as downloaded needs an extra step before it will open.
+`--no-quarantine` means there is nothing extra to do here.
 
 ### Build it yourself
 
@@ -78,6 +59,28 @@ cd chiaro
 swift build && .build/debug/Chiaro   # debug build, straight to the app
 scripts/bundle.sh                     # release build → dist/Chiaro.app
 ```
+
+An app you built is not quarantined either, so drag `dist/Chiaro.app` into
+Applications and it opens.
+
+### Download the DMG
+
+Download it from [the latest release](https://github.com/arjunphull123/chiaro/releases/latest),
+open it, and drag Chiaro into Applications. This is the one route where macOS
+stops the first launch:
+
+1. Double-click Chiaro. macOS says "Apple could not verify Chiaro.app is free
+   of malware". Click **Done** (not Move to Trash).
+2. Open **System Settings → Privacy & Security**, scroll to the Security
+   section, and click **Open Anyway** next to the message about Chiaro.
+3. Confirm with **Open**.
+
+Do it right after the dialog: the button is offered for about an hour. You only
+do this once. (Control-clicking the app no longer bypasses this on modern
+macOS; the Privacy & Security route is the one that works.)
+
+Prefer the terminal? `xattr -d com.apple.quarantine /Applications/Chiaro.app`
+does the same thing in one line.
 
 ## Editing
 
