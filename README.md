@@ -210,5 +210,10 @@ Font License 1.1 and keep their own terms; see
 [`Sources/Chiaro/Resources/Fonts/OFL.txt`](Sources/Chiaro/Resources/Fonts/OFL.txt).
 Agent brand marks come from [Simple Icons](https://simpleicons.org) (CC0).
 
-Issues are welcome. This is a personal project rather than a staffed one, so
-pull requests may sit a while.
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for building, testing, and where things
+live, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for how we treat each other.
+Security issues go through [SECURITY.md](SECURITY.md) instead of a public
+issue. This is a personal project rather than a staffed one, so pull requests
+may sit a while.

@@ -1,0 +1,31 @@
+name: Feature request
+description: Suggest something Chiaro should do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What you want to do
+      description: The thing you're trying to accomplish, not just the control you think is missing.
+    validations:
+      required: true
+  - type: textarea
+    id: why-not
+    attributes:
+      label: Why the current app can't
+      description: What you tried, and where it fell short.
+  - type: dropdown
+    id: mcp
+    attributes:
+      label: Should this be reachable by an agent over MCP too?
+      description: Chiaro's MCP tools are part of the product, not an afterthought.
+      options:
+        - "Yes"
+        - "No"
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: other
+    attributes:
+      label: Anything else

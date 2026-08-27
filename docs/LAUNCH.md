@@ -81,3 +81,5 @@ need to be public; check the profile README, avatar, bio, and pinned repos
 - Topics: `macos`, `swiftui`, `raw-photo-editor`, `mcp`, `photography`
 - Social preview image: `docs/screenshots/card.jpg`
 - Branch protection on `main` (post-launch work lands on feature branches)
+- Enable private vulnerability reporting (Settings → Security → Code security)
+  so SECURITY.md's reporting path works
