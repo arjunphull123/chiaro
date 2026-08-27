@@ -101,6 +101,13 @@ Ranked, with the reasoning that put them here rather than in a tier.
   depend on, days before launch, and needs testing on a real large folder.
 - **Accessibility.** VoiceOver labels on icon-only buttons (cheap, an hour)
   and a decision on Dynamic Type against the fixed-width rail and toolbar.
+- **Dataless cloud files.** Detect placeholders (`isUbiquitousItem` plus the
+  download status keys, and the File Provider equivalents for OneDrive and
+  Dropbox) and offer to download rather than showing an empty tile.
+- **A per-folder "keep edits on this Mac" switch.** The cloud-folder rule in
+  ADR 0007 is a path heuristic; a NAS mounted as a plain folder or a synced
+  folder outside `~/Library/CloudStorage` needs a way to opt in. This is the
+  first real candidate for a Settings window, which 1.0 does not have.
 - **Healing and clone.** Wanted by every photographer, and a real gap. Note
   ADR 0012 already cut generative inpainting on quality evidence, so this means
   classical patch-based healing, not a model.

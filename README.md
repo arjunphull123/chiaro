@@ -23,8 +23,9 @@ Named for the light half of *chiaroscuro*: composing with light against dark.
 
 - **Real RAW.** Apple's RAW engine decodes your files; every adjustment renders
   on the GPU through Core Image, live, at full resolution.
-- **Non-destructive.** Edits live in small sidecar files next to your photos.
-  Your originals are never written to, ever.
+- **Non-destructive.** Edits live in small sidecar files next to your photos,
+  or on your Mac for camera cards and shared cloud folders. Your originals are
+  never written to, ever.
 - **On-device intelligence.** Subject and person segmentation, monocular depth,
   and face-aware auto-tone all run locally. Nothing is uploaded.
 - **Agent-native.** Chiaro serves MCP on localhost whenever it's running, so
@@ -178,6 +179,12 @@ Next to each photo, as a small sidecar file. Editing a photo never writes to the
 RAW; deleting the sidecar restores the original exactly. Sidecars carry your
 adjustments, the starred flag, and any named versions you save, and they decode
 tolerantly: a sidecar from an older Chiaro opens fine in a newer one.
+
+For camera cards, read-only or network volumes, and cloud-synced folders
+(OneDrive, Dropbox, Google Drive, iCloud Drive), the sidecar lives in
+`~/Library/Application Support/Chiaro/Sidecars/` instead, so nothing is written
+to the card and nothing syncs into a folder other people share. Those edits stay
+on this Mac.
 
 ## How it's built
 

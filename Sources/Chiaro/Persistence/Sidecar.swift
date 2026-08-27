@@ -42,8 +42,19 @@ enum Sidecar {
         private enum LegacyKeys: String, CodingKey { case rating }
     }
 
+    /// Where this photo's edits are read from, in order. Beside the photo
+    /// first for a plain local folder (the store is the write fallback). For a
+    /// card or a cloud-synced folder, the store only: a beside-file there was
+    /// not written by this Mac, and reading it would show someone else's
+    /// edits that a revert could never clear.
+    private static func locations(_ photoURL: URL) -> [URL] {
+        keepsEditsOnMac(photoURL)
+            ? [storeURL(photoURL)]
+            : [besideURL(photoURL), storeURL(photoURL)]
+    }
+
     static func read(for photoURL: URL) -> Document? {
-        for location in [besideURL(photoURL), storeURL(photoURL)] {
+        for location in locations(photoURL) {
             if let data = try? Data(contentsOf: location),
                let doc = try? JSONDecoder().decode(Document.self, from: data) {
                 return doc
@@ -60,8 +71,11 @@ enum Sidecar {
         let doc = Document(edit: photo.edit, starred: photo.starred, versions: photo.snapshots)
         let target = preferredURL(photo.url)
         if doc.edit.isNeutral && !doc.starred && doc.versions.isEmpty {
-            try? FileManager.default.removeItem(at: besideURL(photo.url))
+            // A revert removes what Chiaro wrote. A beside-file in a folder
+            // whose edits live on this Mac (a card, a shared cloud folder) is
+            // not ours to delete.
             try? FileManager.default.removeItem(at: storeURL(photo.url))
+            if !keepsEditsOnMac(photo.url) { try? FileManager.default.removeItem(at: besideURL(photo.url)) }
             return true
         }
         let encoder = JSONEncoder()
@@ -82,7 +96,7 @@ enum Sidecar {
     }
 
     static func lastEditDate(for photoURL: URL) -> Date? {
-        for location in [besideURL(photoURL), storeURL(photoURL)] {
+        for location in locations(photoURL) {
             if let date = try? location.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate {
                 return date
             }
@@ -93,7 +107,27 @@ enum Sidecar {
     // MARK: - Locations
 
     private static func preferredURL(_ photoURL: URL) -> URL {
-        isRemovable(photoURL) ? storeURL(photoURL) : besideURL(photoURL)
+        keepsEditsOnMac(photoURL) ? storeURL(photoURL) : besideURL(photoURL)
+    }
+
+    /// Edits stay in Application Support rather than beside the photo when the
+    /// folder is not a plain local one: a card or other removable, ejectable
+    /// or read-only volume (ADR 0007), or a cloud-synced folder, where a
+    /// beside-file would sync to everyone the folder is shared with.
+    static func keepsEditsOnMac(_ url: URL) -> Bool {
+        isRemovable(url) || isCloudSynced(url)
+    }
+
+    /// macOS mounts third-party providers (OneDrive, Dropbox, Google Drive,
+    /// Box) under ~/Library/CloudStorage and iCloud Drive under Mobile
+    /// Documents. Deliberately not `isUbiquitousItem`: with Desktop &
+    /// Documents syncing on, that would move every ~/Documents edit off the
+    /// photo for a folder nobody else sees.
+    private static func isCloudSynced(_ url: URL) -> Bool {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let path = url.standardizedFileURL.path
+        return path.hasPrefix(home + "/Library/CloudStorage/")
+            || path.hasPrefix(home + "/Library/Mobile Documents/")
     }
 
     private static func besideURL(_ photoURL: URL) -> URL {

@@ -92,3 +92,8 @@ roadmap backlog.
   folder opens and stays resident for the session, about 0.7 MB each. A
   folder of a few hundred photos is the designed case; several thousand works
   but takes minutes to fill in and holds gigabytes.
+- **Cloud folders that are not downloaded.** iCloud Drive and OneDrive can
+  keep files as placeholders until opened. Chiaro reads what is on disk; a
+  photo that has not been downloaded shows no thumbnail until it is. Edits in
+  cloud-synced folders stay on this Mac (ADR 0007) and are keyed to the
+  folder's path, so renaming the folder leaves them behind.
