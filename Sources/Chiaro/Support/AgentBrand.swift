@@ -40,8 +40,7 @@ struct AgentBrand {
 
     private static func image(named name: String) -> NSImage? {
         if let cached = imageCache[name] { return cached }
-        guard let url = Bundle.module.url(forResource: name, withExtension: "svg", subdirectory: "AgentIcons"),
-              let image = NSImage(contentsOf: url) else { return nil }
+        guard let image = NSImage(contentsOf: Resources.url("AgentIcons/\(name).svg")) else { return nil }
         imageCache[name] = image
         return image
     }

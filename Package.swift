@@ -8,7 +8,10 @@ let package = Package(
         .executableTarget(
             name: "Chiaro",
             path: "Sources/Chiaro",
-            resources: [.copy("Resources/Fonts"), .copy("Resources/AgentIcons"), .copy("Resources/AppIcon.png"), .copy("Resources/Skill")],
+            // Resources are located by Support/Resources.swift, not declared
+            // here: SwiftPM's Bundle.module accessor embeds the absolute build
+            // path and falls back to it inside a signed .app.
+            exclude: ["Resources"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         )
     ]

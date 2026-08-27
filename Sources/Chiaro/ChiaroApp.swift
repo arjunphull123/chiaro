@@ -43,8 +43,7 @@ struct ChiaroApp: App {
         }
         // Dock icon for unbundled dev runs; the .app bundle carries the .icns.
         DispatchQueue.main.async {
-            if let url = Bundle.module.url(forResource: "AppIcon", withExtension: "png"),
-               let image = NSImage(contentsOf: url) {
+            if let image = NSImage(contentsOf: Resources.url("AppIcon.png")) {
                 NSApp.applicationIconImage = image
             }
         }

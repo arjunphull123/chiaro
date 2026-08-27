@@ -366,7 +366,8 @@ final class MCPServer {
     /// The bundled copy is the same files as `.claude/skills/chiaro` (which
     /// symlinks into Resources/Skill).
     static let editingSkill: String = {
-        guard let dir = Bundle.module.url(forResource: "Skill", withExtension: nil) else {
+        let dir = Resources.url("Skill")
+        guard FileManager.default.fileExists(atPath: dir.appendingPathComponent("SKILL.md").path) else {
             return "The bundled editing skill is missing from this build."
         }
         func read(_ path: String) -> String {

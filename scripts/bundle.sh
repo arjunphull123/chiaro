@@ -14,7 +14,18 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 cp .build/release/Chiaro "$APP/Contents/MacOS/Chiaro"
-cp -R .build/release/Chiaro_Chiaro.bundle "$APP/Contents/Resources/"
+# Fonts/, AgentIcons/, Skill/, AppIcon.png straight into Contents/Resources,
+# where Support/Resources.swift looks for them.
+cp -R Sources/Chiaro/Resources/. "$APP/Contents/Resources/"
+
+# The .app must be self-contained: no path into this checkout may survive in
+# the binary. SwiftPM's Bundle.module accessor did exactly that (and crashed
+# on any Mac without the checkout), so refuse to ship a binary that names one.
+if strings "$APP/Contents/MacOS/Chiaro" | grep -q "^/Users/"; then
+  echo "Binary references a /Users/ path; the app would not be self-contained" >&2
+  strings "$APP/Contents/MacOS/Chiaro" | grep "^/Users/" >&2
+  exit 1
+fi
 
 # Strip the symbol table and debug metadata before signing: swift build -c
 # release leaves them in __LINKEDIT, which grows with the codebase and had the

@@ -22,9 +22,9 @@ enum Theme {
     static func registerFonts() {
         guard !fontsRegistered else { return }
         fontsRegistered = true
-        guard let dir = Bundle.module.url(forResource: "Fonts", withExtension: nil),
-              let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
-        else { return }
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: Resources.url("Fonts"), includingPropertiesForKeys: nil
+        ) else { return }
         for url in files where ["otf", "ttf"].contains(url.pathExtension) {
             CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
         }
