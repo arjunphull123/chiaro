@@ -180,6 +180,15 @@ struct LibraryView: View {
         frame.origin.x += (frame.width - size.width) / 2 // keep the window centred on itself
         frame.origin.y += frame.height - size.height // and its top edge where it is
         frame.size = size
+        // AppKit only keeps the title bar on screen; a window growing near the
+        // right or bottom edge would otherwise run off it. Keep the whole frame
+        // inside the screen's visible area (menu bar and Dock excluded).
+        if let visible = (window.screen ?? NSScreen.main)?.visibleFrame {
+            frame.size.width = min(frame.width, visible.width)
+            frame.size.height = min(frame.height, visible.height)
+            frame.origin.x = min(max(frame.origin.x, visible.minX), visible.maxX - frame.width)
+            frame.origin.y = min(max(frame.origin.y, visible.minY), visible.maxY - frame.height)
+        }
         window.setFrame(frame, display: true, animate: true)
     }
 
