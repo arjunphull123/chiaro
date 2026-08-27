@@ -15,9 +15,9 @@ the DNS all exist. Run top to bottom.
    arjunphull123/tap/chiaro` fails until this exists and holds the cask:
    ```
    gh repo create arjunphull123/homebrew-tap --public
-   git clone git@github.com:arjunphull123/homebrew-tap Casks && \
-     mkdir -p Casks/Casks && cp docs/homebrew/chiaro.rb Casks/Casks/
-   # the cask's sha256 is filled in by release.sh below; push after that
+   gh repo clone arjunphull123/homebrew-tap ../homebrew-tap && mkdir -p ../homebrew-tap/Casks
+   # cloned beside this repo, not inside it, so it never dirties the tree
+   # release.sh checks; the cask's sha256 is filled in by release.sh below
    ```
 3. **DNS**: point `chiaro.arjunphull.dev` at Netlify (CNAME/ALIAS) and attach the
    custom domain in the Netlify site. `og:image` and every share preview use this
@@ -41,7 +41,8 @@ Then push the tap with the now-filled cask, and rebuild + deploy the site so the
 stamped size (currently ~4.8 MB, not the old 3.6 MB) goes live:
 
 ```
-git -C Casks add -A && git -C Casks commit -m "chiaro 1.0.0" && git -C Casks push
+cp docs/homebrew/chiaro.rb ../homebrew-tap/Casks/chiaro.rb
+git -C ../homebrew-tap add -A && git -C ../homebrew-tap commit -m "Chiaro 1.0.0" && git -C ../homebrew-tap push
 cd ../chiaro-site && npm run build && <deploy>   # Netlify picks up the push
 ```
 
