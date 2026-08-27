@@ -52,7 +52,7 @@ brew install --cask arjunphull123/tap/chiaro
 ```
 
 Puts Chiaro.app in Applications. The first launch needs the approval described
-under [Download the DMG](#download-the-dmg) below, once for each version.
+under [First launch](#first-launch) below, once for each version.
 
 ### Build it yourself
 
@@ -72,17 +72,22 @@ are enough. Updating later is `git pull` and the same two lines.
 ### Download the DMG
 
 Download it from [the latest release](https://github.com/arjunphull123/chiaro/releases/latest),
-open it, and drag Chiaro into Applications. Then, as with Homebrew:
+open it, and drag Chiaro into Applications.
+
+### First launch
+
+macOS stops the first launch of a copy it considers downloaded, which covers
+Homebrew and the DMG but not an app you built yourself:
 
 1. Double-click Chiaro. macOS says "Apple could not verify Chiaro.app is free
    of malware". Click **Done** (not Move to Trash).
 2. Open **System Settings → Privacy & Security**, scroll to the Security
    section, and click **Open Anyway** next to the message about Chiaro.
-3. Confirm with **Open**.
+3. Confirm with **Open**, and authenticate if asked.
 
 Do it right after the dialog: the button is offered for about an hour. You only
-do this once. (Control-clicking the app no longer bypasses this on modern
-macOS; the Privacy & Security route is the one that works.)
+do this once for each version. (Control-clicking the app no longer bypasses
+this on modern macOS; the Privacy & Security route is the one that works.)
 
 Prefer the terminal? `xattr -d com.apple.quarantine /Applications/Chiaro.app`
 does the same thing in one line.
