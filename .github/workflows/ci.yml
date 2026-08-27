@@ -30,7 +30,7 @@ jobs:
         run: swift build -c release
 
       - name: Test
-        run: swift test
+        run: scripts/test.sh
 
       - name: Bundle
         run: scripts/bundle.sh

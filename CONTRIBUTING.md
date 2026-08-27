@@ -27,12 +27,16 @@ scripts/bundle.sh && rm -rf /Applications/Chiaro.app && cp -R dist/Chiaro.app /A
 ## Running the tests
 
 ```
-swift test
+scripts/test.sh
 ```
 
+That is `swift test` with a full Xcode install. With Command Line Tools alone,
+SwiftPM does not find Testing.framework, and the script supplies its paths.
+
 The `ChiaroTests` target is the unit suite over Chiaro's pure logic: `EditState`
-serialization, sidecar read/write, the MCP server's Origin check, and library
-enumeration. It doesn't cover rendering or UI; verify those by running the app
+serialization, sidecar read/write and placement, the MCP server's Origin check,
+library enumeration, presets, the update check's version compare, the recent-card
+cache, and a render smoke test. It doesn't cover rendering or UI; verify those by running the app
 itself with the dev harness above.
 
 ## Where things live
