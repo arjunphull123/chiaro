@@ -11,6 +11,7 @@
   <img src="https://img.shields.io/badge/license-GPL--3.0-E8A33D" alt="License: GPL-3.0" />
   <img src="https://img.shields.io/badge/macOS_26+-Apple_silicon-1A1A1C" alt="Platform: macOS 26 and later, Apple silicon" />
   <img src="https://img.shields.io/github/v/release/arjunphull123/chiaro?color=E8A33D" alt="Latest release" />
+  <img src="https://img.shields.io/github/actions/workflow/status/arjunphull123/chiaro/ci.yml?branch=main&label=CI" alt="CI status" />
 </p>
 
 Chiaro is a native macOS RAW photo editor. Dark, glassy, fast. Full-quality RAW editing
