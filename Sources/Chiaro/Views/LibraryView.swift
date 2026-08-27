@@ -1,4 +1,5 @@
 import SwiftUI
+import Vision
 
 /// Date-grouped, justified-rows gallery: sections per capture day (like Photos),
 /// photos keep their shape within even-height rows.
@@ -43,10 +44,18 @@ struct LibraryView: View {
         64 + CGFloat(library.zoomLevel) * 190
     }
 
-    /// The start screen is a fixed composition, so the window hugs it; the
-    /// height a library session had is put back when one opens.
-    private static let startScreenHeight: CGFloat = 620
-    @State private var libraryHeight: CGFloat?
+    /// The start screen is a fixed composition, so the window hugs it and stops
+    /// resizing (as Xcode's welcome window does: stretching it would only add
+    /// void); the size a library session had is put back when one opens.
+    /// First run is a card, not the editor's form factor.
+    private static let startScreenSize = CGSize(width: 1080, height: 640)
+    private static let welcomeSize = CGSize(width: 640, height: 580)
+    /// Before the recents are read, UserDefaults alone (no file access, so no
+    /// permission prompt) says which of the two the window is about to show.
+    private var startSize: CGSize {
+        (startScreenLoaded ? isFirstRun : !Library.hasRecentEdits) ? Self.welcomeSize : Self.startScreenSize
+    }
+    @State private var librarySize: CGSize?
 
     var body: some View {
         Group {
@@ -63,6 +72,12 @@ struct LibraryView: View {
         .onChange(of: library.folderURL == nil) { _, atStart in
             if atStart { hugStartScreen() } else { restoreLibraryHeight() }
         }
+        // The recents came back different from what UserDefaults implied
+        // (paths gone, or the first edit of a session): re-hug to the layout.
+        .onChange(of: isFirstRun) { _, first in
+            library.welcome = first
+            if library.folderURL == nil { hugStartScreen() }
+        }
     }
 
     /// Shown while a folder is opening, and if it turns up empty — which for a
@@ -74,6 +89,15 @@ struct LibraryView: View {
                 Text("Reading \(library.folderURL?.lastPathComponent ?? "folder")…")
                     .font(Theme.ui(12))
                     .foregroundStyle(Theme.ink3)
+                // A scan that has run two seconds is either a big folder or a
+                // permission prompt the user hasn't noticed; the line is true
+                // for both and never shows for an ordinary folder.
+                if permissionHint {
+                    Text("macOS may ask to allow access to this folder")
+                        .font(Theme.ui(11.5))
+                        .foregroundStyle(Theme.ink3)
+                        .transition(.opacity)
+                }
             } else {
                 Text("No photos here")
                     .font(Theme.ui(14, .semibold))
@@ -90,29 +114,46 @@ struct LibraryView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task(id: library.scanning) {
+            permissionHint = false
+            guard library.scanning else { return }
+            try? await Task.sleep(for: .seconds(2))
+            if library.scanning { withAnimation(.easeOut(duration: 0.2)) { permissionHint = true } }
+        }
     }
+    @State private var permissionHint = false
 
     private func hugStartScreen(attempt: Int = 0) {
         // onAppear can run before the window is ordered in — wait for it.
-        guard let window = NSApp.windows.first(where: { $0.isVisible }) else {
+        guard let window = NSApp.windows.first(where: { $0.isVisible && $0.canBecomeMain }) else {
             if attempt < 8 {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { hugStartScreen(attempt: attempt + 1) }
             }
             return
         }
-        if window.frame.height > Self.startScreenHeight + 40 { libraryHeight = window.frame.height }
-        setWindowHeight(window, Self.startScreenHeight)
+        if window.frame.height > Self.startScreenSize.height + 40 { librarySize = window.frame.size }
+        // Coming back from a library, the window still carries the library's
+        // 700pt minimum until SwiftUI's next pass; a frame set now is clamped
+        // to it. One turn later the start screen's minimum is in force.
+        let size = startSize
+        DispatchQueue.main.async {
+            setWindowSize(window, size)
+            window.styleMask.remove(.resizable)
+        }
     }
 
     private func restoreLibraryHeight() {
-        guard let window = NSApp.windows.first(where: { $0.isVisible }) else { return }
-        setWindowHeight(window, max(libraryHeight ?? 900, 760))
+        guard let window = NSApp.windows.first(where: { $0.isVisible && $0.canBecomeMain }) else { return }
+        window.styleMask.insert(.resizable)
+        let size = librarySize ?? CGSize(width: 1080, height: 900)
+        setWindowSize(window, CGSize(width: max(size.width, 1080), height: max(size.height, 760)))
     }
 
-    private func setWindowHeight(_ window: NSWindow, _ height: CGFloat) {
+    private func setWindowSize(_ window: NSWindow, _ size: CGSize) {
         var frame = window.frame
-        frame.origin.y += frame.height - height // keep the top edge where it is
-        frame.size.height = height
+        frame.origin.x += (frame.width - size.width) / 2 // keep the window centred on itself
+        frame.origin.y += frame.height - size.height // and its top edge where it is
+        frame.size = size
         window.setFrame(frame, display: true, animate: true)
     }
 
@@ -877,76 +918,142 @@ struct LibraryView: View {
         let id: URL
         var image: CGImage?
         var editDate: Date?
+        /// Where the eye goes (normalised, top-left origin): the fixed-frame
+        /// cards crop around it instead of around the centre.
+        var focus: CGPoint?
+    }
+
+    nonisolated private static func salientCenter(of image: CGImage) -> CGPoint? {
+        let request = VNGenerateAttentionBasedSaliencyImageRequest()
+        try? VNImageRequestHandler(cgImage: image).perform([request])
+        guard let box = request.results?.first?.salientObjects?.first?.boundingBox else { return nil }
+        return CGPoint(x: box.midX, y: 1 - box.midY)
+    }
+
+    /// The photo filling a fixed frame, positioned so `focus` sits as near the
+    /// frame's centre as full coverage allows.
+    private func focusFilled(_ cg: CGImage, focus: CGPoint?, size: CGSize, label: String) -> some View {
+        let scale = max(size.width / CGFloat(cg.width), size.height / CGFloat(cg.height))
+        let drawn = CGSize(width: CGFloat(cg.width) * scale, height: CGFloat(cg.height) * scale)
+        let f = focus ?? CGPoint(x: 0.5, y: 0.5)
+        let slackX = (drawn.width - size.width) / 2, slackY = (drawn.height - size.height) / 2
+        let dx = min(max((0.5 - f.x) * drawn.width, -slackX), slackX)
+        let dy = min(max((0.5 - f.y) * drawn.height, -slackY), slackY)
+        return Image(cg, scale: 1, label: Text(label))
+            .resizable()
+            .frame(width: drawn.width, height: drawn.height)
+            .offset(x: dx, y: dy)
+            .frame(width: size.width, height: size.height)
+            .clipped()
     }
     @State private var recentEdits: [RecentEditItem] = []
+    /// Set once both refreshes have reported, so the first-run treatment can't
+    /// flash for the frame before a returning user's recents arrive.
+    @State private var startScreenLoaded = false
+    private var isFirstRun: Bool { startScreenLoaded && recentEdits.isEmpty }
 
     private func refreshRecentEdits() {
       Task {
         // Same reason as refreshSources: recentEdits()/lastEditDate() are file
         // I/O, so gather off-main before the window can be blocked by a prompt.
-        let seed = await Offload.on(Offload.render) { () -> [(URL, Date?)] in
-            Array(Library.recentEdits().prefix(7)).map { ($0, Sidecar.lastEditDate(for: $0)) }
+        // Cards rendered on an earlier visit (this session, or on disk from an
+        // earlier launch) come back at once; only an edit that changed since,
+        // a newer sidecar, renders again.
+        let memory = Self.recentRenders
+        let seed = await Offload.on(Offload.render) { () -> [(URL, Date?, RecentCardStore.Card?)] in
+            Array(Library.recentEdits().prefix(7)).map { url in
+                let date = Sidecar.lastEditDate(for: url)
+                if let hit = memory[url], hit.editDate == date {
+                    return (url, date, RecentCardStore.Card(image: hit.image, focus: hit.focus))
+                }
+                return (url, date, RecentCardStore.load(url, editDate: date))
+            }
         }
-        recentEdits = seed.map { RecentEditItem(id: $0.0, image: nil, editDate: $0.1) }
-        for (position, pair) in seed.enumerated() {
+        recentEdits = seed.map { RecentEditItem(id: $0.0, image: $0.2?.image, editDate: $0.1, focus: $0.2?.focus) }
+        for (url, date, card) in seed {
+            if let card { Self.recentRenders[url] = RecentRender(editDate: date, image: card.image, focus: card.focus) }
+        }
+        withAnimation(.easeOut(duration: 0.25)) { startScreenLoaded = true }
+        for (position, pair) in seed.enumerated() where recentEdits[position].image == nil {
             let url = pair.0
+            let editDate = pair.1
             let isHero = position == 0
             Task {
                 // "Recent edits" must show the edits — a file thumbnail would
                 // show the untouched original. Unedited thumbs stay cheap file
-                // scans. A depth-blurred edit needs the on-demand model, which
-                // is still loading when this runs at launch — wait for it a
-                // few beats before rendering without the blur.
-                func renderOnce(requireDepth: Bool) async -> CGImage?? {
-                    await Offload.on(Offload.render) { () -> CGImage?? in
-                        let edit = Sidecar.read(for: url)?.edit ?? .neutral
-                        guard isHero || !edit.isNeutral else {
-                            return Library.scan(url, maxPixelSize: 480).image
-                        }
-                        guard let base = RawEngine.shared.preview(for: url, decode: RawEngine.DecodeParams(edit)) else {
-                            return Library.scan(url, maxPixelSize: isHero ? 1600 : 480).image
-                        }
-                        var mask: CIImage?
-                        var depth: CIImage?
-                        if edit.blurF > 0 {
-                            if edit.blurMode == .depth {
-                                depth = DepthEngine.shared.normalizedMap(for: url, image: base)
-                                if depth == nil && requireDepth { return CGImage??.none } // model not up yet
-                            } else {
-                                mask = PortraitEngine.shared.mask(
-                                    for: url, image: base,
-                                    kind: edit.blurMode == .person ? .person : .subject
-                                )
-                            }
-                        }
-                        var rendered = RenderPipeline.render(base: base, edit: edit, personMask: mask, depthMap: depth, isRAW: Photo.isRAW(url))
-                        if !isHero {
-                            let s = 480 / max(rendered.extent.width, rendered.extent.height)
-                            if s < 1 { rendered = rendered.transformed(by: CGAffineTransform(scaleX: s, y: s)) }
-                        }
-                        return RawEngine.shared.context.createCGImage(rendered, from: rendered.extent)
+                // scans.
+                let edit = await Offload.on(Offload.render) { Sidecar.read(for: url)?.edit ?? .neutral }
+                // A depth-blurred edit needs the on-demand model. At launch it
+                // is still loading (`preparing`): wait for it. Missing or
+                // failed is not worth waiting for; render without the blur and
+                // don't cache, so the next visit tries again.
+                let needsDepth = edit.blurF > 0 && edit.blurMode == .depth
+                var waited = 0
+                while needsDepth, waited < 60, Self.modelLoading {
+                    try? await Task.sleep(for: .milliseconds(500))
+                    waited += 1
+                }
+                let complete = !needsDepth || DepthModelStore.shared.availability == .ready
+                let rendered = await Offload.on(Offload.render) { () -> CGImage? in
+                    guard isHero || !edit.isNeutral else {
+                        return Library.scan(url, maxPixelSize: 480).image
                     }
+                    guard let base = RawEngine.shared.preview(for: url, decode: RawEngine.DecodeParams(edit)) else {
+                        return Library.scan(url, maxPixelSize: isHero ? 1600 : 480).image
+                    }
+                    var mask: CIImage?
+                    var depth: CIImage?
+                    if edit.blurF > 0 {
+                        if edit.blurMode == .depth {
+                            // Scaled to the base, as the editor does; the raw
+                            // model-size map crops to a corner and blurs nothing.
+                            depth = DepthEngine.shared.depthMap(for: url, image: base)
+                        } else {
+                            mask = PortraitEngine.shared.mask(
+                                for: url, image: base,
+                                kind: edit.blurMode == .person ? .person : .subject
+                            )
+                        }
+                    }
+                    var out = RenderPipeline.render(base: base, edit: edit, personMask: mask, depthMap: depth, isRAW: Photo.isRAW(url))
+                    if !isHero {
+                        let s = 480 / max(out.extent.width, out.extent.height)
+                        if s < 1 { out = out.transformed(by: CGAffineTransform(scaleX: s, y: s)) }
+                    }
+                    return RawEngine.shared.context.createCGImage(out, from: out.extent)
                 }
-                var image: CGImage??
-                for _ in 0..<5 {
-                    image = await renderOnce(requireDepth: true)
-                    if image != nil { break }
-                    try? await Task.sleep(for: .seconds(1))
-                }
-                if image == nil { image = await renderOnce(requireDepth: false) }
+                let focus = await Offload.on(Offload.render) { rendered.flatMap(Self.salientCenter) }
                 if let index = recentEdits.firstIndex(where: { $0.id == url }) {
-                    recentEdits[index].image = image ?? nil
+                    recentEdits[index].image = rendered
+                    recentEdits[index].focus = focus
+                }
+                if complete, let rendered {
+                    Self.recentRenders[url] = RecentRender(editDate: editDate, image: rendered, focus: focus)
+                    await Offload.on(Offload.render) {
+                        RecentCardStore.save(.init(image: rendered, focus: focus), for: url, editDate: editDate)
+                    }
                 }
             }
         }
       }
     }
 
-    private func openRecentEdit(_ url: URL) {
-        library.open(url.deletingLastPathComponent())
-        if let photo = library.photos.first(where: { $0.url == url }) {
-            library.edit(photo)
+    private struct RecentRender {
+        let editDate: Date?
+        let image: CGImage
+        let focus: CGPoint?
+    }
+    @MainActor private static var recentRenders: [URL: RecentRender] = [:]
+
+    private static var modelLoading: Bool {
+        switch DepthModelStore.shared.availability {
+        case .preparing, .downloading: true
+        default: false
         }
+    }
+
+    private func openRecentEdit(_ url: URL) {
+        library.open(url.deletingLastPathComponent(), thenEdit: url)
     }
 
     /// "Good evening, Arjun" — hour-aware, first name from the macOS account.
@@ -962,33 +1069,57 @@ struct LibraryView: View {
     }
 
     private var emptyStateContent: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Spacer(minLength: 10)
+        Group {
+            if isFirstRun { welcomeCard } else { returningPage }
+        }
+    }
 
-            VStack(alignment: .leading, spacing: 11) {
-                // Same scale as the library header: the wordmark is a signature
-                // here, not a headline — that job belongs to the greeting.
-                HStack(spacing: 6) {
-                    AppMark(size: 18)
-                    Text("Chiaro")
-                        .font(Theme.serif(19, .semibold))
-                        .kerning(-0.5)
-                        .foregroundStyle(Theme.ink)
-                        .fixedSize()
-                }
-                Text(greeting)
-                    .font(Theme.headline(31))
-                    .kerning(31 * -0.032)
+    /// A composed page, not a floating cluster: the wordmark exactly where the
+    /// library header keeps it, so it holds still when a folder opens; the
+    /// greeting as the headline sitting on its columns; the group floating
+    /// between the wordmark and a footer that gives the window a bottom edge.
+    private var returningPage: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Same metrics as `header`: 16/11 padding, and the 30pt row its
+            // buttons give it, so the wordmark holds still when a folder opens.
+            HStack(spacing: 6) {
+                AppMark(size: 18)
+                Text("Chiaro")
+                    .font(Theme.serif(19, .semibold))
+                    .kerning(-0.5)
                     .foregroundStyle(Theme.ink)
-                    .padding(.top, 14)
-                    .padding(.bottom, 4)
-                if recentEdits.isEmpty {
-                    // Nothing to resume: one column, sources are the show.
-                    startColumn
-                } else {
-                    // Two jobs, two columns: continue on the left, start on
-                    // the right — the window is wide, not tall.
-                    HStack(alignment: .top, spacing: 36) {
+                    .fixedSize()
+            }
+            .frame(height: 30)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 11)
+
+            page
+        }
+        .frame(maxWidth: 1080)
+        .frame(maxWidth: .infinity)
+    }
+
+    private var page: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Spacer(minLength: 20)
+
+            // A title, not a billboard: at this margin a display size fought
+            // the hero and looked stranded.
+            Text(greeting)
+                .font(Theme.headline(28))
+                .kerning(28 * -0.032)
+                .foregroundStyle(Theme.ink)
+                .padding(.bottom, 24)
+
+            if !startScreenLoaded {
+                // Recents are still being read: hold the space rather than
+                // flash the wrong layout.
+                Color.clear.frame(height: 220)
+            } else {
+                // Two jobs, two columns: continue on the left, start on the
+                // right — the window is wide, not tall.
+                HStack(alignment: .top, spacing: 36) {
                         VStack(alignment: .leading, spacing: 11) {
                             if let hero = recentEdits.first {
                                 heroCard(hero)
@@ -1007,51 +1138,166 @@ struct LibraryView: View {
                         }
                         .frame(width: 580, alignment: .leading)
                         startColumn
-                            .frame(width: 380)
-                    }
+                            .frame(width: 432)
                 }
             }
-            .frame(width: 996)
-            .frame(maxWidth: .infinity, alignment: .center)
 
-            Spacer(minLength: 10)
-            Spacer(minLength: 10)
+            Spacer(minLength: 20)
+
+            startFooter
         }
-        .padding(.horizontal, 28)
-        .frame(maxWidth: .infinity)
+        // One left edge for the mark, the greeting, the hero and the footer,
+        // the same 16 the library's tiles start at; the right column then ends
+        // on the agent strip's edge.
+        .padding(.horizontal, 16)
+        .padding(.bottom, 14)
+    }
+
+    /// The window's bottom edge: the build, and the two places a new user may
+    /// need to go. Quiet, so the columns stay the subject.
+    private var startFooter: some View {
+        HStack(spacing: 0) {
+            if let version = Updater.currentVersion {
+                Text("Version ")
+                    .font(Theme.ui(11))
+                    .foregroundStyle(Theme.ink3)
+                Text(version)
+                    .font(Theme.mono(10.5))
+                    .foregroundStyle(Theme.ink3)
+            }
+            Spacer()
+            footerLink("Chiaro on GitHub", Updater.repoPage)
+            Text("·")
+                .font(Theme.ui(11))
+                .foregroundStyle(Theme.ink3)
+                .padding(.horizontal, 8)
+            footerLink("Report a bug", Updater.repoPage.appending(path: "issues/new/choose"))
+        }
+    }
+
+    private func footerLink(_ title: String, _ url: URL) -> some View {
+        Button(title) { NSWorkspace.shared.open(url) }
+            .buttonStyle(.plain)
+            .font(Theme.ui(11))
+            .foregroundStyle(Theme.ink3)
+            .clickCursor()
     }
 
     private var startColumn: some View {
         VStack(alignment: .leading, spacing: 11) {
-            Text("Sources")
-                .font(Theme.ui(12, .medium))
-                .foregroundStyle(Theme.ink2)
-            VStack(spacing: 6) {
-                ForEach(sources) { source in
-                    sourceRow(
-                        icon: source.icon, tint: source.tint,
-                        title: source.title, subtitle: source.subtitle, url: source.id
-                    )
+            if !sources.isEmpty {
+                Text("Sources")
+                    .font(Theme.ui(12, .medium))
+                    .foregroundStyle(Theme.ink2)
+                VStack(spacing: 6) {
+                    ForEach(sources) { source in
+                        sourceRow(
+                            icon: source.icon, tint: source.tint,
+                            title: source.title, subtitle: source.subtitle, url: source.id
+                        )
+                    }
                 }
             }
             HStack(spacing: 12) {
-                // Primary only when there's nothing to resume.
-                if recentEdits.isEmpty {
-                    Button("Open folder…") { openFolder() }
-                        .buttonStyle(AmberButtonStyle())
-                        .clickCursor()
-                        .keyboardShortcut("o")
-                } else {
-                    Button("Open folder…") { openFolder() }
-                        .buttonStyle(OutlineButtonStyle())
-                        .clickCursor()
-                        .keyboardShortcut("o")
-                }
+                // The hero is this screen's primary; opening a folder is the
+                // secondary way in.
+                Button("Open folder…") { openFolder() }
+                    .buttonStyle(OutlineButtonStyle())
+                    .clickCursor()
+                    .keyboardShortcut("o")
                 Text("Or drop a folder anywhere")
                     .font(Theme.ui(11))
                     .foregroundStyle(Theme.ink3)
             }
             .padding(.top, 8)
+        }
+    }
+
+    // MARK: - First run: the window is the welcome card
+
+    /// Seen once, or after the recents are gone: the share card as a window.
+    /// Apple's welcome-panel anatomy (signature, headline, three rows, one
+    /// primary) in a card-sized window on the Caravaggio, rather than the
+    /// editor's form factor. The greeting and footer belong to the returning
+    /// screen; RootView paints the painting and hides the agent strip.
+    private var welcomeCard: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 16)
+            HStack(spacing: 7) {
+                AppMark(size: 22)
+                Text("Chiaro")
+                    .font(Theme.serif(23, .semibold))
+                    .kerning(-0.6)
+                    .foregroundStyle(Theme.ink)
+                    .fixedSize()
+            }
+            // The site's hero line, set as the card sets it: two balanced lines.
+            Text("The RAW editor\nyour agent can drive")
+                .font(Theme.headline(34))
+                .kerning(34 * -0.032)
+                .lineSpacing(-2)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(Theme.ink)
+                .padding(.top, 22)
+            VStack(alignment: .leading, spacing: 18) {
+                welcomeRow("slider.horizontal.3", "RAW editing that renders live",
+                           "Apple's RAW engine on the GPU. Every slider shows the real result as you move it.")
+                welcomeRow("folder", "Your photos stay where they are",
+                           "Open a folder or a card; nothing is imported. Edits live in their own files and originals are never changed.")
+                welcomeRow("sparkles", "Your agent can drive",
+                           "Claude Code or any MCP client sees what you see and edits with you, live in this window.")
+            }
+            .frame(width: 440)
+            .padding(.top, 34)
+            if !sources.isEmpty {
+                VStack(spacing: 6) {
+                    ForEach(sources) { source in
+                        sourceRow(
+                            icon: source.icon, tint: source.tint,
+                            title: source.title, subtitle: source.subtitle, url: source.id
+                        )
+                    }
+                }
+                .frame(width: 440)
+                .padding(.top, 24)
+            }
+            HStack(spacing: 12) {
+                Button("Open folder…") { openFolder() }
+                    .buttonStyle(AmberButtonStyle(large: true))
+                    .clickCursor()
+                    .keyboardShortcut("o")
+                Button("Connect your agent") { showConnect = true }
+                    .buttonStyle(OutlineButtonStyle(large: true))
+                    .clickCursor()
+                    .popover(isPresented: $showConnect, arrowEdge: .bottom) { AgentConnectPopover() }
+            }
+            .padding(.top, 34)
+            Text("Or drop a folder anywhere")
+                .font(Theme.ui(11.5))
+                .foregroundStyle(.white.opacity(0.5))
+                .padding(.top, 14)
+            Spacer(minLength: 16)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    @State private var showConnect = false
+
+    private func welcomeRow(_ symbol: String, _ title: String, _ body: String) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: symbol)
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(Theme.amber)
+                .frame(width: 32, height: 30)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(Theme.ui(13.5, .semibold))
+                    .foregroundStyle(Theme.ink)
+                Text(body)
+                    .font(Theme.ui(12.5))
+                    .foregroundStyle(.white.opacity(0.72)) // on the painting, ink2 sinks
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -1078,20 +1324,19 @@ struct LibraryView: View {
         }
     }
 
+    /// A fixed frame, filled and cropped: the card's job is one big picture of
+    /// the last edit, and a card that followed the photo's aspect collapsed
+    /// the whole column on a portrait. The click opens the real photo.
     private func heroCard(_ item: RecentEditItem) -> some View {
-        // True to the photo's aspect, capped by height.
-        let aspect = item.image.map { Double($0.width) / Double($0.height) } ?? 1.5
+        let width: CGFloat = 580
         let height: CGFloat = 300
-        let width = min(580, height * CGFloat(aspect))
         return Button {
             openRecentEdit(item.id)
         } label: {
             ZStack(alignment: .bottomLeading) {
                 Group {
                     if let cg = item.image {
-                        Image(cg, scale: 1, label: Text(item.id.lastPathComponent))
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
+                        focusFilled(cg, focus: item.focus, size: CGSize(width: width, height: height), label: item.id.lastPathComponent)
                     } else {
                         Theme.panel
                     }
@@ -1117,6 +1362,7 @@ struct LibraryView: View {
 
     private func heroSubtitle(_ item: RecentEditItem) -> String {
         guard let date = item.editDate else { return "Continue editing" }
+        if Date().timeIntervalSince(date) < 60 { return "Edited just now" }
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full
         return "Edited \(formatter.localizedString(for: date, relativeTo: Date()))"
@@ -1128,14 +1374,12 @@ struct LibraryView: View {
         } label: {
             Group {
                 if let cg = item.image {
-                    Image(cg, scale: 1, label: Text(item.id.lastPathComponent))
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
+                    focusFilled(cg, focus: item.focus, size: CGSize(width: 100, height: 66), label: item.id.lastPathComponent)
                 } else {
                     Theme.panel
                 }
             }
-            .frame(width: 97, height: 68)
+            .frame(width: 100, height: 66) // five 3:2 tiles fill the hero's width
             .clipShape(RoundedRectangle(cornerRadius: 7))
         }
         .buttonStyle(.plain)

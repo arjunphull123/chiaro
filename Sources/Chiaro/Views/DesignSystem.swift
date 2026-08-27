@@ -13,13 +13,16 @@ private struct EnabledDim: ViewModifier {
 
 /// Primary action: amber-tinted Liquid Glass, near-black text. One per surface.
 struct AmberButtonStyle: ButtonStyle {
+    /// The welcome card's size; everything else is the toolbar size.
+    var large = false
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(Theme.ui(12, .semibold))
+            .font(Theme.ui(large ? 14 : 12, .semibold))
             .foregroundStyle(Color(hex: 0x131315))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
-            .chiaroGlass(cornerRadius: 8, tint: Theme.amber)
+            .padding(.horizontal, large ? 22 : 14)
+            .padding(.vertical, large ? 11 : 7)
+            .chiaroGlass(cornerRadius: large ? 10 : 8, tint: Theme.amber)
             .opacity(configuration.isPressed ? 0.75 : 1)
             .modifier(EnabledDim())
     }
@@ -27,13 +30,15 @@ struct AmberButtonStyle: ButtonStyle {
 
 /// Secondary action: plain glass, ink text.
 struct OutlineButtonStyle: ButtonStyle {
+    var large = false
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(Theme.ui(12, .medium))
-            .foregroundStyle(Theme.ink2)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
-            .chiaroGlass(cornerRadius: 8)
+            .font(Theme.ui(large ? 14 : 12, .medium))
+            .foregroundStyle(large ? Theme.ink : Theme.ink2)
+            .padding(.horizontal, large ? 22 : 14)
+            .padding(.vertical, large ? 11 : 7)
+            .chiaroGlass(cornerRadius: large ? 10 : 8)
             .opacity(configuration.isPressed ? 0.7 : 1)
             .modifier(EnabledDim())
     }

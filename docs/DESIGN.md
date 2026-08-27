@@ -35,6 +35,20 @@ photo's colors).
   text; **Geist Mono** sparingly, for data only (values, ƒ-stops, EXIF, counts)
   with tabular figures. All bundled (SIL OFL 1.1).
 - UI copy is sentence case with no trailing periods on labels and tips.
+- The start screen has two forms. **First run** (no recent edits) is the
+  share card as a 640×580 window: Caravaggio's *The Calling of Saint Matthew*
+  (public domain) darkened to the card's recipe and run under the title bar,
+  the lockup, the site's hero line in Archivo, three rows (RAW editing, your
+  photos stay put, your agent), Open folder as the one primary with Connect
+  your agent beside it; the agent strip hides here. The one place the hero
+  line appears inside the app, because whoever clicked the card should land
+  on it. **Returning** is a 1080×640 page: wordmark where the library
+  header keeps it, greeting, the last edit as a fixed 580×300 hero with 3:2
+  recent tiles (cropped around Vision's salient region, never sized by the
+  photo's aspect, cached on disk so the screen is complete at launch), sources
+  and Open folder on the right, a footer. Neither form is resizable; the
+  window becomes resizable again once a folder opens. No artwork behind the
+  returning page: the user's own photo is its hero.
 - Components live in DesignSystem.swift: AmberButtonStyle (one primary per surface),
   OutlineButtonStyle (secondary), GlassButtonStyle/GlassIconButtonStyle (canvas
   overlays), Chip (selectable pills).

@@ -87,7 +87,11 @@ struct ChiaroApp: App {
                 .preferredColorScheme(.dark)
                 // The start screen hugs its content (LibraryView resizes the
                 // window to it); the editor needs the taller floor.
-                .frame(minWidth: 1080, minHeight: library.photos.isEmpty ? 560 : 700)
+                // First run is a 640×580 welcome card (LibraryView.welcomeSize).
+                .frame(
+                    minWidth: library.folderURL == nil && !Library.hasRecentEdits ? 640 : 1080,
+                    minHeight: library.folderURL == nil ? 480 : 700
+                )
         }
         .windowStyle(.hiddenTitleBar)
         // Without this the window resizes past the content's minWidth and the
@@ -160,6 +164,16 @@ struct RootView: View {
             // graphite ground, and the rail's frost samples it (ADR 0006).
             WindowBackdrop().ignoresSafeArea()
             Theme.ground.opacity(0.6).ignoresSafeArea()
+            // The welcome card sits on the share card's Caravaggio, run under
+            // the title bar so the window is one surface. First run only.
+            if library.welcome, library.folderURL == nil,
+               let painting = NSImage(contentsOf: Resources.url("Welcome.jpg")) {
+                Image(nsImage: painting)
+                    .resizable()
+                    .scaledToFill()
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+            }
             // Library stays mounted beneath the editor so its scroll position
             // survives a round trip into a photo and back.
             // Wrapped so the library's own intrinsic width cannot raise the
@@ -188,8 +202,11 @@ struct RootView: View {
             ZStack {
                 HStack {
                     Spacer()
-                    AgentStatusStrip(library: library)
-                        .padding(.trailing, 16)
+                    // The welcome card carries its own Connect button.
+                    if !(library.welcome && library.folderURL == nil) {
+                        AgentStatusStrip(library: library)
+                            .padding(.trailing, 16)
+                    }
                 }
             }
             // No fixed height: the card grows downward when it carries the

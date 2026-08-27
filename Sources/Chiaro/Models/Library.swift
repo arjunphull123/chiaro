@@ -128,6 +128,12 @@ final class Library {
         UserDefaults.standard.set(Array(paths.prefix(12)), forKey: "recentEdits")
     }
 
+    /// UserDefaults only, no file access: safe on the main thread at launch,
+    /// where `recentEdits()`'s existence checks could raise a permission prompt.
+    nonisolated static var hasRecentEdits: Bool {
+        !(UserDefaults.standard.stringArray(forKey: "recentEdits") ?? []).isEmpty
+    }
+
     nonisolated static func recentEdits() -> [URL] {
         (UserDefaults.standard.stringArray(forKey: "recentEdits") ?? [])
             .map(URL.init(fileURLWithPath:))
@@ -170,7 +176,14 @@ final class Library {
     /// state rather than the start screen for the gap between click and photos.
     var scanning = false
 
-    func open(_ url: URL) {
+    /// The start screen is showing the first-run welcome card (LibraryView
+    /// decides; RootView paints the window for it).
+    var welcome = false
+
+    /// `thenEdit`: a photo to open in the editor once the scan lands (the
+    /// start screen's recent edits). The scan is asynchronous, so a caller
+    /// cannot look the photo up right after calling this.
+    func open(_ url: URL, thenEdit photoURL: URL? = nil) {
         folderURL = url
         editing = nil
         selection = []
@@ -192,6 +205,9 @@ final class Library {
                 self.photos = found.map(Photo.init)
                 self.scanning = false
                 self.loadThumbnails()
+                if let photoURL, let photo = self.photos.first(where: { $0.url == photoURL }) {
+                    self.edit(photo)
+                }
             }
         }
     }

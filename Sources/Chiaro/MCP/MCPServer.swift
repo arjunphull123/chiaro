@@ -601,6 +601,7 @@ final class MCPServer {
                 p.edit = preset.applied(to: p.edit)
                 target = library.edit(p) // shows the photo in the editor, without activating the app
                 Sidecar.write(for: target)
+                if target.hasEdits { Library.noteRecentEdit(target.url) }
             }
             library.noteAgentActivity(intent: "applying \(presetName)", photo: target.url)
             return try text(["applied": presetName, "name": target.name])
@@ -742,6 +743,9 @@ final class MCPServer {
                 guard Sidecar.write(for: target) else {
                     throw ToolError("couldn't save to \(target.name) — the folder may be read-only or the disk full")
                 }
+                // The editor's own save path records recents; this one must too,
+                // or an agent's edits never reach the start screen.
+                if target.hasEdits { Library.noteRecentEdit(target.url) }
             }
             library.noteAgentActivity(intent: args["intent"] as? String, photo: target.url)
             return try text(["applied": true, "name": target.name])

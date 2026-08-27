@@ -137,10 +137,6 @@ struct AgentStatusStrip: View {
 /// this prompt is just the address and etiquette. Once an agent has done
 /// something, it becomes that agent's activity log instead.
 struct AgentConnectPopover: View {
-    @State private var copied = false
-
-    private var prompt: String { MCPServer.onboardingPrompt }
-
     var body: some View {
         Group {
             // Connected is what flips the popover, not activity: a connected
@@ -188,7 +184,7 @@ struct AgentConnectPopover: View {
             }
             .frame(maxHeight: .infinity)
             DisclosureGroup("Connection prompt") {
-                promptBlock(scrollHeight: 80).padding(.top, 6)
+                ConnectionPrompt(scrollHeight: 80).padding(.top, 6)
             }
             .font(Theme.ui(11, .medium))
             .tint(Theme.ink3)
@@ -206,12 +202,21 @@ struct AgentConnectPopover: View {
                 .font(Theme.ui(11.5))
                 .foregroundStyle(Theme.ink2)
                 .fixedSize(horizontal: false, vertical: true)
-            promptBlock(scrollHeight: 128)
+            ConnectionPrompt(scrollHeight: 128)
         }
         .padding(18)
     }
+}
 
-    private func promptBlock(scrollHeight: CGFloat) -> some View {
+/// The MCP onboarding prompt with a copy button: the popover's setup state
+/// and the start screen's first-run agent column show the same block.
+struct ConnectionPrompt: View {
+    var scrollHeight: CGFloat
+    @State private var copied = false
+
+    private var prompt: String { MCPServer.onboardingPrompt }
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             ScrollView {
                 Text(prompt)
@@ -219,8 +224,17 @@ struct AgentConnectPopover: View {
                     .foregroundStyle(Theme.ink2)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, 14)
             }
             .frame(height: scrollHeight)
+            // The prompt runs past the box; fade the last line out rather than
+            // cut it mid-word.
+            .mask(
+                LinearGradient(
+                    stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.82), .init(color: .clear, location: 1)],
+                    startPoint: .top, endPoint: .bottom
+                )
+            )
             .padding(10)
             .background(RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.3)))
             Button {
