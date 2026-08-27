@@ -70,7 +70,7 @@ final class Updater {
 
     func openReleases() { NSWorkspace.shared.open(Self.releasesPage) }
 
-    static let brewUpgrade = "brew upgrade --cask --no-quarantine chiaro"
+    static let brewUpgrade = "brew upgrade --cask chiaro"
 
     /// A Homebrew cask leaves a Caskroom entry beside the app it installed, so
     /// the update instruction can name the route this copy actually came from.
@@ -94,8 +94,8 @@ final class Updater {
 
                 \(Self.brewUpgrade)
 
-                The --no-quarantine keeps macOS from blocking the new copy. The \
-                DMG on the release page works too.
+                macOS treats every version as a new app, so it asks once more \
+                for permission to open this one.
                 """,
                 confirm: "Copy command",
                 action: { Self.copyBrewUpgrade() }
@@ -104,8 +104,9 @@ final class Updater {
             Self.alert(
                 version,
                 """
-                \(onVersion). Download the new DMG, and drag it over the copy in \
-                Applications.
+                \(onVersion). Download the new DMG and drag it over the copy in \
+                Applications, or if you built from source, git pull and run \
+                scripts/bundle.sh again.
 
                 Installed with Homebrew instead? Run \(Self.brewUpgrade)
                 """,

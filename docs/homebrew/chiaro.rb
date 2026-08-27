@@ -14,22 +14,18 @@ cask "chiaro" do
 
   app "Chiaro.app"
 
-  # Chiaro is ad-hoc signed, not notarized (ADR 0014). Without --no-quarantine,
-  # first launch needs System Settings > Privacy & Security > Open Anyway.
+  # Chiaro is ad-hoc signed, not notarized (ADR 0014), so Gatekeeper stops the
+  # first launch. Homebrew removed --no-quarantine in 5.0, and it inherits the
+  # user's approval across an upgrade only when the signing identity is
+  # unchanged; an ad-hoc identity is the build's cdhash, so every version asks
+  # again. Building from source avoids all of it.
   caveats do
     <<~EOS
-      Chiaro is not notarized. If you installed without --no-quarantine, the
-      first launch is blocked: open System Settings > Privacy & Security and
-      click "Open Anyway" next to Chiaro.
+      Chiaro is not notarized, so macOS stops the first launch: open System
+      Settings > Privacy & Security and click "Open Anyway" next to Chiaro.
+      The button is offered for about an hour after the first try.
 
-      Upgrades need the flag again, since it applies to the command and not to
-      the installed app:
-
-        brew upgrade --cask --no-quarantine chiaro
-
-      To stop passing it, put this in your shell profile:
-
-        export HOMEBREW_CASK_OPTS="--no-quarantine"
+      Every version is a new app to macOS, so an update asks once more.
     EOS
   end
 

@@ -120,7 +120,7 @@ if [[ -d $TAP/.git ]]; then
   else
     git -C "$TAP" commit -q -m "Chiaro $V"
     git -C "$TAP" push -q
-    echo "Tap pushed: brew upgrade --cask --no-quarantine chiaro now finds $V."
+    echo "Tap pushed: brew upgrade --cask chiaro now finds $V."
   fi
 else
   cat <<NOTE

@@ -41,33 +41,38 @@ Built around a Sony RX100 IV workflow, but camera-agnostic: anything on
 
 Requires **macOS 26** or later on Apple silicon.
 
+Chiaro is signed by its author rather than through Apple's paid developer
+program. macOS stops the first launch of any copy it considers downloaded, so
+the routes below differ only in whether that applies.
+
 ### Homebrew
 
 ```
-brew install --cask --no-quarantine arjunphull123/tap/chiaro
+brew install --cask arjunphull123/tap/chiaro
 ```
 
-Chiaro is signed ad hoc rather than with a paid Apple Developer certificate,
-so a copy macOS sees as downloaded needs an extra step before it will open.
-`--no-quarantine` means there is nothing extra to do here.
+Puts Chiaro.app in Applications. The first launch needs the approval described
+under [Download the DMG](#download-the-dmg) below, once for each version.
 
 ### Build it yourself
+
+Nothing you compile is treated as downloaded, so this route never meets
+Gatekeeper:
 
 ```
 git clone https://github.com/arjunphull123/chiaro.git
 cd chiaro
-swift build && .build/debug/Chiaro   # debug build, straight to the app
-scripts/bundle.sh                     # release build → dist/Chiaro.app
+scripts/bundle.sh                    # about 3 minutes, gives dist/Chiaro.app
+cp -R dist/Chiaro.app /Applications
 ```
 
-An app you built is not quarantined either, so drag `dist/Chiaro.app` into
-Applications and it opens.
+There are no third-party dependencies to fetch; the Xcode Command Line Tools
+are enough. Updating later is `git pull` and the same two lines.
 
 ### Download the DMG
 
 Download it from [the latest release](https://github.com/arjunphull123/chiaro/releases/latest),
-open it, and drag Chiaro into Applications. This is the one route where macOS
-stops the first launch:
+open it, and drag Chiaro into Applications. Then, as with Homebrew:
 
 1. Double-click Chiaro. macOS says "Apple could not verify Chiaro.app is free
    of malware". Click **Done** (not Move to Trash).
@@ -88,17 +93,17 @@ Chiaro checks GitHub for a newer release and tells you when there is one. It
 never downloads or replaces itself (ADR 0014), so updating is yours to do:
 
 ```
-brew upgrade --cask --no-quarantine chiaro
+brew upgrade --cask chiaro
 ```
 
-The flag applies to the command rather than to the installed app, so upgrades
-need it again; `export HOMEBREW_CASK_OPTS="--no-quarantine"` in your shell
-profile settles it for good. Installed from the DMG instead? Download the new
-one and drag it over the copy in Applications.
+From the DMG, download the new one and drag it over the copy in Applications.
+From source, `git pull` and run `scripts/bundle.sh` again.
 
-Because each build is signed ad hoc, macOS treats an update as a new app and
-asks again for access to the folders you open. That goes away if Chiaro is ever
-notarized.
+Because each build is signed ad hoc, its signing identity is that build's
+hash, and macOS treats every version as a new app: the Privacy & Security
+approval is asked for again, and so is access to the folders you open.
+Homebrew would carry the approval across an upgrade for an app whose identity
+stayed the same, which is one of the things notarizing would buy.
 
 ## Editing
 
