@@ -50,8 +50,8 @@ open it, and drag Chiaro into Applications.
 with a paid Apple Developer certificate, so macOS quarantines it and refuses to
 open it the first time. To let it through:
 
-1. Double-click Chiaro. macOS says it "can't be opened because Apple cannot
-   check it for malicious software". Click **Done**.
+1. Double-click Chiaro. macOS says "Apple could not verify Chiaro.app is free
+   of malware". Click **Done** (not Move to Trash).
 2. Open **System Settings → Privacy & Security**, scroll to the Security
    section, and click **Open Anyway** next to the message about Chiaro.
 3. Confirm with **Open**.
