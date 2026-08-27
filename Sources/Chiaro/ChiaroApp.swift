@@ -8,6 +8,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Updater.checkInBackground()
     }
 
+    // Closing the window quits, as a single-window app should, unless an agent
+    // is mid-session: then the app and its MCP server stay up so the agent's
+    // work continues, and quit on their own once the agent has gone quiet
+    // (ADR 0017). "Quiet" is AgentStatus.isActive's window, checked each minute.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        MainActor.assumeIsolated {
+            guard AgentStatus.shared.isActive() else { return true }
+            headlessTimer?.invalidate()
+            headlessTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { timer in
+                MainActor.assumeIsolated {
+                    if NSApp.windows.contains(where: \.isVisible) { timer.invalidate(); return }
+                    if !AgentStatus.shared.isActive() { NSApp.terminate(nil) }
+                }
+            }
+            return false
+        }
+    }
+    private var headlessTimer: Timer?
+
+    // Dock click or `open -a` with the window closed brings it back.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        if !hasVisibleWindows {
+            NSApp.windows.first { $0.contentView != nil }?.makeKeyAndOrderFront(nil)
+        }
+        return true
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         MainActor.assumeIsolated {
             MCPServer.shared.library?.activeEditor?.saveNow()
