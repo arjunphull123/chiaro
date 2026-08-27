@@ -75,7 +75,10 @@ struct LibraryView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear { if library.folderURL == nil { hugStartScreen() } }
+        // A folder open at launch (the dev harness's --open) appears with the
+        // saved start-screen frame; it needs the library size as much as a
+        // folder opened from the start screen does.
+        .onAppear { if library.folderURL == nil { hugStartScreen() } else { restoreLibraryHeight() } }
         .onChange(of: library.folderURL == nil) { _, atStart in
             if atStart { hugStartScreen() } else { restoreLibraryHeight() }
         }
@@ -146,19 +149,27 @@ struct LibraryView: View {
         // Coming back from a library, the window still carries the library's
         // 700pt minimum until SwiftUI's next pass; a frame set now is clamped
         // to it. One turn later the start screen's minimum is in force.
-        var size = startSize
-        // The page height excludes the title bar; the difference between the
-        // window and this view is exactly that chrome.
-        if !isFirstRun, viewHeight > 0 { size.height += window.frame.height - viewHeight }
-        guard window.frame.size != size || window.styleMask.contains(.resizable) else { return }
         DispatchQueue.main.async {
+            // A folder may have opened in the meantime (the harness does this
+            // right after launch); the start size must not land on a library.
+            guard library.folderURL == nil else { return }
+            var size = startSize
+            // The page height excludes the title bar; the difference between
+            // the window and this view is exactly that chrome.
+            if !isFirstRun, viewHeight > 0 { size.height += window.frame.height - viewHeight }
+            guard window.frame.size != size || window.styleMask.contains(.resizable) else { return }
             setWindowSize(window, size)
             window.styleMask.remove(.resizable)
         }
     }
 
-    private func restoreLibraryHeight() {
-        guard let window = NSApp.windows.first(where: { $0.isVisible && $0.canBecomeMain }) else { return }
+    private func restoreLibraryHeight(attempt: Int = 0) {
+        guard let window = NSApp.windows.first(where: { $0.isVisible && $0.canBecomeMain }) else {
+            if attempt < 8 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { restoreLibraryHeight(attempt: attempt + 1) }
+            }
+            return
+        }
         window.styleMask.insert(.resizable)
         let size = librarySize ?? CGSize(width: 1080, height: 900)
         setWindowSize(window, CGSize(width: max(size.width, 1080), height: max(size.height, 760)))
