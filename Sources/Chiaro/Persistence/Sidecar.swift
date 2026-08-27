@@ -130,11 +130,11 @@ enum Sidecar {
             || path.hasPrefix(home + "/Library/Mobile Documents/")
     }
 
-    private static func besideURL(_ photoURL: URL) -> URL {
+    static func besideURL(_ photoURL: URL) -> URL {
         photoURL.deletingPathExtension().appendingPathExtension("chiaro.json")
     }
 
-    private static func storeURL(_ photoURL: URL) -> URL {
+    static func storeURL(_ photoURL: URL) -> URL {
         let digest = SHA256.hash(data: Data(photoURL.path.utf8))
             .prefix(8).map { String(format: "%02x", $0) }.joined()
         return store.appendingPathComponent("\(digest)-\(photoURL.deletingPathExtension().lastPathComponent).chiaro.json")

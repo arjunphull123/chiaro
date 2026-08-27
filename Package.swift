@@ -13,6 +13,7 @@ let package = Package(
             // path and falls back to it inside a signed .app.
             exclude: ["Resources"],
             swiftSettings: [.swiftLanguageMode(.v5)]
-        )
+        ),
+        .testTarget(name: "ChiaroTests", dependencies: ["Chiaro"], path: "Tests/ChiaroTests")
     ]
 )

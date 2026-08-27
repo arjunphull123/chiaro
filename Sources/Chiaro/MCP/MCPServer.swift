@@ -139,10 +139,15 @@ final class MCPServer {
 
     /// The Origin's host, compared exactly against the loopback names. A bare
     /// host with no scheme (rare, but some clients send it) is read directly;
-    /// "null" and anything else is rejected.
+    /// "null" and anything else is rejected. URLComponents keeps an IPv6
+    /// host's brackets (a browser's Origin for ::1 is "http://[::1]:port"),
+    /// so those are stripped before the comparison.
     static func isLoopbackOrigin(_ origin: String) -> Bool {
         let allowed: Set<String> = ["127.0.0.1", "::1", "localhost"]
-        if let host = URLComponents(string: origin)?.host { return allowed.contains(host) }
+        if var host = URLComponents(string: origin)?.host {
+            if host.hasPrefix("["), host.hasSuffix("]") { host = String(host.dropFirst().dropLast()) }
+            return allowed.contains(host)
+        }
         return allowed.contains(origin)
     }
 

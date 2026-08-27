@@ -79,7 +79,7 @@ final class Updater {
         return String(release.tagName.trimmingPrefix("v"))
     }
 
-    private static func isNewer(_ latest: String, than current: String) -> Bool {
+    static func isNewer(_ latest: String, than current: String) -> Bool {
         latest.compare(current, options: .numeric) == .orderedDescending
     }
 
