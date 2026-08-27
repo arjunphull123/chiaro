@@ -92,6 +92,11 @@ roadmap backlog.
   folder opens and stays resident for the session, about 0.7 MB each. A
   folder of a few hundred photos is the designed case; several thousand works
   but takes minutes to fill in and holds gigabytes.
+- **Folder permissions reset on update.** Releases are ad-hoc signed (ADR
+  0014), and every build has a different signature, so macOS treats each
+  update as a new app and asks for Documents, Desktop or card access again.
+  A Developer ID certificate is the only fix; until then, one prompt per
+  update per folder.
 - **Cloud folders that are not downloaded.** iCloud Drive and OneDrive can
   keep files as placeholders until opened. Chiaro reads what is on disk; a
   photo that has not been downloaded shows no thumbnail until it is. Edits in
