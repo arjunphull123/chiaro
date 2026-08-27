@@ -1241,11 +1241,11 @@ struct LibraryView: View {
                 .padding(.top, 22)
             VStack(alignment: .leading, spacing: 18) {
                 welcomeRow("slider.horizontal.3", "RAW editing that renders live",
-                           "Apple's RAW engine on the GPU. Every slider shows the real result as you move it.")
+                           "Light, color, background blur, grain, detail. Pick a control, then drag on the photo itself and watch the real result.")
                 welcomeRow("folder", "Your photos stay where they are",
-                           "Open a folder or a card; nothing is imported. Edits live in their own files and originals are never changed.")
-                welcomeRow("sparkles", "Your agent can drive",
-                           "Claude Code or any MCP client sees what you see and edits with you, live in this window.")
+                           "No import step. Plug in a card or open a folder and start editing. Originals are never changed.")
+                welcomeRow("sparkles", "Your agent can edit, too",
+                           "Connect any agent via MCP and watch it edit in front of you.")
             }
             .frame(width: 440)
             .padding(.top, 34)
