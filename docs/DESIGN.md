@@ -35,8 +35,10 @@ photo's colors).
   text; **Geist Mono** sparingly, for data only (values, ƒ-stops, EXIF, counts)
   with tabular figures. All bundled (SIL OFL 1.1).
 - UI copy is sentence case with no trailing periods on labels and tips.
-- The start screen has two forms. **First run** (no recent edits) is the
-  share card as a 640×580 window: Caravaggio's *The Calling of Saint Matthew*
+- The start screen has two forms. **First run** (no folder ever opened, no
+  edits; a mounted card does not count) is the share card as a fixed 640×560
+  window, which is also the scene's default size so a first launch opens at
+  it with no resize: Caravaggio's *The Calling of Saint Matthew*
   (public domain) darkened to the card's recipe and run under the title bar,
   the lockup, the site's hero line in Archivo, three rows (RAW editing, your
   photos stay put, your agent), Open folder as the one primary with Connect
@@ -44,7 +46,8 @@ photo's colors).
   line appears inside the app, because whoever clicked the card should land
   on it. **Returning** is a 900-wide page whose height follows its content:
   wordmark where the library header keeps it, greeting, the last edit as a
-  fixed 450×300 (3:2) hero on the left; on the right, up to three more
+  fixed 450×300 (3:2) hero on the left (a "No recent edits" placeholder in
+  its frame until there is one); on the right, up to three more
   recents as 3:2 tiles, up to three sources (cards first), Open folder; a
   footer. Cards are cropped around Vision's salient region, never sized by
   the photo's aspect, and cached on disk so the screen is complete at launch.

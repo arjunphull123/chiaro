@@ -52,11 +52,14 @@ struct LibraryView: View {
     /// vary), measured by the page itself; 580 is the estimate used until the
     /// first measurement lands.
     private static let startScreenWidth: CGFloat = 900
-    private static let welcomeSize = CGSize(width: 640, height: 580)
+    /// The welcome card is a fixed window (with room for one card row), and
+    /// the scene's default size matches it (ChiaroApp), so a first launch
+    /// opens at this size rather than settling into it.
+    static let welcomeSize = CGSize(width: 640, height: 560)
     /// Before the recents are read, UserDefaults alone (no file access, so no
     /// permission prompt) says which of the two the window is about to show.
     private var startSize: CGSize {
-        if startScreenLoaded ? isFirstRun : !Library.hasRecentEdits { return Self.welcomeSize }
+        if startScreenLoaded ? isFirstRun : !Library.hasHistory { return Self.welcomeSize }
         return CGSize(width: Self.startScreenWidth, height: pageHeight > 0 ? pageHeight : 552)
     }
     @State private var librarySize: CGSize?
@@ -147,6 +150,7 @@ struct LibraryView: View {
         // The page height excludes the title bar; the difference between the
         // window and this view is exactly that chrome.
         if !isFirstRun, viewHeight > 0 { size.height += window.frame.height - viewHeight }
+        guard window.frame.size != size || window.styleMask.contains(.resizable) else { return }
         DispatchQueue.main.async {
             setWindowSize(window, size)
             window.styleMask.remove(.resizable)
@@ -894,6 +898,8 @@ struct LibraryView: View {
         let tint: Color
         let title: String
         let subtitle: String
+        /// A mounted camera card, as opposed to a folder opened before.
+        let isCard: Bool
     }
     @State private var sources: [SourceItem] = []
 
@@ -918,8 +924,9 @@ struct LibraryView: View {
                 }
                 return (cards, recents)
             }
-            sources = gathered.0.map { SourceItem(id: $0.0, icon: "camera.fill", tint: Theme.amber, title: $0.1, subtitle: $0.2) }
-                + gathered.1.map { SourceItem(id: $0.0, icon: "folder", tint: Theme.ink2, title: $0.1, subtitle: $0.2) }
+            sources = gathered.0.map { SourceItem(id: $0.0, icon: "camera.fill", tint: Theme.amber, title: $0.1, subtitle: $0.2, isCard: true) }
+                + gathered.1.map { SourceItem(id: $0.0, icon: "folder", tint: Theme.ink2, title: $0.1, subtitle: $0.2, isCard: false) }
+            sourcesLoaded = true
         }
     }
 
@@ -960,8 +967,15 @@ struct LibraryView: View {
     @State private var recentEdits: [RecentEditItem] = []
     /// Set once both refreshes have reported, so the first-run treatment can't
     /// flash for the frame before a returning user's recents arrive.
-    @State private var startScreenLoaded = false
-    private var isFirstRun: Bool { startScreenLoaded && recentEdits.isEmpty }
+    @State private var recentsLoaded = false
+    @State private var sourcesLoaded = false
+    private var startScreenLoaded: Bool { recentsLoaded && sourcesLoaded }
+    /// The welcome card shows until a folder has ever been opened; after that
+    /// the returning page carries the state, with a placeholder where the last
+    /// edit will go. A mounted card does not count as history.
+    private var isFirstRun: Bool {
+        startScreenLoaded && recentEdits.isEmpty && !sources.contains { !$0.isCard }
+    }
 
     private func refreshRecentEdits() {
       Task {
@@ -985,7 +999,7 @@ struct LibraryView: View {
         for (url, date, card) in seed {
             if let card { Self.recentRenders[url] = RecentRender(editDate: date, image: card.image, focus: card.focus) }
         }
-        withAnimation(.easeOut(duration: 0.25)) { startScreenLoaded = true }
+        withAnimation(.easeOut(duration: 0.25)) { recentsLoaded = true }
         for (position, pair) in seed.enumerated() where recentEdits[position].image == nil {
             let url = pair.0
             let editDate = pair.1
@@ -1142,6 +1156,8 @@ struct LibraryView: View {
                 HStack(alignment: .top, spacing: 36) {
                     if let hero = recentEdits.first {
                         heroCard(hero)
+                    } else {
+                        heroPlaceholder
                     }
                     startColumn
                         .frame(width: 382, alignment: .leading)
@@ -1241,7 +1257,7 @@ struct LibraryView: View {
     /// screen; RootView paints the painting and hides the agent strip.
     private var welcomeCard: some View {
         VStack(spacing: 0) {
-            Spacer(minLength: 16)
+            Spacer(minLength: 24)
             HStack(spacing: 7) {
                 AppMark(size: 22)
                 Text("Chiaro")
@@ -1268,9 +1284,9 @@ struct LibraryView: View {
             }
             .frame(width: 440)
             .padding(.top, 34)
-            if !sources.isEmpty {
+            if sources.contains(where: \.isCard) {
                 VStack(spacing: 6) {
-                    ForEach(sources) { source in
+                    ForEach(sources.filter(\.isCard)) { source in
                         sourceRow(
                             icon: source.icon, tint: source.tint,
                             title: source.title, subtitle: source.subtitle, url: source.id
@@ -1295,7 +1311,7 @@ struct LibraryView: View {
                 .font(Theme.ui(11.5))
                 .foregroundStyle(.white.opacity(0.5))
                 .padding(.top, 14)
-            Spacer(minLength: 16)
+            Spacer(minLength: 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -1377,6 +1393,21 @@ struct LibraryView: View {
         }
         .buttonStyle(.plain)
         .clickCursor()
+    }
+
+    /// Folders opened, nothing edited yet: the hero's frame, waiting.
+    private var heroPlaceholder: some View {
+        VStack(spacing: 6) {
+            Text("No recent edits")
+                .font(Theme.ui(13.5, .semibold))
+                .foregroundStyle(Theme.ink2)
+            Text("Open a photo to start editing")
+                .font(Theme.ui(12))
+                .foregroundStyle(Theme.ink3)
+        }
+        .frame(width: 450, height: 300)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Theme.panel.opacity(0.6)))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.hairline))
     }
 
     private func heroSubtitle(_ item: RecentEditItem) -> String {

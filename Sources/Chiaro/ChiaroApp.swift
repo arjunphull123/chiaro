@@ -91,11 +91,14 @@ struct ChiaroApp: App {
                 // welcome card, or the 900-wide returning page at its content's
                 // height); the editor's 1080 floor applies once a folder opens.
                 .frame(
-                    minWidth: library.folderURL == nil ? (Library.hasRecentEdits ? 900 : 640) : 1080,
+                    minWidth: library.folderURL == nil ? (Library.hasHistory ? 900 : 640) : 1080,
                     minHeight: library.folderURL == nil ? 480 : 700
                 )
         }
         .windowStyle(.hiddenTitleBar)
+        // A first launch has no saved frame, so this is the size the window
+        // opens at: the welcome card's, exactly, with no resize after.
+        .defaultSize(width: LibraryView.welcomeSize.width, height: LibraryView.welcomeSize.height)
         // Without this the window resizes past the content's minWidth and the
         // layout overflows instead of reflowing: the rail is a fixed 268 and the
         // toolbar cannot compress, so both edges get clipped.

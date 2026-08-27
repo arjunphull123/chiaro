@@ -128,10 +128,12 @@ final class Library {
         UserDefaults.standard.set(Array(paths.prefix(12)), forKey: "recentEdits")
     }
 
-    /// UserDefaults only, no file access: safe on the main thread at launch,
-    /// where `recentEdits()`'s existence checks could raise a permission prompt.
-    nonisolated static var hasRecentEdits: Bool {
+    /// Has a folder ever been opened or a photo edited. UserDefaults only, no
+    /// file access: safe on the main thread at launch, where the existence
+    /// checks in `recentEdits()` could raise a permission prompt.
+    nonisolated static var hasHistory: Bool {
         !(UserDefaults.standard.stringArray(forKey: "recentEdits") ?? []).isEmpty
+            || !(UserDefaults.standard.stringArray(forKey: "recentFolders") ?? []).isEmpty
     }
 
     nonisolated static func recentEdits() -> [URL] {
