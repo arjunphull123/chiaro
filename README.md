@@ -82,6 +82,24 @@ macOS; the Privacy & Security route is the one that works.)
 Prefer the terminal? `xattr -d com.apple.quarantine /Applications/Chiaro.app`
 does the same thing in one line.
 
+### Updating
+
+Chiaro checks GitHub for a newer release and tells you when there is one. It
+never downloads or replaces itself (ADR 0014), so updating is yours to do:
+
+```
+brew upgrade --cask --no-quarantine chiaro
+```
+
+The flag applies to the command rather than to the installed app, so upgrades
+need it again; `export HOMEBREW_CASK_OPTS="--no-quarantine"` in your shell
+profile settles it for good. Installed from the DMG instead? Download the new
+one and drag it over the copy in Applications.
+
+Because each build is signed ad hoc, macOS treats an update as a new app and
+asks again for access to the folders you open. That goes away if Chiaro is ever
+notarized.
+
 ## Editing
 
 Open a folder of RAW files and Chiaro lays them out as a justified gallery,

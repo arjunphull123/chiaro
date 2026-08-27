@@ -146,6 +146,15 @@ enum DevHarness {
                 DepthModelStore.shared.downloadIfNeeded()
             }
         }
+        // --offer-update <version>: the update alert without waiting for a real
+        // release to be newer. The route it names still depends on whether a
+        // Homebrew Caskroom entry exists, so both branches are reachable.
+        if let i = args.firstIndex(of: "--offer-update"), i + 1 < args.count {
+            let latest = args[i + 1]
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                Updater.shared.offerUpdate(latest: latest)
+            }
+        }
         if let i = args.firstIndex(of: "--snapshot"), i + 1 < args.count {
             let path = args[i + 1]
             let lib = library

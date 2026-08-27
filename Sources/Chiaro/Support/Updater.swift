@@ -56,7 +56,7 @@ final class Updater {
             }
             if isNewer(latest, than: current) {
                 shared.available = latest
-                alert("Chiaro \(latest) is available", "You're on \(current).", confirm: "Download")
+                shared.offerUpdate(from: current)
             } else {
                 alert("You're up to date", "Chiaro \(current) is the latest release.")
             }
@@ -69,6 +69,55 @@ final class Updater {
     }
 
     func openReleases() { NSWorkspace.shared.open(Self.releasesPage) }
+
+    static let brewUpgrade = "brew upgrade --cask --no-quarantine chiaro"
+
+    /// A Homebrew cask leaves a Caskroom entry beside the app it installed, so
+    /// the update instruction can name the route this copy actually came from.
+    private static var installedByHomebrew: Bool {
+        ["/opt/homebrew/Caskroom/chiaro", "/usr/local/Caskroom/chiaro"]
+            .contains { FileManager.default.fileExists(atPath: $0) }
+    }
+
+    /// Both entry points (the menu command and the library chip) land here.
+    /// Chiaro never replaces itself (ADR 0014), so this hands over the command
+    /// or the page and stops. Each route names the other, since a copy can be
+    /// installed one way and replaced the other.
+    func offerUpdate(latest: String? = nil, from current: String? = nil) {
+        let version = (latest ?? available).map { "Chiaro \($0) is available" } ?? "A newer Chiaro is available"
+        let onVersion = (current ?? Self.currentVersion).map { "You're on \($0)" } ?? "This build has no version"
+        if Self.installedByHomebrew {
+            Self.alert(
+                version,
+                """
+                \(onVersion), installed with Homebrew.
+
+                \(Self.brewUpgrade)
+
+                The --no-quarantine keeps macOS from blocking the new copy. The \
+                DMG on the release page works too.
+                """,
+                confirm: "Copy command",
+                action: { Self.copyBrewUpgrade() }
+            )
+        } else {
+            Self.alert(
+                version,
+                """
+                \(onVersion). Download the new DMG, and drag it over the copy in \
+                Applications.
+
+                Installed with Homebrew instead? Run \(Self.brewUpgrade)
+                """,
+                confirm: "Open releases"
+            )
+        }
+    }
+
+    private static func copyBrewUpgrade() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(brewUpgrade, forType: .string)
+    }
 
     private static func fetchLatest() async throws -> String {
         var request = URLRequest(url: latestAPI)
@@ -83,7 +132,12 @@ final class Updater {
         latest.compare(current, options: .numeric) == .orderedDescending
     }
 
-    private static func alert(_ title: String, _ message: String, confirm: String? = nil) {
+    /// `action` defaults to opening the releases page (resolved in the body:
+    /// a default argument is type-checked outside this type's isolation).
+    private static func alert(
+        _ title: String, _ message: String, confirm: String? = nil,
+        action: (() -> Void)? = nil
+    ) {
         let alert = NSAlert()
         alert.messageText = title
         alert.informativeText = message
@@ -94,7 +148,7 @@ final class Updater {
         }
         alert.addButton(withTitle: confirm)
         alert.addButton(withTitle: "Later")
-        if alert.runModal() == .alertFirstButtonReturn { shared.openReleases() }
+        if alert.runModal() == .alertFirstButtonReturn { (action ?? { shared.openReleases() })() }
     }
 
     private struct Release: Decodable {

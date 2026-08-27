@@ -107,9 +107,27 @@ else
   echo "gh is not installed: push, then create release v$V on GitHub, attach the DMG, and paste $NOTES as the notes."
 fi
 
-cat <<NOTE
+# The tap is the whole update path for Homebrew users: until the cask names
+# the new version, `brew upgrade` finds nothing and says nothing. Pushed here,
+# after the release exists, since the cask's url points at its asset.
+TAP=../homebrew-tap
+if [[ -d $TAP/.git ]]; then
+  mkdir -p "$TAP/Casks"
+  cp docs/homebrew/chiaro.rb "$TAP/Casks/chiaro.rb"
+  git -C "$TAP" add Casks/chiaro.rb
+  if git -C "$TAP" diff --cached --quiet; then
+    echo "Tap already at $V."
+  else
+    git -C "$TAP" commit -q -m "Chiaro $V"
+    git -C "$TAP" push -q
+    echo "Tap pushed: brew upgrade --cask --no-quarantine chiaro now finds $V."
+  fi
+else
+  cat <<NOTE
 
-Last step, the tap (once ~/Documents/GitHub/homebrew-tap exists):
-  cp docs/homebrew/chiaro.rb ../homebrew-tap/Casks/chiaro.rb
-  cd ../homebrew-tap && git commit -am "Chiaro $V" && git push
+The tap is not cloned at $TAP, so Homebrew users cannot see $V yet:
+  gh repo clone arjunphull123/homebrew-tap $TAP
+  cp docs/homebrew/chiaro.rb $TAP/Casks/chiaro.rb
+  git -C $TAP add -A && git -C $TAP commit -m "Chiaro $V" && git -C $TAP push
 NOTE
+fi

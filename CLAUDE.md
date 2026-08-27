@@ -51,6 +51,7 @@ driving the running app over spawning new instances.
 `swift run Chiaro -- --open <folder> [--edit <name>] [--snapshot <png>] [--export-test <name>]
 [--quiet (no focus steal)] [--click <x> <y-from-top> [n]] [--show-tips] [--show-export] [--download-depth]
 [--render-icon <png>] [--render-depth-scene <name> <png>] [--auto-test <name>]
+[--offer-update <version> (shows the update alert without a newer release)]
 [--greeting <text> (pins the clock-derived start-screen salutation)]`
 `scripts/bundle.sh` builds dist/Chiaro.app (icns + Info.plist + ad-hoc signing).
 After any app-code change lands, refresh the installed copy the owner runs:

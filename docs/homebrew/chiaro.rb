@@ -21,6 +21,15 @@ cask "chiaro" do
       Chiaro is not notarized. If you installed without --no-quarantine, the
       first launch is blocked: open System Settings > Privacy & Security and
       click "Open Anyway" next to Chiaro.
+
+      Upgrades need the flag again, since it applies to the command and not to
+      the installed app:
+
+        brew upgrade --cask --no-quarantine chiaro
+
+      To stop passing it, put this in your shell profile:
+
+        export HOMEBREW_CASK_OPTS="--no-quarantine"
     EOS
   end
 
