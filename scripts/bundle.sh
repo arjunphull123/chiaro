@@ -71,6 +71,18 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 	<true/>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.photography</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>© 2026 Arjun Phull. GPL-3.0.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Chiaro reads the photos in folders you open. Edits are saved as separate files and originals are never changed.</string>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Chiaro reads the photos in folders you open. Edits are saved as separate files and originals are never changed.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Chiaro reads the photos in folders you open. Edits are saved as separate files and originals are never changed.</string>
+	<key>NSRemovableVolumesUsageDescription</key>
+	<string>Chiaro reads photos straight from your camera card. Edits are saved on your Mac and the card is never written to.</string>
+	<key>NSNetworkVolumesUsageDescription</key>
+	<string>Chiaro reads the photos in folders you open. Edits are saved as separate files and originals are never changed.</string>
 </dict>
 </plist>
 PLIST

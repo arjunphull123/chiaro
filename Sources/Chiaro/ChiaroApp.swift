@@ -207,8 +207,10 @@ struct RootView: View {
             ZStack {
                 HStack {
                     Spacer()
-                    // The welcome card carries its own Connect button.
-                    if !(library.welcome && library.folderURL == nil) {
+                    // The welcome card carries its own Connect button, so the
+                    // strip stays out of the poster until an agent actually
+                    // connects; then it is the acknowledgement.
+                    if !(library.welcome && library.folderURL == nil) || AgentStatus.shared.isConnected {
                         AgentStatusStrip(library: library)
                             .padding(.trailing, 16)
                     }
