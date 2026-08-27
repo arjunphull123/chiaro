@@ -2,7 +2,7 @@
 # Update version + sha256 on each release, then copy into the tap repo.
 cask "chiaro" do
   version "1.0.0"
-  sha256 "6bf2a1dfd0e757c56007778aa9185e135fd1a5d126b71be3694aa8ca7b5540f2"
+  sha256 "039b3dca324f37f3fa68ff47aef991f55e353e4171701cbced7ffbf373ef4d3c"
 
   url "https://github.com/arjunphull123/chiaro/releases/download/v#{version}/Chiaro-#{version}.dmg"
   name "Chiaro"
