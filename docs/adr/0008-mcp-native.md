@@ -29,6 +29,31 @@ Chiaro ships an MCP server, on whenever the app runs:
 - No embedded chat, agent, or API keys in the app for now. Revisit only if MCP proves
   insufficient.
 
+### Why HTTP and not stdio
+
+The usual guidance is stdio for local servers, HTTP for remote. What actually
+decides it is who owns the server process. With stdio the client spawns the
+server as a child and talks over its pipes, which fits a tool the client starts
+on demand: a filesystem server, a database wrapper, a CLI.
+
+Chiaro inverts that ownership. The server is a GUI app the user launched, with
+a window in front of them and a photo open, and the whole point is that the
+agent edits that photo in that window. Under stdio, a client would spawn a
+second Chiaro: not the window in use, a fresh instance with no folder open,
+contending for the discovery file and the sidecar store. Avoiding that would
+mean shipping a separate stdio shim that forwards to the running app over local
+IPC, which is a socket with an extra hop and an extra binary to distribute. Two
+clients would mean two subprocesses, neither of them the app.
+
+Loopback HTTP makes the running app the server: one instance, the one holding
+the user's photos, reachable by any number of clients by URL, with no knowledge
+of where the app is installed and no coupling to how it was launched.
+
+The cost is a listening port, which is why the server binds loopback only,
+compares the Origin header by exact host, and caps request bodies. stdio would
+have no network surface at all. That tradeoff is accepted here and documented
+in SECURITY.md.
+
 ## Consequences
 
 - "AI editing" costs Chiaro no model integration; capability rides on the user's agents.
