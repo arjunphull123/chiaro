@@ -57,8 +57,8 @@ cd "$(dirname "$0")/.."
 V=${1:?usage: scripts/release.sh <version>}
 [[ -z $(git status --porcelain) ]] || { echo "Working tree not clean — commit first"; exit 1; }
 # Fail before doing any build work if the push target isn't wired up (see
-# docs/LAUNCH.md) — better than dying half-committed at the push step.
-git remote get-url origin >/dev/null 2>&1 || { echo "No 'origin' remote — see docs/LAUNCH.md prerequisites"; exit 1; }
+# better than dying half-committed at the push step.
+git remote get-url origin >/dev/null 2>&1 || { echo "No 'origin' remote"; exit 1; }
 
 changelog_verify_unreleased CHANGELOG.md || { echo "CHANGELOG.md has no content under '## [Unreleased]': write release notes first"; exit 1; }
 RELDATE=$(date +%Y-%m-%d)
