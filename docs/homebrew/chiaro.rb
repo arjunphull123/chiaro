@@ -9,7 +9,9 @@ cask "chiaro" do
   desc "Native RAW photo editor with a built-in MCP server"
   homepage "https://github.com/arjunphull123/chiaro"
 
-  depends_on macos: ">= :tahoe"
+  # The symbol form parses with a ">=" comparator, so this is Tahoe or newer.
+  # The old ">= :tahoe" string is deprecated and warns on every brew command.
+  depends_on macos: :tahoe
   depends_on arch: :arm64
 
   app "Chiaro.app"
